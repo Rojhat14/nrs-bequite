@@ -7,7 +7,7 @@ const SELECTED_PRODUCTS: Product[] = [
   {
     id: 'piece-1',
     name: 'The Sculpted Silk Scarf',
-    category: 'Accessories',
+    category: 'Aksesuar',
     description: 'A refined silk scarf with hand-rolled edges, crafted from pure Italian silk.',
     image: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?q=80&w=2070&auto=format&fit=crop',
     price: '₺4,200',
@@ -17,7 +17,7 @@ const SELECTED_PRODUCTS: Product[] = [
   {
     id: 'piece-2',
     name: 'Midnight Wool Overcoat',
-    category: 'Tops',
+    category: 'Üst Giyim',
     description: 'A double-faced wool overcoat with clean, architectural silhouette.',
     image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?q=80&w=2070&auto=format&fit=crop',
     price: '₺12,500',
@@ -27,7 +27,7 @@ const SELECTED_PRODUCTS: Product[] = [
   {
     id: 'piece-3',
     name: 'Architectural Cufflinks',
-    category: 'Accessories',
+    category: 'Aksesuar',
     description: 'Minimalist cufflinks in brushed gold vermeil, inspired by modernist sculpture.',
     image: 'https://images.unsplash.com/photo-1573408301185-9519f94816b5?q=80&w=2070&auto=format&fit=crop',
     price: '₺3,800',
@@ -37,7 +37,7 @@ const SELECTED_PRODUCTS: Product[] = [
   {
     id: 'piece-4',
     name: 'Ivory Cashmere Knit',
-    category: 'Tops',
+    category: 'Üst Giyim',
     description: 'A weightless cashmere knit in pure ivory, finished with hand-stitched detailing.',
     image: 'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?q=80&w=2070&auto=format&fit=crop',
     price: '₺8,900',
