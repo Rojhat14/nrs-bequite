@@ -3,6 +3,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { PRODUCTS } from '@/data/products';
+import Image from 'next/image';
+import Link from 'next/link';
 
 const Selected = () => {
   // Show the first 3 products as "featured" since there is no is_exclusive field
@@ -35,14 +37,16 @@ const Selected = () => {
                 transition={{ duration: 1, delay: 0.2, ease: [0.22, 1, 0.32, 1] }}
                 className="group cursor-pointer"
               >
-                <div className="relative overflow-hidden bg-nrs-charcoal/5 aspect-[3/4] mb-8">
-                  <img
+                <Link href={`/product/${product.id}`} className="block relative overflow-hidden bg-nrs-charcoal/5 aspect-[3/4] mb-8">
+                  <Image
                     src={product.image}
                     alt={product.name}
-                    className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-[1000ms] ease-in-out transform group-hover:scale-105"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="object-cover grayscale hover:grayscale-0 transition-all duration-[1000ms] ease-in-out transform group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-all duration-500" />
-                </div>
+                </Link>
 
                 <div className="flex flex-col gap-2">
                   <span className="text-xs uppercase tracking-widest text-nrs-charcoal/40">{product.category}</span>

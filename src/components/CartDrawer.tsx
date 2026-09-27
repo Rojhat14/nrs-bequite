@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/store/useCart';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 const CartDrawer = () => {
   const { items, isDrawerOpen, closeDrawer, removeItem, totalAmount } = useCart();
@@ -62,11 +63,13 @@ const CartDrawer = () => {
                 <div className="flex-1 overflow-y-auto pr-4 space-y-8">
                   {items.map((item) => (
                     <div key={item.id} className="flex gap-6 pb-8 border-b border-nrs-black/10">
-                      <div className="w-24 h-32 bg-nrs-black/5 flex-shrink-0 overflow-hidden">
-                        <img
+                      <div className="w-24 h-32 bg-nrs-black/5 flex-shrink-0 overflow-hidden relative">
+                        <Image
                           src={item.image || 'https://images.unsplash.com/photo-1515378791000-01714bb6013c?q=80&w=200&auto=format&fit=crop'}
                           alt={item.title}
-                          className="w-full h-full object-cover opacity-80"
+                          fill
+                          className="object-cover opacity-80"
+                          sizes="96px"
                         />
                       </div>
                       <div className="flex flex-col justify-between flex-1 py-1">

@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PRODUCTS } from '@/data/products';
+import Image from 'next/image';
 
 export default function WishlistGrid() {
   const { user } = useAuth();
@@ -101,17 +102,19 @@ export default function WishlistGrid() {
               animate={{ opacity: 1, scale: 1 }}
               className="group relative bg-white border border-nrs-black/10 p-4 hover:border-nrs-black/30 transition-all duration-500"
             >
-              <div className="aspect-[3/4] overflow-hidden mb-4">
-                <img
+              <div className="relative aspect-[3/4] overflow-hidden mb-4">
+                <Image
                   src={product.image}
                   alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  fill
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
               <div className="flex justify-between items-end">
                 <div>
                   <h3 className="text-sm font-serif text-nrs-black">{product.name}</h3>
-                  <p className="text-xs text-nrs-black/60">€{product.price}</p>
+                  <p className="text-xs text-nrs-black/60">{product.price}</p>
                 </div>
                 <button
                   onClick={() => toggleFavorite(product.id)}

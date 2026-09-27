@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Home, ShoppingBag, User } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import ProfileHeader from './components/ProfileHeader';
 import OrderHistory from './components/OrderHistory';
 import WishlistGrid from './components/WishlistGrid';
@@ -38,7 +39,13 @@ export default function ProfilePage() {
       <aside className="fixed left-0 top-0 h-full w-20 md:w-64 bg-white border-r border-nrs-black/10 flex flex-col items-center py-12 px-6 z-50">
         <div className="mb-12">
           <Link href="/" className="flex flex-col items-center gap-1">
-            <img src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png" alt="Logo" className="h-10 md:h-14 w-auto object-contain" />
+            <Image
+              src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
+              alt="Logo"
+              width={140}
+              height={56}
+              className="h-10 md:h-14 w-auto object-contain"
+            />
             <span className="hidden md:block text-[9px] uppercase tracking-[0.4em] font-sans text-nrs-black/60 mt-1 text-center">
               Boutique Luminous
             </span>

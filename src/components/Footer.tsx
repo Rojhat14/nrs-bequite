@@ -13,9 +13,11 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="col-span-1 md:col-span-1 flex flex-col items-start space-y-6">
             <Link href="/" className="flex flex-col items-start group">
-              <img
+              <Image
                 src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
                 alt="NRS Logo"
+                width={160}
+                height={64}
                 className="h-16 w-auto object-contain transition-transform duration-700 group-hover:scale-105"
               />
               <span className="text-[10px] uppercase tracking-[0.4em] font-sans text-nrs-black/40 mt-4">

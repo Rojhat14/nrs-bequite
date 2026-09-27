@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const CategoryMood = () => {
   const moods = [
@@ -57,11 +58,13 @@ const CategoryMood = () => {
               viewport={{ once: true }}
               className="relative group cursor-pointer overflow-hidden aspect-[3/4]"
             >
-              <Link href={mood.href} className="block w-full h-full">
-                <img
+              <Link href={mood.href} className="block w-full h-full relative">
+                <Image
                   src={mood.image}
                   alt={mood.name}
-                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-105"
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                  className="object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-105"
                 />
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-nrs-black/40 opacity-60 group-hover:opacity-80 transition-all duration-700" />

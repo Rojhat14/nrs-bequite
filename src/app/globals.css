@@ -7,6 +7,7 @@
   --foreground: 5 5 5;       /* #050505 */
   --muted: 139 129 123;     /* #8B817B */
   --accent: 184 137 112;    /* #B88970 */
+  --nrs-header-height: 100px; /* Default fallback */
 }
 
 body {
@@ -15,6 +16,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
+}
+
+/* Layout Wrappers */
+.layout-immersive {
+  position: relative;
+}
+
+.layout-content {
+  padding-top: var(--nrs-header-height);
 }
 
 h1, h2, h3, h4, .font-serif {
@@ -26,7 +36,7 @@ p, span, div, .font-sans {
   font-family: var(--font-sans), 'Inter', sans-serif;
 }
 
-/* Luxury interactive transitions - Slower and more controlled */
+/* Luxury interactive transitions */
 a, button {
   transition-property: all;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);

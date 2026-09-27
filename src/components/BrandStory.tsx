@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const BrandStory = () => {
   return (
@@ -17,10 +18,12 @@ const BrandStory = () => {
             viewport={{ once: true }}
             className="relative aspect-[4/5] overflow-hidden bg-nrs-black/5"
           >
-            <img
+            <Image
               src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"
               alt="NRS Luxury Fashion"
-              className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-1000"
+              fill
+              className="object-cover grayscale hover:grayscale-0 transition-all duration-1000"
+              sizes="(max-width: 1024px) 100vw, 50vw"
             />
             <div className="absolute inset-0 border-[20px] border-nrs-ivory/10 pointer-events-none"></div>
           </motion.div>

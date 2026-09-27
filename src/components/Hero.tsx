@@ -22,16 +22,20 @@ const Hero = ({ introFinished }: HeroProps) => {
         <div className="max-w-6xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.5, ease: [0.22, 1, 0.32, 1] }}
+            animate={{ opacity: introFinished ? 1 : 0, y: introFinished ? 0 : 30 }}
+            transition={{
+              duration: 1.5,
+              delay: introFinished ? 0 : 0, // Triggered by introFinished prop
+              ease: [0.22, 1, 0.32, 1]
+            }}
             className="space-y-8"
           >
             {/* Main Editorial Text */}
             <div className="relative flex flex-col justify-center items-center py-12">
               <motion.h1
                 initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 1.8 }}
+                animate={{ opacity: introFinished ? 1 : 0, scale: introFinished ? 1 : 0.98 }}
+                transition={{ delay: introFinished ? 0.5 : 0, duration: 1.8 }}
                 className="text-5xl md:text-8xl font-serif text-nrs-black tracking-tight mb-6"
               >
                 ZARAFETİN SANATI
@@ -39,8 +43,8 @@ const Hero = ({ introFinished }: HeroProps) => {
 
               <motion.p
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1, duration: 1.5 }}
+                animate={{ opacity: introFinished ? 1 : 0 }}
+                transition={{ delay: introFinished ? 1 : 0, duration: 1.5 }}
                 className="text-sm md:text-lg font-sans text-nrs-black/60 max-w-2xl mx-auto leading-relaxed tracking-wide px-4"
               >
                 Modern kadının özgün duruşu için tasarlanan rafine siluetler, seçkin dokular ve zamansız detaylar.
@@ -48,8 +52,8 @@ const Hero = ({ introFinished }: HeroProps) => {
 
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.4, duration: 1.2 }}
+                animate={{ opacity: introFinished ? 1 : 0, y: introFinished ? 0 : 20 }}
+                transition={{ delay: introFinished ? 1.4 : 0, duration: 1.2 }}
                 className="flex flex-col md:flex-row items-center justify-center gap-6 mt-12"
               >
                 <Link
@@ -69,6 +73,7 @@ const Hero = ({ introFinished }: HeroProps) => {
           </motion.div>
         </div>
       </div>
+
 
       {/* Side Decorative Lines - Minimalist structure */}
       <div className="hidden lg:block absolute inset-0 pointer-events-none">

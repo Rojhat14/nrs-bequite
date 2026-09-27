@@ -6,6 +6,7 @@ import Collection from '@/components/Collection';
 import Navigation from '@/components/Navigation';
 import BrandStory from '@/components/BrandStory';
 import CategoryMood from '@/components/CategoryMood';
+import IntroAnimation from '@/components/IntroAnimation';
 import { PRODUCTS } from '@/data/products';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -13,20 +14,9 @@ import Link from 'next/link';
 export default function Page() {
   const [introFinished, setIntroFinished] = useState(false);
 
-  useEffect(() => {
-    // The sequence:
-    // 0s: Page loads, Intro starts
-    // 2s: Logo moves to navigation for a balanced, fast feel
-    // 3s: Intro officially finished, Navigation fully active
-    const timer = setTimeout(() => {
-      setIntroFinished(true);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <main className="min-h-screen bg-[#F7F3EE] text-[#050505]">
+    <main className="relative min-h-screen bg-[#F7F3EE] text-[#050505]">
+      <IntroAnimation onComplete={() => setIntroFinished(true)} />
       <Navigation introFinished={introFinished} />
 
       <div className="pt-0">
