@@ -193,7 +193,7 @@ export default function ProductDetail({ product, onBack }: ProductDetailProps) {
                 priority
               />
               <button
-                onClick={() => toggleWishlist(product.id)}
+                onClick={toggleWishlist}
                 className="absolute top-6 right-6 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-colors"
                 aria-label="Add to wishlist"
               >
