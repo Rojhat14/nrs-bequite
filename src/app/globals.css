@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 247 243 238; /* #F7F3EE */
+  --foreground: 5 5 5;       /* #050505 */
+  --muted: 139 129 123;     /* #8B817B */
+  --accent: 184 137 112;    /* #B88970 */
+}
+
+body {
+  background-color: #F7F3EE;
+  color: #050505;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Base interactive transitions */
+a, button {
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  transition-duration: 300ms;
+}

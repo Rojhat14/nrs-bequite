@@ -1,0 +1,278 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { PRODUCTS } from '@/data/products';
+import Navigation from '@/components/Navigation';
+import { motion } from 'framer-motion';
+import { ShoppingBag, Heart, Share2, ChevronRight, ChevronLeft, Home } from 'lucide-react';
+import { useCart } from '@/store/useCart';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+interface ProductPageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default function ProductPage({ params }: ProductPageProps) {
+  const { id } = params;
+  const product = PRODUCTS.find(p => p.id === id);
+  const [mainImage, setMainImage] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const { addItem, openDrawer } = useCart();
+  const router = useRouter();
+
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-[#F7F3EE] flex items-center justify-center">
+        <Navigation />
+        <h1 className="text-3xl font-serif text-center">Product not found</h1>
+      </div>
+    );
+  }
+
+  React.useEffect(() => {
+    setMainImage(product.image);
+  }, [product]);
+
+  const images = [product.image, product.hoverImage].filter(Boolean) as string[];
+  const currentIndex = images.indexOf(mainImage || '');
+
+  const nextImage = () => {
+    const nextIdx = (currentIndex + 1) % images.length;
+    setMainImage(images[nextIdx]);
+  };
+
+  const prevImage = () => {
+    const prevIdx = (currentIndex - 1 + images.length) % images.length;
+    setMainImage(images[prevIdx]);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F7F3EE] text-[#050505] flex">
+      {/* LEFT SIDEBAR NAVIGATION - Matching the Checkout style */}
+      <aside className="fixed left-0 top-0 h-full w-20 md:w-64 bg-white border-r border-nrs-black/10 flex flex-col items-center py-12 px-6 z-50">
+        <div className="mb-12">
+          <Link href="/" className="flex flex-col items-center gap-1">
+            <img src="/images/logo.jpeg" alt="Logo" className="h-10 md:h-14 w-auto object-contain" />
+            <span className="hidden md:block text-[9px] uppercase tracking-[0.4em] font-sans text-nrs-black/60 mt-1 text-center">
+              Boutique Luminous
+            </span>
+          </Link>
+        </div>
+
+        <nav className="flex flex-col gap-8 w-full">
+          <Link
+            href="/"
+            className="flex items-center gap-4 text-nrs-black/40 hover:text-nrs-black transition-colors group"
+          >
+            <Home size={20} className="group-hover:scale-110 transition-transform" />
+            <span className="hidden md:block text-xs uppercase tracking-widest">Home</span>
+          </Link>
+          <Link
+            href="/cart"
+            className="flex items-center gap-4 text-nrs-black/40 hover:text-nrs-black transition-colors group"
+          >
+            <ShoppingBag size={20} className="group-hover:scale-110 transition-transform" />
+            <span className="hidden md:block text-xs uppercase tracking-widest">Bag</span>
+          </Link>
+        </nav>
+
+        <div className="mt-auto">
+          <button
+            onClick={() => router.push('/')}
+            className="hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-nrs-black/40 hover:text-nrs-black transition-colors"
+          >
+            <ChevronLeft size={14} />
+            Back to Collection
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT - Pushed to the right */}
+      <main className="flex-1 ml-20 md:ml-64 max-w-7xl mx-auto px-6 py-24 md:py-32">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20 items-start">
+
+          {/* LEFT: Product Gallery & Details */}
+          <div className="space-y-12">
+            <div className="space-y-4">
+              <div className="relative group">
+                <motion.div
+                  key={mainImage}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4 }}
+                  className="aspect-[3/4] w-full overflow-hidden bg-gray-200 relative"
+                >
+                  <img
+                    src={mainImage || product.image}
+                    alt={product.name}
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <button className="absolute top-4 right-4 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-colors">
+                    <Heart size={20} strokeWidth={1.5} />
+                  </button>
+                </motion.div>
+                {images.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-all opacity-0 group-hover:opacity-100 z-10"
+                    >
+                      <ChevronLeft size={24} strokeWidth={1.5} />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-all opacity-0 group-hover:opacity-100 z-10"
+                    >
+                      <ChevronRight size={24} strokeWidth={1.5} />
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                {images.map((img, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * idx }}
+                    className={`aspect-[3/4] w-full overflow-hidden bg-gray-200 cursor-pointer border-2 transition-all duration-300 ${mainImage === img ? 'border-nrs-rosegold' : 'border-transparent'}`}
+                    onClick={() => setMainImage(img)}
+                  >
+                    <img src={img} alt="Detail" className="h-full w-full object-cover hover:opacity-80 transition-opacity" />
+                  </motion.div>
+                ))}
+                <div className="aspect-[3/4] w-full bg-nrs-black text-nrs-ivory flex items-center justify-center text-center p-4 cursor-pointer hover:bg-black transition-colors">
+                  <span className="text-[10px] uppercase tracking-widest font-sans">View Campaign</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-12 border-t border-nrs-black/10 space-y-6">
+              <DetailsAccordion title="Composition & Care" content={`Fabric: ${product.details.fabric}. ${product.details.care}.`} />
+              <DetailsAccordion title="Shipping & Delivery" content="Complimentary express shipping on all luxury orders. Signature required upon delivery." />
+              <DetailsAccordion title="Returns & Exchanges" content="Returns are accepted within 14 days of delivery. Items must be in original condition with tags attached." />
+            </div>
+          </div>
+
+          {/* RIGHT: Product Info - STICKY on PC */}
+          <div className="md:sticky md:top-32 self-start h-fit">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="space-y-8"
+            >
+              <div className="space-y-2">
+                <span className="text-xs uppercase tracking-[0.3em] text-nrs-rosegold font-sans font-medium">
+                  {product.category}
+                </span>
+                <h1 className="text-4xl md:text-5xl font-serif leading-tight">
+                  {product.name}
+                </h1>
+                <p className="text-2xl font-light text-nrs-black/80">
+                  {product.price}
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                <p className="text-gray-600 font-light leading-relaxed text-lg max-w-md">
+                  {product.description}
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs uppercase tracking-widest font-sans text-nrs-black/60">Select Size</span>
+                    <button className="text-xs underline underline-offset-4 hover:text-nrs-rosegold transition-colors">Size Guide</button>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {['XS', 'S', 'M', 'L', 'XL'].map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setSelectedSize(size)}
+                        className={`w-12 h-12 border flex items-center justify-center text-xs transition-all duration-300 ${
+                          selectedSize === size
+                            ? 'bg-nrs-black text-nrs-ivory border-nrs-black'
+                            : 'border-nrs-black/20 hover:bg-nrs-black hover:text-nrs-ivory'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                  <button
+                    onClick={() => {
+                      if (!selectedSize) {
+                        alert('Please select a size');
+                        return;
+                      }
+                      addItem({ id: product.id, title: product.name, price: product.price });
+                      openDrawer();
+                    }}
+                    className="w-full bg-nrs-black text-nrs-ivory py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black/90 transition-all duration-300 flex items-center justify-center gap-3"
+                  >
+                    <ShoppingBag size={18} />
+                    Add to Bag
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!selectedSize) {
+                        alert('Please select a size');
+                        return;
+                      }
+                      addItem({ id: product.id, title: product.name, price: product.price });
+                      router.push('/checkout');
+                    }}
+                    className="w-full border border-nrs-black py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-300"
+                  >
+                    Buy Now
+                  </button>
+                  <a
+                    href={`https://wa.me/905000000000?text=I%20am%20interested%20in%20${encodeURIComponent(product.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-[#25D366] text-white py-4 uppercase tracking-widest text-xs font-sans hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-3"
+                  >
+                    <span className="text-xs">Order via WhatsApp</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-8">
+                <button className="flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-black/60 hover:text-nrs-black transition-colors">
+                  <Share2 size={16} />
+                  Share
+                </button>
+                <button className="flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-black/60 hover:text-nrs-black transition-colors">
+                  <Heart size={16} />
+                  Add to Wishlist
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function DetailsAccordion({ title, content }: { title: string; content: string }) {
+  return (
+    <details className="group py-4 border-b border-nrs-black/10 cursor-pointer">
+      <summary className="list-none flex justify-between items-center font-sans text-xs uppercase tracking-widest text-nrs-black hover:text-nrs-rosegold transition-colors">
+        {title}
+        <span className="transition-transform duration-300 group-open:rotate-180">
+          <ChevronRight size={16} />
+        </span>
+      </summary>
+      <p className="pt-4 text-sm font-light text-gray-600 leading-relaxed">
+        {content}
+      </p>
+    </details>
+  );
+}
