@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Product, PRODUCTS } from '@/data/products';
 import { ProductCard } from '@/components/ProductCard';
+import Link from 'next/link';
 
 interface CollectionProps {
   products?: Product[];
@@ -11,45 +12,61 @@ interface CollectionProps {
 }
 
 const Collection = ({ products = PRODUCTS, onProductClick }: CollectionProps) => {
-  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [activeCategory, setActiveCategory] = useState<string>('Tümü');
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(products.map((p) => p.category)));
-    return ['All', ...cats];
+    return ['Tümü', ...cats];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    if (activeCategory === 'All') return products;
+    if (activeCategory === 'Tümü') return products;
     return products.filter((p) => p.category === activeCategory);
   }, [activeCategory, products]);
 
   return (
     <section id="collection" className="py-32 bg-nrs-ivory">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-24 gap-8">
-          <div className="space-y-4">
-            <h2 className="text-4xl md:text-6xl font-serif text-nrs-black">
-              The Collection
-            </h2>
-            <div className="h-px w-24 bg-nrs-rosegold"></div>
-            <p className="max-w-md text-nrs-black/60 text-lg font-sans italic">
-              A curated selection of pieces designed to elevate the everyday into the extraordinary.
-            </p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-24 gap-12">
+          <div className="space-y-6">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-4xl md:text-6xl font-serif text-nrs-black tracking-tight"
+            >
+              NRS KOLEKSİYONU
+            </motion.h2>
+            <div className="h-px w-20 bg-nrs-black/20"></div>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="max-w-2xl text-nrs-black/60 text-lg font-sans leading-relaxed"
+            >
+              Modern kadın için yeniden yorumlanan zarafet. NRS koleksiyonu; güçlü siluetleri, rafine detayları ve zamansız tasarım anlayışını bir araya getirir.
+              <br />
+              <span className="text-sm italic block mt-4">Her parça, sezonluk bir trendin ötesinde uzun süre kullanılabilecek bir gardırop anlayışıyla tasarlanır.</span>
+            </motion.p>
           </div>
 
-          <div className="flex flex-wrap gap-6">
+          <div className="flex flex-wrap gap-8">
             {categories.map((cat) => {
               return (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`text-[11px] uppercase tracking-[0.2em] transition-all duration-300 ${
+                  className={`text-[10px] uppercase tracking-[0.3em] transition-all duration-700 font-sans relative group ${
                     activeCategory === cat
-                      ? 'text-nrs-black border-b border-nrs-black'
+                      ? 'text-nrs-black'
                       : 'text-nrs-black/40 hover:text-nrs-black'
                   }`}
                 >
                   {cat}
+                  <span className={`absolute -bottom-1 left-0 h-px bg-nrs-black transition-all duration-700 ${
+                    activeCategory === cat ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}></span>
                 </button>
               );
             })}
@@ -75,14 +92,23 @@ const Collection = ({ products = PRODUCTS, onProductClick }: CollectionProps) =>
                 exit={{ opacity: 0 }}
                 className="col-span-full py-20 text-center"
               >
-                <p className="text-nrs-black/40 italic font-serif">No pieces in this category.</p>
+                <p className="text-nrs-black/40 italic font-serif">Bu kategoride henüz bir parça bulunmuyor.</p>
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+
+        <div className="mt-24 text-center">
+          <Link
+            href="/collections"
+            className="inline-block px-12 py-5 border border-nrs-black uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-700"
+          >
+            Koleksiyonu Keşfet
+          </Link>
         </div>
       </div>
     </section>
   );
 };
 
-export default Collection;
+  export default Collection;

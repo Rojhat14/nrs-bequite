@@ -14,11 +14,32 @@ body {
   color: #050505;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
-/* Base interactive transitions */
+h1, h2, h3, h4, .font-serif {
+  font-family: var(--font-serif), 'Playfair Display', serif;
+  letter-spacing: 0.02em;
+}
+
+p, span, div, .font-sans {
+  font-family: var(--font-sans), 'Inter', sans-serif;
+}
+
+/* Luxury interactive transitions - Slower and more controlled */
 a, button {
-  transition-property: color, background-color, border-color, opacity, transform;
-  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
-  transition-duration: 300ms;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 500ms;
+}
+
+/* Custom scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #F7F3EE;
+}
+::-webkit-scrollbar-thumb {
+  background: #D2B48C;
 }

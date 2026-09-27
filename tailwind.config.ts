@@ -9,11 +9,13 @@ const config: Config = {
       colors: {
         'nrs-black': '#050505',
         'nrs-ivory': '#F7F3EE',
-        'nrs-offwhite': '#F0EBE3',
-        'nrs-rosegold': '#B88970',
-        'nrs-gold': '#C9A96E',
-        'nrs-gray': '#8B817B',
+        'nrs-warm-white': '#FAF9F6',
+        'nrs-champagne': '#E7DCD3',
+        'nrs-beige': '#D2B48C',
         'nrs-charcoal': '#1A1A1A',
+        'nrs-gold': '#C9A96E',
+        'nrs-rosegold': '#B88970',
+        'nrs-gray': '#8B817B',
       },
       fontFamily: {
         serif: ['var(--font-serif)', 'Playfair Display', 'serif'],

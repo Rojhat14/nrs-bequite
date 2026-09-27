@@ -1,4 +1,4 @@
-export type Category = 'Dresses' | 'Tops' | 'Bottoms' | 'Bedding' | 'Accessories';
+export type Category = 'Elbiseler' | 'Üst Giyim' | 'Alt Giyim' | 'Bedding' | 'Aksesuar';
 
 export type Product = {
   id: string;
@@ -18,46 +18,46 @@ export type Product = {
 export const PRODUCTS: Product[] = [
   {
     id: 'mavi-ceket-01',
-    name: 'Azure Luminous Blazer',
-    category: 'Tops',
-    description: 'A sophisticated azure blue tailoring that combines modern cuts with timeless luxury. A centerpiece of the NRS Luminous collection.',
+    name: 'Mavi Işıltılı Blazer',
+    category: 'Üst Giyim',
+    description: 'Modern terziliğin zarif bir yorumu olan Mavi Işıltılı Blazer, yapılandırılmış silueti ve ışığı yakalayan dokusuyla dikkat çeker. Günlük şıklığın bir parçası olarak kullanılabileceği gibi, özel akşam görünümlerine de sofistike bir dokunuş kazandırır. Zamansız kesimi sayesinde sezonun ötesine geçen bir gardırop parçası olarak tasarlanmıştır.',
     image: '/images/products/tops/mavi-ceket.png',
     hoverImage: '/images/products/tops/mavi-ceket-2.png',
     price: '₺8,200',
     inStock: true,
-    details: { fabric: 'Premium Wool Blend', care: 'Professional dry clean' },
+    details: { fabric: 'Premium Yün Karışımı', care: 'Kuru Temizleme' },
   },
   {
     id: 'kirmizi-saten-01',
-    name: 'Crimson Luminous Satin',
-    category: 'Tops',
-    description: 'Liquid crimson satin that reflects light with a luminous, high-fashion glow. A bold statement of femininity and power.',
+    name: 'Kızıl Saten Siluet',
+    category: 'Üst Giyim',
+    description: 'Işığı yüksek moda bir parıltıyla yansıtan, akışkan ve güçlü bir kadınsılık ifadesi. Modern zarafetin en cesur hali olan Kızıl Saten Siluet, her detayında lüksü hissettirir.',
     image: '/images/products/tops/kirmizi-saten.png',
     hoverImage: '/images/products/tops/kirmizi-saten.png',
     price: '₺5,400',
     inStock: true,
-    details: { fabric: 'Pure Mulberry Silk Satin', care: 'Hand wash cold' },
+    details: { fabric: 'Saf Mulberry İpek Saten', care: 'Soğuk Elde Yıkama' },
   },
   {
     id: 'bordo-ceket-01',
-    name: 'Bordeaux Structured Blazer',
-    category: 'Tops',
-    description: 'A bold statement of power and elegance. Deep bordeaux hue with precision tailoring and a luminous finish.',
+    name: 'Bordo Yapılandırılmış Blazer',
+    category: 'Üst Giyim',
+    description: 'Güç ve zarafetin iddialı bir dışa vurumu. Derin bordo tonu, hassas terzilik detayları ve ışıltılı bitişiyle modern kadının gardırobunda zamansız bir imza parça.',
     image: '/images/products/tops/bordo-ceket.png',
     hoverImage: '/images/products/tops/bordo-ceket.png',
     price: '₺8,500',
     inStock: true,
-    details: { fabric: 'Premium Wool Blend', care: 'Professional dry clean' },
+    details: { fabric: 'Premium Yün Karışımı', care: 'Kuru Temizleme' },
   },
   {
     id: 'bordo-detail-01',
-    name: 'Bordeaux Detail Piece',
-    category: 'Tops',
-    description: 'Focusing on the intricate details of the bordeaux collection, where luxury meets art.',
+    name: 'Bordo Detay Parça',
+    category: 'Üst Giyim',
+    description: 'Lüksün sanatla buluştuğu noktada, bordo koleksiyonun karmaşık detaylarına odaklanan özel bir tasarım. Rafine çizgileriyle modern bir duruş sergiler.',
     image: '/images/products/tops/ceket-kare.png',
     hoverImage: '/images/products/tops/ceket-kare.png',
     price: '₺7,900',
     inStock: true,
-    details: { fabric: 'Premium Wool', care: 'Professional dry clean' },
+    details: { fabric: 'Premium Yün', care: 'Kuru Temizleme' },
   },
 ];
