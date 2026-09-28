@@ -7,7 +7,7 @@
   --foreground: 5 5 5;       /* #050505 */
   --muted: 139 129 123;     /* #8B817B */
   --accent: 184 137 112;    /* #B88970 */
-  --nrs-header-height: 100px; /* Default fallback */
+  --nrs-header-height: 65px; /* Ultra-compact luxury height */
 }
 
 body {

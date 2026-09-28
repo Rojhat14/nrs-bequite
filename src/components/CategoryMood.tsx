@@ -10,13 +10,13 @@ const CategoryMood = () => {
     {
       name: 'GÜNDÜZ',
       description: 'Günün zarafeti. Günün her anına eşlik eden sade, modern ve rafine siluetler.',
-      image: 'https://images.unsplash.com/photo-1434389677669-7486e12638ce?q=80&w=2070&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1485231183945-fffde7e1ca17?q=80&w=2070&auto=format&fit=crop', // Refined day look
       href: '/category/tops'
     },
     {
       name: 'GECE',
       description: 'Gecenin kendine özgü hali. Işığı yakalayan dokular ve güçlü siluetlerle akşamın ritmine uyum sağlayan tasarımlar.',
-      image: 'https://images.unsplash.com/photo-1539008835757-a65767669e6b?q=80&w=2070&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?q=80&w=2070&auto=format&fit=crop', // Refined elegant night look
       href: '/category/dresses'
     },
     {
@@ -28,7 +28,7 @@ const CategoryMood = () => {
     {
       name: 'İMZA',
       description: "NRS'nin karakteri. Markanın estetik anlayışını tanımlayan özgün ve zamansız parçalar.",
-      image: 'https://images.unsplash.com/photo-1485231183945-fffde7e1ca17?q=80&w=2070&auto=format&fit=crop',
+      image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=2071&auto=format&fit=crop', // High-end studio signature look
       href: '/collections'
     },
   ];

@@ -1,0 +1,35 @@
+.admin-field {
+  width: 100%;
+  border: 1px solid #e4ded2;
+  background: white;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  color: #11110f;
+  outline: none;
+}
+.admin-field:focus {
+  border-color: #9e804a;
+  box-shadow: 0 0 0 2px rgb(185 154 98 / 20%);
+}
+.admin-primary {
+  min-height: 2.75rem;
+  border: 1px solid #11110f;
+  background: #11110f;
+  padding: 0.7rem 1.25rem;
+  color: white;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.admin-primary:hover { background: #665434; border-color: #665434; }
+.admin-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.admin-secondary {
+  min-height: 2.75rem;
+  border: 1px solid #d8d0c3;
+  background: white;
+  padding: 0.7rem 1.25rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.admin-secondary:hover { background: #f8f4ea; }

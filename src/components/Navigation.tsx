@@ -84,7 +84,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
     if (isSolidPage || initialMode === 'solid' || isScrolled) {
       return {
-        container: 'bg-nrs-ivory/95 backdrop-blur-md py-3 shadow-sm',
+        container: 'bg-nrs-ivory/95 backdrop-blur-md py-1 shadow-sm',
         text: 'text-nrs-black',
         logo: 'brightness-100',
         announcement: 'bg-nrs-black text-nrs-ivory'
@@ -93,7 +93,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
     if (initialMode === 'dark') {
       return {
-        container: 'bg-nrs-black/80 backdrop-blur-md py-4',
+        container: 'bg-nrs-black/80 backdrop-blur-md py-2',
         text: 'text-nrs-ivory',
         logo: 'brightness-0 invert',
         announcement: 'bg-nrs-ivory text-nrs-black'
@@ -102,7 +102,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
     if (initialMode === 'transparent' || (initialMode === 'adaptive' && pathname === '/')) {
       return {
-        container: 'bg-transparent py-6',
+        container: 'bg-transparent py-2',
         text: 'text-nrs-black',
         logo: 'brightness-100',
         announcement: 'bg-nrs-black text-nrs-ivory'
@@ -110,12 +110,26 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     }
 
     return {
-      container: 'bg-nrs-ivory py-4',
+      container: 'bg-nrs-ivory py-1',
       text: 'text-nrs-black',
       logo: 'brightness-100',
       announcement: 'bg-nrs-black text-nrs-ivory'
     };
   };
+
+  // Logic to handle the logo opacity for the home page intro
+  const shouldShowLogo = () => {
+    if (pathname !== '/') return true;
+    if (introFinished) return true;
+
+    // Check if intro has already been played in this session
+    if (typeof window !== 'undefined' && sessionStorage.getItem('nrs-intro-played')) {
+      return true;
+    }
+    return false;
+  };
+
+  const logoOpacity = shouldShowLogo() ? 'opacity-100' : 'opacity-0';
 
   const styles = getNavStyles();
 
@@ -143,24 +157,19 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
             </div>
 
             <div className="flex flex-col items-center justify-center w-1/3">
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: introFinished ? 1 : 0, y: 0 }}
-                transition={{ delay: 0.5, duration: 1.2 }}
-                className="flex justify-center"
-              >
+              <div className="flex justify-center relative">
                 <Link href="/" className="flex flex-col items-center justify-center cursor-pointer group relative">
                   <Image
                     src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
                     alt="NRS Logo"
-                    width={1680}
-                    height={672}
+                    width={180}
+                    height={72}
                     priority
                     data-intro-target="logo"
-                    className={`h-72 md:h-96 w-auto object-contain transition-all duration-1000 group-hover:scale-105 ${styles.logo} ${introFinished ? 'opacity-100' : 'opacity-0'}`}
+                    className={`h-16 md:h-24 w-auto object-contain transition-all duration-1000 group-hover:scale-105 ${styles.logo} ${logoOpacity}`}
                   />
                 </Link>
-              </motion.div>
+              </div>
             </div>
 
             <div className="hidden md:flex items-center justify-end gap-8 w-1/3">
@@ -249,9 +258,9 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                 <Image
                   src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
                   alt="NRS Logo"
-                  width={1170}
-                  height={390}
-                  className={`h-48 w-auto object-contain ${styles.logo}`}
+                  width={180}
+                  height={72}
+                  className={`h-12 w-auto object-contain ${styles.logo}`}
                 />
               </Link>
               <div className="flex items-center gap-2">
@@ -270,7 +279,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
             </div>
           </div>
 
-          <div className="hidden md:flex justify-center gap-x-10 mt-8">
+          <div className="hidden md:flex justify-center gap-x-8 -mt-4">
             {navLinks.map((link) => (
               <button
                 key={link.name}

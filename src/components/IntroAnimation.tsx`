@@ -119,12 +119,6 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
             x: { times: [0, 0.5, 0.5, 1], duration: 3.4, ease: [0.45, 0, 0.55, 1] },
             y: { times: [0, 0.5, 0.5, 1], duration: 3.4, ease: [0.45, 0, 0.55, 1] },
           }}
-          onAnimationComplete={() => {
-            const ghostLogo = document.querySelector<HTMLElement>('[data-intro-target="logo"]');
-            if (ghostLogo) {
-              ghostLogo.style.opacity = '1';
-            }
-          }}
           className="relative z-10"
         >
           <Image
@@ -135,6 +129,24 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
             priority
             className="h-64 md:h-80 w-auto object-contain"
           />
+        </motion.div>
+
+        {/* Slogan: ZARAFETİN SANATI */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{
+            opacity: [0, 1, 1, 0],
+            y: [10, 0, 0, -10]
+          }}
+          transition={{
+            opacity: { times: [0, 0.3, 0.6, 0.8], duration: 3.4 },
+            y: { times: [0, 0.3, 0.6, 0.8], duration: 3.4 }
+          }}
+          className="absolute top-32 text-center"
+        >
+          <p className="text-[11px] md:text-[13px] uppercase tracking-[0.3em] font-serif text-nrs-black/70 font-light">
+            ZARAFETİN SANATI
+          </p>
         </motion.div>
       </div>
     </motion.div>

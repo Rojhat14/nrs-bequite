@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import ProductShowcase from '@/components/ProductShowcase';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface HeroProps {
   introFinished?: boolean;
@@ -12,10 +13,26 @@ interface HeroProps {
 const Hero = ({ introFinished }: HeroProps) => {
   return (
     <section className="relative h-screen w-full bg-nrs-ivory flex flex-col items-center justify-center overflow-hidden">
-      {/* Ambient Background Element - Soft and sophisticated */}
+      {/* Ambient Background Element */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-nrs-champagne/30 blur-[150px] rounded-full pointer-events-none" />
 
-      {/* Background Product Showcase - Editorial Fashion Campaign feel */}
+      {/* Editorial Background Image - Soft, high-end fashion feel */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: introFinished ? 0.4 : 0 }}
+        transition={{ duration: 2, delay: 1 }}
+        className="absolute inset-0 z-0"
+      >
+        <Image
+          src="https://images.unsplash.com/photo-1490481651818-503f6c70611d?q=80&w=2070&auto=format&fit=crop"
+          alt="Luxury Fashion Background"
+          fill
+          className="object-cover opacity-40 mix-blend-multiply"
+          priority
+        />
+      </motion.div>
+
+      {/* Background Product Showcase */}
       <ProductShowcase introFinished={introFinished} />
 
       <div className="container mx-auto px-4 z-10">
@@ -25,7 +42,7 @@ const Hero = ({ introFinished }: HeroProps) => {
             animate={{ opacity: introFinished ? 1 : 0, y: introFinished ? 0 : 30 }}
             transition={{
               duration: 1.5,
-              delay: introFinished ? 0 : 0, // Triggered by introFinished prop
+              delay: introFinished ? 0 : 0,
               ease: [0.22, 1, 0.32, 1]
             }}
             className="space-y-8"
@@ -35,7 +52,7 @@ const Hero = ({ introFinished }: HeroProps) => {
               <motion.h1
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: introFinished ? 1 : 0, scale: introFinished ? 1 : 0.98 }}
-                transition={{ delay: introFinished ? 0.5 : 0, duration: 1.8 }}
+                transition={{ delay: introFinished ? 0.2 : 0, duration: 1.8 }}
                 className="text-5xl md:text-8xl font-serif text-nrs-black tracking-tight mb-6"
               >
                 ZARAFETİN SANATI
@@ -74,8 +91,7 @@ const Hero = ({ introFinished }: HeroProps) => {
         </div>
       </div>
 
-
-      {/* Side Decorative Lines - Minimalist structure */}
+      {/* Side Decorative Lines */}
       <div className="hidden lg:block absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-24 w-px h-full bg-nrs-black/[0.05]"></div>
         <div className="absolute top-0 right-24 w-px h-full bg-nrs-black/[0.05]"></div>

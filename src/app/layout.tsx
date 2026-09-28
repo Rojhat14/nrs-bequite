@@ -1,10 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import './globals.css'
-import CartDrawer from '@/components/CartDrawer'
-import Newsletter from '@/components/Newsletter'
-import Footer from '@/components/Footer'
 import { AuthProvider } from '@/context/AuthContext'
+import StorefrontShell from '@/components/StorefrontShell'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' })
@@ -24,10 +22,7 @@ export default function RootLayout({
     <html lang="tr" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-ivory text-nrs-black`}>
         <AuthProvider>
-          {children}
-          <Footer />
-          <Newsletter />
-          <CartDrawer />
+          <StorefrontShell>{children}</StorefrontShell>
         </AuthProvider>
       </body>
     </html>

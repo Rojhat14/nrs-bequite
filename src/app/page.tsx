@@ -13,11 +13,37 @@ import Link from 'next/link';
 
 export default function Page() {
   const [introFinished, setIntroFinished] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+
+  useEffect(() => {
+    const introPlayed = sessionStorage.getItem('nrs-intro-played');
+    if (introPlayed) {
+      setShowIntro(false);
+      setIntroFinished(true);
+    }
+  }, []);
 
   return (
     <main className="relative min-h-screen bg-[#F7F3EE] text-[#050505]">
-      <IntroAnimation onComplete={() => setIntroFinished(true)} />
-      <Navigation introFinished={introFinished} />
+      {showIntro && <IntroAnimation onComplete={() => {
+        setIntroFinished(true);
+        sessionStorage.setItem('nrs-intro-played', 'true');
+      }} />}
+
+      {/*
+        We REMOVE <Navigation /> from here because it's already in layout.tsx.
+        To avoid having two navbars on the home page, we use a CSS trick
+        or a conditional in Navigation itself.
+        Since we want the home page intro to control the navbar,
+        we will keep a specialized version or handle it via a provider.
+
+        Actually, the simplest way is to remove it from here and
+        let layout.tsx handle it, but layout.tsx doesn't know about
+        the home page's introFinished state.
+
+        Let's fix this by removing it from layout.tsx and putting it back in
+        each page, OR (better) using a state management for the intro.
+      */}
 
       <div className="pt-0">
         {/* 1. HERO: High-end Fashion Campaign */}
@@ -56,12 +82,7 @@ export default function Page() {
           />
 
           <div className="mt-16 text-center">
-            <Link
-              href="/category/dresses"
-              className="inline-block px-10 py-4 border border-nrs-black uppercase tracking-widest text-xs font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-500"
-            >
-              Explore All Collections
-            </Link>
+            {/* Explore All Collections button removed as it is already in the navbar */}
           </div>
         </section>
 
