@@ -28,6 +28,29 @@ function mapWriteError(error: { code?: string } | null, fallback: string) {
 export async function saveProduct(form: FormData): Promise<ActionResult> {
   await requireAdmin()
   const supabase = await createSupabaseServerClient()
+  const collectionIds = Array.from(
+    new Set(
+      form
+        .getAll('collection_ids')
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+    )
+  )
+  const uuidPattern = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
+  if (collectionIds.some((collectionId) => !uuidPattern.test(collectionId))) {
+    return failure('Koleksiyon seçimi geçersiz.')
+  }
+  if (collectionIds.length > 0) {
+    const { data: activeCollections, error: collectionsError } = await supabase
+      .from('collections')
+      .select('id')
+      .in('id', collectionIds)
+      .eq('is_active', true)
+    if (collectionsError) return failure(mapWriteError(collectionsError, 'Seçilen koleksiyonlar doğrulanamadı.'))
+    if ((activeCollections ?? []).length !== collectionIds.length) {
+      return failure('Seçilen koleksiyonlardan biri artık aktif değil veya bulunamadı.')
+    }
+  }
   const id = text(form, 'id')
   const name = text(form, 'name')
   const slug = text(form, 'slug')
@@ -69,10 +92,71 @@ export async function saveProduct(form: FormData): Promise<ActionResult> {
     const { error } = await supabase.from('products').insert(payload)
     if (error) return failure(mapWriteError(error, 'Ürün oluşturulamadı.'))
   }
+  const { error: clearCollectionsError } = await supabase
+    .from('product_collections')
+    .delete()
+    .eq('product_id', id)
+  if (clearCollectionsError) {
+    return failure(mapWriteError(clearCollectionsError, 'Ürün koleksiyonları güncellenemedi.'))
+  }
+  if (collectionIds.length > 0) {
+    const { error: collectionInsertError } = await supabase
+      .from('product_collections')
+      .insert(
+        collectionIds.map((collectionId) => ({
+          product_id: id,
+          collection_id: collectionId,
+        }))
+      )
+
+    if (collectionInsertError) {
+      return failure(mapWriteError(collectionInsertError, 'Ürün koleksiyonları kaydedilemedi.'))
+    }
+  }
   revalidatePath('/admin')
   revalidatePath('/admin/products')
   revalidatePath(`/admin/products/${encodeURIComponent(id)}`)
   return { ok: true, id, message: existing ? 'Ürün güncellendi.' : 'Ürün oluşturuldu.' }
+}
+
+export async function duplicateProduct(sourceProductId: string): Promise<ActionResult> {
+  await requireAdmin()
+  const sourceId = sourceProductId.trim()
+  if (!sourceId || sourceId.length > 160) return failure('Ürün seçimi geçersiz.')
+
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.rpc('nrs_duplicate_product', {
+    p_source_product_id: sourceId,
+  })
+
+  if (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[DUPLICATE PRODUCT] RPC: ERROR', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      })
+    }
+    return failure(mapWriteError(error, 'Ürün kopyalanırken bir hata oluştu.'))
+  }
+
+  const duplicate = data as { id?: unknown; stages?: unknown } | null
+  const id = typeof duplicate?.id === 'string' ? duplicate.id : ''
+  if (!id) return failure('Ürün kopyalandı ancak yeni kayıt bilgisi alınamadı.')
+  if (process.env.NODE_ENV === 'development' && Array.isArray(duplicate?.stages)) {
+    for (const stage of duplicate.stages) {
+      if (typeof stage === 'string') console.info(`[DUPLICATE PRODUCT] ${stage}: PASS`)
+    }
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/products')
+  revalidatePath(`/admin/products/${encodeURIComponent(sourceId)}`)
+  revalidatePath(`/admin/products/${encodeURIComponent(id)}`)
+  revalidatePath('/')
+  revalidatePath('/collections')
+  return { ok: true, id, message: 'Ürün başarıyla kopyalandı.' }
 }
 
 export async function archiveProduct(form: FormData): Promise<ActionResult> {
@@ -254,8 +338,17 @@ export async function deleteProductImage(form: FormData): Promise<ActionResult> 
   if (readError || !image) return failure('Görsel bulunamadı veya silme yetkisi yok.')
   const storageImage = image as unknown as { provider: string; storage_key: string | null }
   if (storageImage.provider === 'supabase' && storageImage.storage_key) {
-    const { error: storageError } = await supabase.storage.from('product-images').remove([storageImage.storage_key])
-    if (storageError) return failure('Görsel dosyası silinemedi; veritabanı kaydı korundu.')
+    const { count, error: referenceError } = await supabase
+      .from('product_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider', 'supabase')
+      .eq('storage_key', storageImage.storage_key)
+      .neq('id', id)
+    if (referenceError) return failure('Görsel kullanımı doğrulanamadı; kayıt güvenlik için korundu.')
+    if ((count ?? 0) === 0) {
+      const { error: storageError } = await supabase.storage.from('product-images').remove([storageImage.storage_key])
+      if (storageError) return failure('Görsel dosyası silinemedi; veritabanı kaydı korundu.')
+    }
   }
   const { error } = await supabase.from('product_images').delete().eq('id', id).eq('product_id', productId)
   if (error) return failure(mapWriteError(error, 'Görsel kaydı silinemedi.'))

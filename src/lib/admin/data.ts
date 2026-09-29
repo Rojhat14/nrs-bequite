@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { LOW_STOCK_THRESHOLD } from '@/lib/admin/config'
-import type { CategoryRow, OrderItemRow, OrderRow, ProductImageRow, ProductRow, ProductVariantRow, ProfileRow, WishlistRow } from '@/lib/admin/types'
+import type { CategoryRow, CollectionRow, OrderItemRow, OrderRow, ProductImageRow, ProductRow, ProductVariantRow, ProfileRow, WishlistRow } from '@/lib/admin/types'
 
 const pageSize = 20
 
@@ -14,6 +14,22 @@ export async function getCategories() {
   const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase.from('categories').select('*').order('sort_order').order('name')
   return { data: (data ?? []) as unknown as CategoryRow[], error }
+}
+
+export async function getCollections() {
+  const supabase = await createSupabaseServerClient()
+
+  const { data, error } = await supabase
+    .from('collections')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order')
+    .order('name')
+
+  return {
+    data: (data ?? []) as unknown as CollectionRow[],
+    error,
+  }
 }
 
 export async function getProductList(options: { page?: number; query?: string; category?: string; status?: string } = {}) {
@@ -53,18 +69,23 @@ export async function getProductList(options: { page?: number; query?: string; c
 
 export async function getProductEditorData(id: string) {
   const supabase = await createSupabaseServerClient()
-  const [productResult, imagesResult, variantsResult, categoryResult] = await Promise.all([
+  const [productResult, imagesResult, variantsResult, categoryResult, collectionsResult, collectionResult] = await Promise.all([
     supabase.from('products').select('*').eq('id', id).maybeSingle(),
     supabase.from('product_images').select('*').eq('product_id', id).order('sort_order'),
     supabase.from('product_variants').select('*').eq('product_id', id).order('size'),
     getCategories(),
+    getCollections(),
+    supabase.from('product_collections').select('collection_id').eq('product_id', id),
   ])
+  const selectedCollectionIds = (collectionResult.data ?? []).map((row) => row.collection_id as string)
   return {
     product: productResult.data as unknown as ProductRow | null,
     images: (imagesResult.data ?? []) as unknown as ProductImageRow[],
     variants: (variantsResult.data ?? []) as unknown as ProductVariantRow[],
     categories: categoryResult.data,
-    error: productResult.error ?? imagesResult.error ?? variantsResult.error ?? categoryResult.error,
+    collections: collectionsResult.data,
+    selectedCollectionIds,
+    error: productResult.error ?? imagesResult.error ?? variantsResult.error ?? categoryResult.error ?? collectionsResult.error ?? collectionResult.error,
   }
 }
 

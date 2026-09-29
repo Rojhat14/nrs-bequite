@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Smartphone, CheckCircle2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/store/useCart';
 
-export default function VerifyPayment() {
+function VerifyPaymentContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
   const { user } = useAuth();
+  const { clearCart } = useCart();
   const [code, setCode] = useState(['', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
   const [step, setStep] = useState('input'); // 'input' | 'verifying' | 'success'
@@ -20,10 +24,6 @@ export default function VerifyPayment() {
     const newCode = [...code];
     newCode[index] = value.slice(-1);
     setCode(newCode);
-
-    if (newCode.every(c => c !== '')) {
-      // Auto-submit when all fields are filled
-    }
   };
 
   const verifyCode = async () => {
@@ -37,11 +37,24 @@ export default function VerifyPayment() {
     if (finalCode === MOCK_CODE) {
       setStep('success');
 
-      // In real integration, we would call /api/payment/callback here
-      // But for simulation, we'll just redirect to success page
+      // Update order status if orderId exists
+      if (orderId) {
+        try {
+          await fetch('/api/payment/callback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, status: 'paid' }),
+          });
+        } catch (e) {
+          console.error('Failed to notify payment callback', e);
+        }
+      }
+
+      clearCart();
+
       setTimeout(() => {
         router.push('/checkout/success');
-      }, 2000);
+      }, 1500);
     } else {
       alert('Invalid verification code. Please try again.');
       setStep('input');
@@ -133,3 +146,16 @@ export default function VerifyPayment() {
     </div>
   );
 }
+
+export default function VerifyPayment() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-nrs-ivory flex items-center justify-center p-6">
+        <div className="w-8 h-8 border-2 border-nrs-black/20 border-t-nrs-black rounded-full animate-spin" />
+      </div>
+    }>
+      <VerifyPaymentContent />
+    </Suspense>
+  );
+}
+

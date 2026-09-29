@@ -300,7 +300,7 @@ export default function Checkout() {
                   </div>
                 </div>
                 <div className="mt-8 flex justify-between items-center pt-6 border-t border-nrs-black/10">
-                  <span className="text-sm uppercase tracking-widest text-nrs-black/40">Total: €{totalAmount.toLocaleString()}</span>
+                  <span className="text-sm uppercase tracking-widest text-nrs-black/40">Total: ₺{totalAmount.toLocaleString('tr-TR')}</span>
                   <button
                     onClick={handleCompletePurchase}
                     disabled={isProcessing}
@@ -328,14 +328,12 @@ export default function Checkout() {
                   >
                     Return to Collection
                   </button>
-                  {checkoutMode === 'guest' && (
-                    <button
-                      onClick={() => router.push('/auth/register')}
-                      className="bg-nrs-black text-nrs-ivory px-8 py-3 text-xs uppercase tracking-widest hover:bg-nrs-black/90 transition-all"
-                    >
-                      Create Account
-                    </button>
-                  )}
+                  <button
+                    onClick={() => router.push('/profile')}
+                    className="bg-nrs-black text-nrs-ivory px-8 py-3 text-xs uppercase tracking-widest hover:bg-nrs-black/90 transition-all"
+                  >
+                    View Account
+                  </button>
                 </div>
               </motion.div>
             )}

@@ -3,12 +3,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag } from 'lucide-react';
-import { useCart } from '@/store/useCart';
+import { getCartItemId, useCart } from '@/store/useCart';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 const CartDrawer = () => {
-  const { items, isDrawerOpen, closeDrawer, removeItem, totalAmount } = useCart();
+  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
   const router = useRouter();
 
   return (
@@ -61,8 +61,9 @@ const CartDrawer = () => {
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto pr-4 space-y-8">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex gap-6 pb-8 border-b border-nrs-black/10">
+                  {items.map((item) => {
+                    const cartItemId = getCartItemId(item)
+                    return <div key={cartItemId} className="flex gap-6 pb-8 border-b border-nrs-black/10">
                       <div className="w-24 h-32 bg-nrs-black/5 flex-shrink-0 overflow-hidden relative">
                         <Image
                           src={item.image || 'https://images.unsplash.com/photo-1515378791000-01714bb6013c?q=80&w=200&auto=format&fit=crop'}
@@ -78,9 +79,16 @@ const CartDrawer = () => {
                           <p className="text-sm font-sans text-nrs-black">{item.price}</p>
                         </div>
                         <div className="flex justify-between items-center mt-4">
-                          <p className="text-xs text-nrs-black/40 uppercase tracking-widest">Qty: {item.quantity}</p>
+                          <div className="space-y-2">
+                            {item.size && <p className="text-xs text-nrs-black/50">Beden: {item.size}</p>}
+                            <div className="flex items-center gap-3 text-xs text-nrs-black/50 uppercase tracking-widest">
+                              <button type="button" aria-label={`${item.title} miktarını azalt`} onClick={() => updateQuantity(cartItemId, item.quantity - 1)} className="h-7 w-7 border border-nrs-black/15 hover:border-nrs-black">−</button>
+                              <span>Qty: {item.quantity}</span>
+                              <button type="button" aria-label={`${item.title} miktarını artır`} onClick={() => updateQuantity(cartItemId, item.quantity + 1)} className="h-7 w-7 border border-nrs-black/15 hover:border-nrs-black">+</button>
+                            </div>
+                          </div>
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(cartItemId)}
                             className="text-[10px] uppercase tracking-widest text-nrs-black/40 hover:text-red-800 transition-colors"
                           >
                             Remove
@@ -88,14 +96,28 @@ const CartDrawer = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  })}
                 </div>
 
-                <div className="pt-8 border-t border-nrs-black/20 space-y-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-nrs-black/60 uppercase tracking-widest">Subtotal</span>
-                    <span className="text-lg font-serif text-nrs-black">€{totalAmount.toFixed(2)}</span>
-                  </div>
+                  <div className="pt-8 border-t border-nrs-black/20 space-y-6">
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-nrs-black/60 uppercase tracking-widest">Ara Toplam</span>
+                        <span className="font-serif text-nrs-black">₺{subtotalAmount.toLocaleString('tr-TR')}</span>
+                      </div>
+                      {discountAmount > 0 && <div className="flex justify-between items-center text-nrs-black/55">
+                        <span className="uppercase tracking-widest">İndirim</span>
+                        <span>−₺{discountAmount.toLocaleString('tr-TR')}</span>
+                      </div>}
+                      <div className="flex justify-between items-center text-nrs-black/55">
+                        <span className="uppercase tracking-widest">Kargo</span>
+                        <span>{shippingAmount === 0 ? 'Henüz tanımlanmadı' : `₺${shippingAmount.toLocaleString('tr-TR')}`}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-t border-nrs-black/10 pt-3">
+                        <span className="text-nrs-black/60 uppercase tracking-widest">Genel Toplam</span>
+                        <span className="text-lg font-serif text-nrs-black">₺{totalAmount.toLocaleString('tr-TR')}</span>
+                      </div>
+                    </div>
                   <button
                     onClick={() => {
                       closeDrawer();

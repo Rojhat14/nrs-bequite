@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     console.log('[Payment Callback] Received update for order:', orderId, 'Status:', status);
 
     // 1. Validate Payment Status
-    if (status === 'success') {
+    if (status === 'success' || status === 'paid') {
       const { error } = await supabase
         .from('orders')
         .update({ status: 'paid' })

@@ -1,0 +1,32 @@
+const categoryImages: Record<string, string> = {
+  elbiseler: '/images/editorial/categories/dresses.jpg',
+  dresses: '/images/editorial/categories/dresses.jpg',
+  'ust-giyim': '/images/editorial/categories/tops.jpg',
+  tops: '/images/editorial/categories/tops.jpg',
+  'ceketler-blazerlar': '/images/editorial/categories/blazers.jpg',
+  blazers: '/images/editorial/categories/blazers.jpg',
+  'alt-giyim': '/images/editorial/categories/bottoms.jpg',
+  bottoms: '/images/editorial/categories/bottoms.jpg',
+  takimlar: '/images/editorial/categories/suits.jpg',
+  suits: '/images/editorial/categories/suits.jpg',
+  indirim: '/images/editorial/collections/sale.jpg',
+  sale: '/images/editorial/collections/sale.jpg',
+}
+
+const collectionImages: Record<string, string> = {
+  'yeni-gelenler': '/images/editorial/collections/new-arrivals.jpg',
+  gunduz: '/images/editorial/collections/daytime.jpg',
+  gece: '/images/editorial/collections/evening.jpg',
+  davet: '/images/editorial/collections/occasion.jpg',
+  imza: '/images/editorial/collections/signature.jpg',
+  seckiler: '/images/editorial/collections/curated.jpg',
+  indirim: '/images/editorial/collections/sale.jpg',
+}
+
+export function getCategoryEditorialImage(slug: string) {
+  return categoryImages[slug.toLocaleLowerCase('tr-TR')] ?? null
+}
+
+export function getCollectionEditorialImage(slug: string) {
+  return collectionImages[slug.toLocaleLowerCase('tr-TR')] ?? null
+}

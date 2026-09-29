@@ -34,7 +34,7 @@ export default function OrderHistory() {
   }, [user]);
 
   return (
-    <div className="space-y-8">
+    <div id="orders" className="space-y-8 scroll-mt-32">
       <div className="flex items-center gap-4">
         <Package size={20} className="text-nrs-black/40" />
         <h2 className="text-2xl font-serif italic text-nrs-black">Order History</h2>
@@ -78,7 +78,7 @@ export default function OrderHistory() {
                   <span className="text-xs uppercase tracking-widest text-nrs-black/60">{order.status}</span>
                 </div>
                 <span className="text-sm font-serif text-nrs-black font-medium">
-                  €{order.total_amount.toLocaleString()}
+                  ₺{order.total_amount.toLocaleString('tr-TR')}
                 </span>
               </div>
             </motion.div>

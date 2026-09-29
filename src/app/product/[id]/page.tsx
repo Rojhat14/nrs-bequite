@@ -1,36 +1,23 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { PRODUCTS } from '@/data/products';
 import ProductDetail from '@/components/ProductDetail';
-import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
+import { getStorefrontProduct } from '@/lib/products'
 
 interface ProductPageProps {
-  params: {
-    id: string;
-  };
+  params: { id: string };
 }
 
-export default function ProductPage({ params }: ProductPageProps) {
-  const { id } = params;
-  const product = PRODUCTS.find(p => p.id === id);
-  const router = useRouter();
-
-  if (!product) {
-    return (
-      <div className="min-h-screen bg-[#F7F3EE] flex items-center justify-center">
-        <h1 className="text-3xl font-serif text-center">Product not found</h1>
-      </div>
-    );
+export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const product = await getStorefrontProduct(params.id)
+  if (!product) return { title: 'Ürün bulunamadı | NRS' }
+  return {
+    title: `NRS | ${product.name}`,
+    description: product.description || `${product.name} ürününü NRS'de keşfedin.`,
   }
+}
 
-  return (
-    <div className="min-h-screen bg-[#F7F3EE] text-[#050505]">
-      <ProductDetail
-        product={product}
-        onBack={() => router.back()}
-      />
-    </div>
-  );
+export default async function ProductPage({ params }: ProductPageProps) {
+  const product = await getStorefrontProduct(params.id)
+  if (!product) notFound()
+  return <div className="min-h-screen bg-[#F7F3EE] text-[#050505]"><ProductDetail product={product} /></div>
 }

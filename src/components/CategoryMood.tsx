@@ -3,32 +3,33 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import Image from 'next/image';
+import EditorialImage from '@/components/EditorialImage'
+import { getCollectionEditorialImage } from '@/lib/editorialImages'
 
 const CategoryMood = () => {
   const moods = [
     {
       name: 'GÜNDÜZ',
+      collectionSlug: 'gunduz',
       description: 'Günün zarafeti. Günün her anına eşlik eden sade, modern ve rafine siluetler.',
-      image: 'https://images.unsplash.com/photo-1485231183945-fffde7e1ca17?q=80&w=2070&auto=format&fit=crop', // Refined day look
       href: '/category/tops'
     },
     {
       name: 'GECE',
+      collectionSlug: 'gece',
       description: 'Gecenin kendine özgü hali. Işığı yakalayan dokular ve güçlü siluetlerle akşamın ritmine uyum sağlayan tasarımlar.',
-      image: 'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?q=80&w=2070&auto=format&fit=crop', // Refined elegant night look
       href: '/category/dresses'
     },
     {
       name: 'DAVET',
+      collectionSlug: 'davet',
       description: 'Anın kendisi için. Hatırlanmaya değer anlar için tasarlanan özel parçalar.',
-      image: 'https://images.unsplash.com/photo-1566174053895-827e65767724?q=80&w=2070&auto=format&fit=crop',
       href: '/category/dresses'
     },
     {
       name: 'İMZA',
+      collectionSlug: 'imza',
       description: "NRS'nin karakteri. Markanın estetik anlayışını tanımlayan özgün ve zamansız parçalar.",
-      image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=2071&auto=format&fit=crop', // High-end studio signature look
       href: '/collections'
     },
   ];
@@ -59,10 +60,9 @@ const CategoryMood = () => {
               className="relative group cursor-pointer overflow-hidden aspect-[3/4]"
             >
               <Link href={mood.href} className="block w-full h-full relative">
-                <Image
-                  src={mood.image}
+                <EditorialImage
+                  src={getCollectionEditorialImage(mood.collectionSlug)}
                   alt={mood.name}
-                  fill
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                   className="object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-105"
                 />

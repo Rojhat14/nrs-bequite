@@ -2,16 +2,16 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Product, PRODUCTS } from '@/data/products';
+import type { Product } from '@/data/products';
 import { ProductCard } from '@/components/ProductCard';
 import Link from 'next/link';
 
 interface CollectionProps {
-  products?: Product[];
+  products: Product[];
   onProductClick?: (id: string) => void;
 }
 
-const Collection = ({ products = PRODUCTS, onProductClick }: CollectionProps) => {
+const Collection = ({ products, onProductClick }: CollectionProps) => {
   const [activeCategory, setActiveCategory] = useState<string>('Tümü');
 
   const categories = useMemo(() => {

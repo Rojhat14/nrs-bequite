@@ -3,17 +3,25 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { archiveProduct, saveProduct } from '@/app/admin/(protected)/actions'
-import type { CategoryRow, ProductRow } from '@/lib/admin/types'
+import type { CategoryRow, CollectionRow, ProductRow, ProductVariantRow } from '@/lib/admin/types'
 import { DEFAULT_ADMIN_SETTINGS } from '@/lib/admin/config'
 import ProductImageManager from '@/components/admin/ProductImageManager'
 import ProductVariantManager from '@/components/admin/ProductVariantManager'
 
-export default function AdminProductForm({ product, categories, variants = [] }: { product?: ProductRow; categories: CategoryRow[]; variants?: import('@/lib/admin/types').ProductVariantRow[] }) {
+const EMPTY_COLLECTIONS: CollectionRow[] = []
+const EMPTY_COLLECTION_IDS: string[] = []
+
+export default function AdminProductForm({ product, categories, collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [] }: { product?: ProductRow; categories: CategoryRow[]; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[] }) {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null)
   const [slug, setSlug] = useState(product?.slug ?? '')
+  const [selectedCollections, setSelectedCollections] = useState<string[]>(selectedCollectionIds)
+
+  useEffect(() => {
+    setSelectedCollections(selectedCollectionIds)
+  }, [product?.id, selectedCollectionIds])
 
   useEffect(() => {
     if (!dirty) return
@@ -64,6 +72,29 @@ export default function AdminProductForm({ product, categories, variants = [] }:
               {categories.map((category) => <option key={category.id} value={category.id}>{category.name} · {category.slug}</option>)}
             </select>
           </div>
+          <fieldset className="space-y-3 border border-[#E4DED2] bg-[#FAF9F6] p-4 sm:col-span-2 sm:p-5">
+            <legend className="px-1 font-serif text-lg">Koleksiyonlar</legend>
+            <p className="text-xs text-[#777165]">Ürün birden fazla koleksiyonda yer alabilir.</p>
+            {collections.length > 0 ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {collections.map((collection) => <label key={collection.id} className="flex cursor-pointer items-center gap-3 border border-[#E4DED2] bg-white px-3 py-3 text-sm focus-within:ring-2 focus-within:ring-[#9B835B]">
+                <input
+                  type="checkbox"
+                  name="collection_ids"
+                  value={collection.id}
+                  checked={selectedCollections.includes(collection.id)}
+                  onChange={(event) => {
+                    setDirty(true)
+                    const isChecked = event.currentTarget.checked
+                    setSelectedCollections((current) => isChecked
+                      ? [...current, collection.id]
+                      : current.filter((id) => id !== collection.id))
+                  }}
+                  className="size-4 accent-[#8A744F]"
+                />
+                <span>{collection.name}</span>
+              </label>)}
+            </div> : <p className="border border-dashed border-[#D8D0C3] bg-white/70 p-3 text-sm text-[#777165]">Aktif koleksiyon bulunmuyor.</p>}
+          </fieldset>
           <div className="space-y-2"><label htmlFor="description" className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">Açıklama</label><textarea id="description" name="description" defaultValue={product?.description ?? ''} rows={5} className="admin-field resize-y" /></div>
           <Field label="Fiyat" name="price_amount" type="number" defaultValue={product?.price_amount ?? ''} min="0.01" step="0.01" required />
           <Field label="Karşılaştırma fiyatı" name="compare_at_price" type="number" defaultValue={product?.compare_at_price ?? ''} min="0" step="0.01" />

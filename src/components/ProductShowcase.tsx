@@ -2,15 +2,16 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { PRODUCTS } from '@/data/products';
+import type { Product } from '@/data/products';
 
 interface ProductShowcaseProps {
   introFinished?: boolean;
+  products: Product[];
 }
 
-const ProductShowcase = ({ introFinished }: ProductShowcaseProps) => {
+const ProductShowcase = ({ introFinished, products }: ProductShowcaseProps) => {
   // Duplicate products to create a seamless infinite loop
-  const duplicatedProducts = [...PRODUCTS, ...PRODUCTS, ...PRODUCTS];
+  const duplicatedProducts = [...products, ...products, ...products];
 
   return (
     <motion.div

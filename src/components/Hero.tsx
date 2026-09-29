@@ -5,12 +5,14 @@ import { motion } from 'framer-motion';
 import ProductShowcase from '@/components/ProductShowcase';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Product } from '@/data/products';
 
 interface HeroProps {
   introFinished?: boolean;
+  products: Product[];
 }
 
-const Hero = ({ introFinished }: HeroProps) => {
+const Hero = ({ introFinished, products }: HeroProps) => {
   return (
     <section className="relative h-screen w-full bg-nrs-ivory flex flex-col items-center justify-center overflow-hidden">
       {/* Ambient Background Element */}
@@ -33,7 +35,7 @@ const Hero = ({ introFinished }: HeroProps) => {
       </motion.div>
 
       {/* Background Product Showcase */}
-      <ProductShowcase introFinished={introFinished} />
+      <ProductShowcase introFinished={introFinished} products={products} />
 
       <div className="container mx-auto px-4 z-10">
         <div className="max-w-6xl mx-auto text-center">

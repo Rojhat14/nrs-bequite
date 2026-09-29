@@ -3,7 +3,8 @@
 import React from 'react';
 import Navigation from '@/components/Navigation';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
+import EditorialImage from '@/components/EditorialImage'
+import { getCollectionEditorialImage } from '@/lib/editorialImages'
 
 export default function CuratedPage() {
   return (
@@ -31,17 +32,17 @@ export default function CuratedPage() {
               {
                 title: 'Minimalist Lüks',
                 desc: 'Sessiz lüksün en saf hali. Monokrom tonlar ve kusursuz kesimler.',
-                image: 'https://images.unsplash.com/photo-1434389677669-7486e12638ce?q=80&w=2070&auto=format&fit=crop'
+                collectionSlug: 'imza',
               },
               {
                 title: 'Gece Işıltısı',
                 desc: 'Davetlerin odak noktası olacak, iddialı ve rafine gece tasarımları.',
-                image: 'https://images.unsplash.com/photo-1539008835757-a65767669e6b?q=80&w=2070&auto=format&fit=crop'
+                collectionSlug: 'davet',
               },
               {
                 title: 'Modern Şehir',
                 desc: 'Şehrin ritmine ayak uyduran, konfor ve zarafeti birleştiren parçalar.',
-                image: 'https://images.unsplash.com/photo-1485231183945-fffde7e1ca17?q=80&w=2070&auto=format&fit=crop'
+                collectionSlug: 'gunduz',
               },
             ].map((item, index) => (
               <motion.div
@@ -53,10 +54,9 @@ export default function CuratedPage() {
                 className="group cursor-pointer"
               >
                 <div className="relative aspect-[3/4] overflow-hidden mb-6">
-                  <Image
-                    src={item.image}
+                  <EditorialImage
+                    src={getCollectionEditorialImage(item.collectionSlug)}
                     alt={item.title}
-                    fill
                     className="object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-105"
                     sizes="(max-width: 768px) 100vw, 33vw"
                   />

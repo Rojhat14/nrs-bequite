@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Navigation from '@/components/Navigation';
 import { motion } from 'framer-motion';
 
 export default function ContactPage() {
+  const [submitted, setSubmitted] = useState(false);
   return (
     <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
       <Navigation />
@@ -41,23 +42,45 @@ export default function ContactPage() {
             </div>
 
             <div className="bg-white p-8 border border-nrs-black/5 shadow-sm space-y-6">
-              <form className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-nrs-black/40 block">Ad Soyad</label>
-                  <input type="text" className="w-full bg-transparent border-b border-nrs-black/10 py-2 focus:outline-none focus:border-nrs-black transition-colors text-sm" placeholder="Adınız Soyadınız" />
+              {submitted ? (
+                <div className="py-12 text-center space-y-4">
+                  <p className="text-xs uppercase tracking-widest text-nrs-rosegold font-sans">Teşekkürler</p>
+                  <h3 className="text-2xl font-serif text-nrs-black">Mesajınız İletildi</h3>
+                  <p className="text-xs text-nrs-black/60 font-sans leading-relaxed">
+                    Talebiniz alınmıştır. Ekibimiz en kısa sürede sizinle iletişime geçecektir.
+                  </p>
+                  <button
+                    onClick={() => setSubmitted(false)}
+                    className="mt-4 text-[10px] uppercase tracking-widest text-nrs-black border-b border-nrs-black pb-1 hover:text-nrs-rosegold transition-colors"
+                  >
+                    Yeni Mesaj Gönder
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-nrs-black/40 block">E-posta</label>
-                  <input type="email" className="w-full bg-transparent border-b border-nrs-black/10 py-2 focus:outline-none focus:border-nrs-black transition-colors text-sm" placeholder="eposta@ornek.com" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-nrs-black/40 block">Mesajınız</label>
-                  <textarea rows={4} className="w-full bg-transparent border-b border-nrs-black/10 py-2 focus:outline-none focus:border-nrs-black transition-colors text-sm" placeholder="Mesajınızı buraya yazın..."></textarea>
-                </div>
-                <button className="w-full py-4 bg-nrs-black text-nrs-ivory uppercase tracking-widest text-[10px] hover:bg-nrs-charcoal transition-all duration-500">
-                  GÖNDER
-                </button>
-              </form>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setSubmitted(true);
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-nrs-black/40 block">Ad Soyad</label>
+                    <input required type="text" className="w-full bg-transparent border-b border-nrs-black/10 py-2 focus:outline-none focus:border-nrs-black transition-colors text-sm" placeholder="Adınız Soyadınız" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-nrs-black/40 block">E-posta</label>
+                    <input required type="email" className="w-full bg-transparent border-b border-nrs-black/10 py-2 focus:outline-none focus:border-nrs-black transition-colors text-sm" placeholder="eposta@ornek.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-nrs-black/40 block">Mesajınız</label>
+                    <textarea required rows={4} className="w-full bg-transparent border-b border-nrs-black/10 py-2 focus:outline-none focus:border-nrs-black transition-colors text-sm" placeholder="Mesajınızı buraya yazın..."></textarea>
+                  </div>
+                  <button type="submit" className="w-full py-4 bg-nrs-black text-nrs-ivory uppercase tracking-widest text-[10px] hover:bg-nrs-charcoal transition-all duration-500">
+                    GÖNDER
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>

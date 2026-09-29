@@ -4,6 +4,7 @@ import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import AdminDatabaseState from '@/components/admin/AdminDatabaseState'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge'
 import AdminPagination from '@/components/admin/AdminPagination'
+import DuplicateProductButton from '@/components/admin/DuplicateProductButton'
 import { getProductList, isMissingTable } from '@/lib/admin/data'
 import { formatDate, formatMoney } from '@/lib/admin/types'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -49,7 +50,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
               <td className="p-3"><AdminStatusBadge value={product.status} /></td>
               <td className="p-3 text-xs">{(result.stockByProduct.get(product.id) ?? 0) > 0 ? `${result.stockByProduct.get(product.id)} adet` : 'Tükendi / varyant yok'}</td>
               <td className="p-3 text-xs text-[#777165]">{formatDate(product.updated_at)}</td>
-              <td className="p-3"><Link href={`/admin/products/${encodeURIComponent(product.id)}`} className="text-xs text-[#6B5734] underline underline-offset-4">Düzenle</Link></td>
+              <td className="p-3 whitespace-nowrap"><Link href={`/admin/products/${encodeURIComponent(product.id)}`} className="text-xs text-[#6B5734] underline underline-offset-4">Düzenle</Link><DuplicateProductButton productId={product.id} /></td>
             </tr>
           })}
           {result.products.length === 0 && !result.error && <tr><td colSpan={8} className="p-12 text-center text-sm text-[#9A9385]">Filtrelere uygun ürün yok.</td></tr>}

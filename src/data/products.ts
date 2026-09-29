@@ -1,4 +1,17 @@
-export type Category = 'Elbiseler' | 'Üst Giyim' | 'Alt Giyim' | 'Bedding' | 'Aksesuar';
+export type Category = string;
+
+export type ProductGalleryImage = {
+  url: string;
+  altText: string;
+  sortOrder: number;
+  isPrimary: boolean;
+};
+
+export type ProductVariant = {
+  id: string;
+  size: string | null;
+  stock_quantity: number;
+};
 
 export type Product = {
   id: string;
@@ -9,6 +22,14 @@ export type Product = {
   hoverImage?: string;
   price: string;
   inStock: boolean;
+  slug?: string;
+  currency?: string;
+  priceAmount?: number;
+  compareAtPrice?: number | null;
+  galleryImages?: ProductGalleryImage[];
+  variants?: ProductVariant[];
+  collections?: Array<{ id: string; name: string; slug: string }>;
+  catalogSource?: 'database' | 'legacy-fallback';
   details: {
     fabric: string;
     care: string;

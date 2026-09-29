@@ -11,7 +11,7 @@ export default function SuccessPage() {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md w-full text-center space-y la-12 py-12 px-8 bg-white border border-nrs-black/10 shadow-xl"
+        className="max-w-md w-full text-center space-y-12 py-12 px-8 bg-white border border-nrs-black/10 shadow-xl"
       >
         <div className="flex justify-center mb-8">
           <div className="p-4 bg-green-50 text-green-600 rounded-full">
