@@ -7,7 +7,8 @@ import { displayName, formatDate } from '@/lib/admin/types'
 
 type SearchParams = { page?: string; q?: string }
 
-export default async function AdminUsersPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminUsersPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await searchParamsPromise
   const result = await getAdminUsers({ page: Number(searchParams.page) || 1, query: searchParams.q })
   const query = new URLSearchParams()
   if (searchParams.q) query.set('q', searchParams.q)

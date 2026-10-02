@@ -1,10 +1,11 @@
 import AdminLoginForm from '@/components/admin/AdminLoginForm'
 
 interface AdminLoginPageProps {
-  searchParams?: { reason?: string }
+  searchParams?: Promise<{ reason?: string }>
 }
 
-export default function AdminLoginPage({ searchParams }: AdminLoginPageProps) {
+export default async function AdminLoginPage({ searchParams: searchParamsPromise }: AdminLoginPageProps) {
+  const searchParams = await searchParamsPromise
   const reason = searchParams?.reason
 
   const notice = reason === 'not-authorized'

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useDialog } from '@/hooks/useDialog';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -21,14 +22,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const reduceMotion = useReducedMotion();
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  const dialogRef = useDialog(isOpen, onClose);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,15 +54,16 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
         const { data, error: authError } = await supabase.auth.signUp({
           email,
           password,
+          options: { data: { first_name: firstName.trim(), last_name: lastName.trim(), phone: phone.trim() } },
         });
 
         if (authError) throw authError;
 
-        if (data.user) {
+        if (data.user && data.session) {
           // Save additional info to public.profiles table
           const { error: profileError } = await supabase
             .from('profiles')
-            .insert([
+            .upsert([
               {
                 id: data.user.id,
                 first_name: firstName,
@@ -76,12 +71,12 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                 phone: phone,
                 email: email
               },
-            ]);
+            ], { onConflict: 'id', ignoreDuplicates: true });
 
           if (profileError) throw profileError;
 
-          setMessage({ type: 'success', text: 'Hesabınız oluşturuldu. Lütfen e-postanızı kontrol edin.' });
         }
+        setMessage({ type: 'success', text: data.session ? 'Hesabınız oluşturuldu.' : 'Kaydı tamamlamak için e-postanızı kontrol edin.' });
       }
     } catch (error: any) {
       setMessage({
@@ -115,9 +110,11 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
               exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.99, y: reduceMotion ? 0 : 8 }}
               transition={{ duration: reduceMotion ? 0.1 : 0.24, ease: [0.22, 1, 0.36, 1] }}
               role="dialog"
+              ref={dialogRef}
+              tabIndex={-1}
               aria-modal="true"
               aria-labelledby="account-modal-title"
-              className="pointer-events-auto relative w-full max-w-[420px] border border-[#DCD6CA] bg-nrs-ivory p-7 shadow-[0_18px_60px_rgba(15,14,12,0.2)] sm:p-10"
+              className="pointer-events-auto relative max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-[420px] border border-[#DCD6CA] bg-nrs-ivory p-7 shadow-[0_18px_60px_rgba(15,14,12,0.2)] sm:p-10"
             >
               <button
                 type="button"
@@ -216,6 +213,8 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   <input
                     id="account-password"
                     type="password"
+                    autoComplete={isLogin ? 'current-password' : 'new-password'}
+                    minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-transparent border-b border-nrs-black/20 py-2 px-1 focus:border-nrs-black outline-none transition-all duration-500 font-light text-sm"

@@ -4,7 +4,9 @@ import AdminProductForm from '@/components/admin/AdminProductForm'
 import AdminDatabaseState from '@/components/admin/AdminDatabaseState'
 import { getProductEditorData, isMissingTable } from '@/lib/admin/data'
 
-export default async function AdminProductDetailPage({ params, searchParams }: { params: { id: string }; searchParams?: { duplicated?: string } }) {
+export default async function AdminProductDetailPage({ params: paramsPromise, searchParams: searchParamsPromise }: { params: Promise<{ id: string }>; searchParams?: Promise<{ duplicated?: string }> }) {
+  const params = await paramsPromise
+  const searchParams = await searchParamsPromise
   const data = await getProductEditorData(params.id)
   if (isMissingTable(data.error)) return <AdminDatabaseState title="Katalog tabloları henüz kurulmamış" />
   if (!data.product && !data.error) notFound()

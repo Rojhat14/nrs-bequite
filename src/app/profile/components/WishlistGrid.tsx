@@ -8,14 +8,19 @@ import { motion } from 'framer-motion';
 import { PRODUCTS, type Product } from '@/data/products';
 import Image from 'next/image';
 import Link from 'next/link';
+import { getProductImageUrl } from '@/lib/storage/products';
+import type { ProductImageRow } from '@/lib/admin/types';
 
 export default function WishlistGrid() {
   const { user } = useAuth();
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const fetchWishlist = async () => {
+      setLoading(true);
+      setErrorMessage('');
       if (!user) {
         setWishlistProducts([]);
         setLoading(false);
@@ -36,7 +41,7 @@ export default function WishlistGrid() {
         }
 
         // Fetch product details from Supabase
-        const { data: dbProducts } = await supabase
+        const { data: dbProducts, error: productsError } = await supabase
           .from('products')
           .select(`
             id,
@@ -44,18 +49,20 @@ export default function WishlistGrid() {
             price_amount,
             currency,
             categories (name),
-            product_images (url, is_primary)
+            product_images (id, product_id, provider, storage_key, url, alt_text, sort_order, is_primary, created_at)
           `)
           .in('id', productIds);
+        if (productsError) throw productsError;
 
         const mappedDbProducts: Product[] = (dbProducts || []).map((p: any) => {
-          const primaryImg = p.product_images?.find((img: any) => img.is_primary)?.url || p.product_images?.[0]?.url;
+          const images = (p.product_images ?? []) as ProductImageRow[];
+          const primaryImg = getProductImageUrl(supabase, images.find(img => img.is_primary) ?? images[0]);
           const currencySymbol = p.currency === 'TRY' || !p.currency ? '₺' : `${p.currency} `;
           return {
             id: p.id,
             name: p.name,
             category: p.categories?.name || 'Koleksiyon',
-            price: `${currencySymbol}${p.price_amount?.toLocaleString('en-US') ?? '0'}`,
+            price: `${currencySymbol}${Number(p.price_amount ?? 0).toLocaleString('en-US')}`,
             image: primaryImg || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop',
             description: '',
             inStock: true,
@@ -81,6 +88,7 @@ export default function WishlistGrid() {
         setWishlistProducts(combined);
       } catch (err) {
         console.error('[Wishlist] Error fetching wishlist:', err);
+        setErrorMessage('Favoriler yüklenemedi. Lütfen sayfayı yenileyerek tekrar deneyin.');
       } finally {
         setLoading(false);
       }
@@ -117,7 +125,7 @@ export default function WishlistGrid() {
         <h2 className="text-2xl font-serif italic text-nrs-black">My Wishlist</h2>
       </div>
 
-      {loading ? (
+      {errorMessage ? <p role="alert" className="text-sm text-red-800">{errorMessage}</p> : loading ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-nrs-black/20 border-t-nrs-black rounded-full animate-spin" />
         </div>
@@ -165,4 +173,3 @@ export default function WishlistGrid() {
     </div>
   );
 }
-

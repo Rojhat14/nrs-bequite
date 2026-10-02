@@ -36,7 +36,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-nrs-ivory flex">
       {/* LEFT SIDEBAR NAVIGATION - Consistent with Checkout */}
-      <aside className="fixed left-0 top-0 h-full w-20 md:w-64 bg-white border-r border-nrs-black/10 flex flex-col items-center py-12 px-6 z-50">
+      <aside className="fixed left-0 top-[var(--nrs-header-height)] bottom-0 w-64 bg-white border-r border-nrs-black/10 hidden md:flex flex-col items-center py-12 px-6 z-50">
         <div className="mb-12">
           <Link href="/" className="flex flex-col items-center gap-1">
             <Image
@@ -88,7 +88,7 @@ export default function ProfilePage() {
       </aside>
 
       {/* MAIN CONTENT - Pushed to the right to make space for sidebar */}
-      <main className="flex-1 ml-20 md:ml-64">
+      <main className="min-w-0 flex-1 md:ml-64 pt-[var(--nrs-header-height)]">
         <div className="max-w-4xl mx-auto py-20 px-8">
           <div className="mb-12">
             <button

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import Image from 'next/image';
 
@@ -16,16 +16,16 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
   const sparkles = React.useMemo(() =>
     Array.from({ length: 10 }).map((_, i) => ({
       id: i,
-      x: (Math.random() - 0.5) * 250,
-      y: (Math.random() - 0.5) * 250,
-      size: Math.random() * 2 + 1,
-      duration: Math.random() * 0.6 + 0.6,
-      delay: Math.random() * 0.7 + 0.5,
+      x: (i * 73 % 251) - 125,
+      y: (i * 97 % 251) - 125,
+      size: 1 + (i % 3) * 0.5,
+      duration: 0.6 + (i % 4) * 0.15,
+      delay: 0.5 + (i % 7) * 0.1,
     })), []
   );
 
-  useLayoutEffect(() => {
-    const ghostLogo = document.querySelector('[data-intro-target="logo"]');
+  useEffect(() => {
+    const ghostLogo = Array.from(document.querySelectorAll('[data-intro-target="logo"]')).find(logo => logo.getClientRects().length > 0);
     if (ghostLogo) {
       setTargetRect(ghostLogo.getBoundingClientRect());
     }
@@ -58,7 +58,7 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
             width={300}
             height={120}
             priority
-            className="h-64 md:h-80 w-auto object-contain"
+            className="h-auto w-[min(300px,80vw)] object-contain"
           />
         </motion.div>
       </motion.div>
@@ -109,7 +109,7 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
           }}
           animate={{
             opacity: [0, 1, 1, 1],
-            scale: [0.96, 1, 1, targetRect ? targetRect.width / 300 : 1],
+            scale: [0.96, 1, 1, targetRect ? targetRect.width / Math.min(300, window.innerWidth * 0.8) : 1],
             x: [0, 0, 0, targetRect ? targetRect.left + targetRect.width / 2 - (window.innerWidth / 2) : 0],
             y: [0, 0, 0, targetRect ? targetRect.top + targetRect.height / 2 - (window.innerHeight / 2) : 0],
           }}
@@ -133,7 +133,7 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
             width={300}
             height={120}
             priority
-            className="h-64 md:h-80 w-auto object-contain"
+            className="h-auto w-[min(300px,80vw)] object-contain"
           />
         </motion.div>
       </div>

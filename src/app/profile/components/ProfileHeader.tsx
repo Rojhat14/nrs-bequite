@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, Edit2, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import type { ProfileRow } from '@/lib/admin/types';
 
 interface ProfileHeaderProps {
-  profile: any;
+  profile: ProfileRow | null;
 }
 
 export default function ProfileHeader({ profile }: ProfileHeaderProps) {
@@ -20,7 +21,12 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
   });
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (!isEditing) setFormData({ first_name: profile?.first_name || '', last_name: profile?.last_name || '', phone: profile?.phone || '' });
+  }, [profile, isEditing]);
+
   const handleSave = async () => {
+    if (!user || saving) return;
     setSaving(true);
     try {
       const { error } = await supabase
@@ -30,7 +36,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
           last_name: formData.last_name,
           phone: formData.phone,
         })
-        .eq('id', user?.id);
+        .eq('id', user.id);
 
       if (error) throw error;
       setIsEditing(false);
@@ -62,7 +68,7 @@ export default function ProfileHeader({ profile }: ProfileHeaderProps) {
               <h2 className="text-2xl font-serif text-nrs-black">
                 {profile?.first_name} {profile?.last_name}
               </h2>
-              <p className="text-xs uppercase tracking-widest text-nrs-black/50">{profile?.email}</p>
+              <p className="break-all text-xs uppercase tracking-widest text-nrs-black/50">{profile?.email}</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left max-w-md mx-auto pt-6 border-t border-nrs-black/10">

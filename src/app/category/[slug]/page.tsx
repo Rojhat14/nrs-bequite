@@ -1,13 +1,12 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { ProductCard } from '@/components/ProductCard'
+import ProductListing from '@/components/ProductListing'
 import CategoryHero from '@/components/CategoryHero'
-import Navigation from '@/components/Navigation'
-import { getCategoryCatalog } from '@/lib/products'
+import { getCategoryCatalog, getStorefrontProducts } from '@/lib/products'
 import { getCategoryEditorialImage } from '@/lib/editorialImages'
 
 interface CategoryPageProps {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 const categoryBanners: Record<string, { title: string; description: string }> = {
@@ -28,10 +27,19 @@ const categoryBanners: Record<string, { title: string; description: string }> = 
 }
 
 async function getPageData(slug: string) {
-  return getCategoryCatalog(slug)
+  const catalog = await getCategoryCatalog(slug)
+  if (!catalog.category && ['sale', 'indirim'].includes(slug.toLowerCase())) {
+    const products = await getStorefrontProducts()
+    return {
+      category: { id: '', name: 'İndirim', slug: 'sale', description: null, sort_order: 0 },
+      products: products.filter(product => product.compareAtPrice != null && product.priceAmount != null && product.compareAtPrice > product.priceAmount),
+    }
+  }
+  return catalog
 }
 
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+export async function generateMetadata({ params: paramsPromise }: CategoryPageProps): Promise<Metadata> {
+  const params = await paramsPromise
   const { category } = await getPageData(params.slug)
   if (!category) return { title: 'Kategori bulunamadı | NRS' }
   return {
@@ -40,7 +48,8 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   }
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage({ params: paramsPromise }: CategoryPageProps) {
+  const params = await paramsPromise
   const { category, products } = await getPageData(params.slug)
   if (!category) notFound()
   const banner = categoryBanners[params.slug.toLowerCase()] ?? categoryBanners[category.slug] ?? {
@@ -51,24 +60,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   return (
     <div className="min-h-screen bg-nrs-ivory text-nrs-black">
-      <Navigation />
       <CategoryHero title={banner.title} description={banner.description} image={image} />
 
       <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="flex justify-between items-end mb-16">
-          <div className="space-y-2">
-            <h2 className="text-3xl font-serif tracking-tight">{category.name}</h2>
-            <p className="text-nrs-black/40 font-light text-sm">{products.length} Parça Mevcut</p>
-          </div>
-          <div className="hidden md:block">
-            <select aria-label="Ürünleri sırala" className="bg-transparent border-b border-nrs-black py-2 pr-8 focus:outline-none font-light text-xs uppercase tracking-widest">
-              <option>Öne Çıkanlar</option><option>Fiyat: Artan</option><option>Fiyat: Azalan</option><option>Yeni Gelenler</option>
-            </select>
-          </div>
-        </div>
-        {products.length > 0 ? <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-16">
-          {products.map((product) => <ProductCard key={product.id} product={product} />)}
-        </div> : <div className="text-center py-32"><p className="text-xl font-serif italic text-nrs-black/40">Bu seçkide henüz ürün bulunmuyor.</p></div>}
+        <ProductListing products={products} title={category.name} />
       </section>
     </div>
   )

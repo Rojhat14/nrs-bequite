@@ -1,3 +1,6 @@
+// Next config includes only files present in public at build/dev startup.
+const availableAssets = new Set<string>(JSON.parse(process.env.NRS_EDITORIAL_ASSETS || '[]'))
+
 const categoryImages: Record<string, string> = {
   elbiseler: '/images/editorial/categories/dresses.jpg',
   dresses: '/images/editorial/categories/dresses.jpg',
@@ -24,9 +27,11 @@ const collectionImages: Record<string, string> = {
 }
 
 export function getCategoryEditorialImage(slug: string) {
-  return categoryImages[slug.toLocaleLowerCase('tr-TR')] ?? null
+  const image = categoryImages[slug.toLocaleLowerCase('tr-TR')]
+  return image && availableAssets.has(image) ? image : null
 }
 
 export function getCollectionEditorialImage(slug: string) {
-  return collectionImages[slug.toLocaleLowerCase('tr-TR')] ?? null
+  const image = collectionImages[slug.toLocaleLowerCase('tr-TR')]
+  return image && availableAssets.has(image) ? image : null
 }

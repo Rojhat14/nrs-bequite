@@ -10,7 +10,8 @@ import { displayName, formatDate } from '@/lib/admin/types'
 
 type SearchParams = { page?: string; product?: string; user?: string }
 
-export default async function AdminFavoritesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminFavoritesPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await searchParamsPromise
   const result = await getFavorites({ page: Number(searchParams.page) || 1, productId: searchParams.product, userId: searchParams.user })
   const supabase = await createSupabaseServerClient()
   const userIds = Array.from(new Set(result.favorites.map((favorite) => favorite.user_id)))

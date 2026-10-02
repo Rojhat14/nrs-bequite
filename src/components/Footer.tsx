@@ -112,10 +112,10 @@ export default function Footer() {
           </p>
           <div className="flex gap-6">
             {/* Social icons would go here */}
-            <span className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans cursor-pointer hover:text-nrs-black transition-colors">
+            <span className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans transition-colors">
               Instagram
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans cursor-pointer hover:text-nrs-black transition-colors">
+            <span className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans transition-colors">
               Pinterest
             </span>
           </div>

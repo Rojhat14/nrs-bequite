@@ -6,7 +6,8 @@ import AdminStatusBadge from '@/components/admin/AdminStatusBadge'
 import { getAdminUserDetail, isMissingTable } from '@/lib/admin/data'
 import { displayName, formatDate, formatMoney } from '@/lib/admin/types'
 
-export default async function AdminUserDetailPage({ params }: { params: { id: string } }) {
+export default async function AdminUserDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = await paramsPromise
   const result = await getAdminUserDetail(params.id)
   if (isMissingTable(result.error)) return <AdminDatabaseState title="Müşteri tablolarına erişilemiyor" />
   if (!result.profile && !result.error) notFound()

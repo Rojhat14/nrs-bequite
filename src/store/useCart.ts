@@ -114,6 +114,28 @@ function validQuantity(quantity: number) {
   return Number.isFinite(quantity) ? Math.max(0, Math.floor(quantity)) : 0
 }
 
+function restoreItems(value: unknown): Item[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item: unknown) => {
+    if (!item || typeof item !== 'object') return []
+    const candidate = item as Partial<Item>
+    if (typeof candidate.id !== 'string' || typeof candidate.title !== 'string'
+      || typeof candidate.price !== 'string' || typeof candidate.quantity !== 'number') return []
+    const quantity = validQuantity(candidate.quantity)
+    if (!quantity) return []
+    return [{
+      id: candidate.id,
+      title: candidate.title,
+      price: candidate.price,
+      quantity,
+      image: typeof candidate.image === 'string' ? candidate.image : undefined,
+      size: typeof candidate.size === 'string' ? candidate.size : undefined,
+      variantId: typeof candidate.variantId === 'string' ? candidate.variantId : undefined,
+      compareAtPrice: typeof candidate.compareAtPrice === 'number' || typeof candidate.compareAtPrice === 'string' ? candidate.compareAtPrice : null,
+    }]
+  })
+}
+
 export const useCart = create<CartStore>()(
   persist(
     (set) => ({
@@ -173,11 +195,10 @@ export const useCart = create<CartStore>()(
       partialize: (state) => ({ items: state.items, wishlist: state.wishlist }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<CartStore> | undefined
-        const items = Array.isArray(persisted?.items) ? persisted.items : currentState.items
-        const wishlist = Array.isArray(persisted?.wishlist) ? persisted.wishlist : currentState.wishlist
+        const items = persisted?.items === undefined ? currentState.items : restoreItems(persisted.items)
+        const wishlist = Array.isArray(persisted?.wishlist) ? persisted.wishlist.filter((id): id is string => typeof id === 'string') : currentState.wishlist
         return {
           ...currentState,
-          ...persisted,
           items,
           wishlist,
           ...calculateCartTotals(items),

@@ -6,7 +6,8 @@ import OrderStatusForm from '@/components/admin/OrderStatusForm'
 import { getOrderDetail, isMissingTable } from '@/lib/admin/data'
 import { formatDate, formatMoney } from '@/lib/admin/types'
 
-export default async function AdminOrderDetailPage({ params }: { params: { id: string } }) {
+export default async function AdminOrderDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = await paramsPromise
   const data = await getOrderDetail(params.id)
   if (isMissingTable(data.error)) return <AdminDatabaseState title="Sipariş tablolarına erişilemiyor" />
   if (!data.order && !data.error) notFound()

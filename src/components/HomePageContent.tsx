@@ -14,7 +14,8 @@ export default function HomePageContent({ products }: { products: Product[] }) {
   const [showIntro, setShowIntro] = useState(true)
 
   useEffect(() => {
-    const introPlayed = sessionStorage.getItem('nrs-intro-played')
+    let introPlayed = null
+    try { introPlayed = sessionStorage.getItem('nrs-intro-played') } catch { /* Storage can be disabled. */ }
     if (introPlayed) {
       setShowIntro(false)
       setIntroFinished(true)
@@ -25,7 +26,8 @@ export default function HomePageContent({ products }: { products: Product[] }) {
     <main className="relative min-h-screen bg-[#F7F3EE] text-[#050505]">
       {showIntro && <IntroAnimation onComplete={() => {
         setIntroFinished(true)
-        sessionStorage.setItem('nrs-intro-played', 'true')
+        setShowIntro(false)
+        try { sessionStorage.setItem('nrs-intro-played', 'true') } catch { /* Optional animation preference. */ }
       }} />}
 
       <div className="pt-0">

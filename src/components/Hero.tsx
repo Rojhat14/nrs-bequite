@@ -14,7 +14,7 @@ interface HeroProps {
 
 const Hero = ({ introFinished, products }: HeroProps) => {
   return (
-    <section className="relative h-screen w-full bg-nrs-ivory flex flex-col items-center justify-center overflow-hidden">
+    <section className="relative min-h-[100svh] w-full bg-nrs-ivory flex flex-col items-center justify-center overflow-hidden pt-[var(--nrs-header-height)] pb-8">
       {/* Ambient Background Element */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-nrs-champagne/30 blur-[150px] rounded-full pointer-events-none" />
 
@@ -82,7 +82,7 @@ const Hero = ({ introFinished, products }: HeroProps) => {
                   Koleksiyonu Keşfet
                 </Link>
                 <Link
-                  href="/"
+                  href="/#collection"
                   className="px-10 py-4 border border-nrs-black text-nrs-black uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-700"
                 >
                   Yeni Gelenler

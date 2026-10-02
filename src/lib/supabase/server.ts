@@ -9,7 +9,7 @@ export async function createSupabaseServerClient() {
     throw new Error('Supabase server environment variables are not configured.')
   }
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {

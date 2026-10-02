@@ -43,7 +43,7 @@ const Selected = () => {
                     alt={product.name}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover grayscale hover:grayscale-0 transition-all duration-[1000ms] ease-in-out transform group-hover:scale-105"
+                    className="object-cover transition-transform duration-[1000ms] ease-in-out transform group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-all duration-500" />
                 </Link>

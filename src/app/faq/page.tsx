@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Navigation from '@/components/Navigation';
 import { motion } from 'framer-motion';
 
 export default function FAQPage() {
@@ -26,7 +25,6 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
-      <Navigation />
 
       <section className="pb-24 px-6">
         <div className="max-w-3xl mx-auto space-y-16">

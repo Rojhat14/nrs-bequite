@@ -12,7 +12,8 @@ import { getProductImageUrl } from '@/lib/storage/products'
 
 type SearchParams = { page?: string; q?: string; category?: string; status?: string }
 
-export default async function AdminProductsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminProductsPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await searchParamsPromise
   const page = Number(searchParams.page) || 1
   const result = await getProductList({ page, query: searchParams.q, category: searchParams.category, status: searchParams.status })
   const supabase = await createSupabaseServerClient()

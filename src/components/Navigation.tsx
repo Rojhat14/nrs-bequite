@@ -66,12 +66,15 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', updateHeaderHeight);
 
-    // Initial height calculation
-    setTimeout(updateHeaderHeight, 100);
+    const frame = requestAnimationFrame(updateHeaderHeight);
+    const observer = new ResizeObserver(updateHeaderHeight);
+    if (headerRef.current) observer.observe(headerRef.current);
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', updateHeaderHeight);
+      cancelAnimationFrame(frame);
+      observer.disconnect();
     };
   }, [handleScroll, updateHeaderHeight]);
 
@@ -259,14 +262,15 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                 <Menu size={21} strokeWidth={1.25} />
               </button>
               <button
-                aria-label="Search"
+                aria-label="Ürün ara"
+                onClick={() => router.push('/search')}
                 className={`p-2 ${styles.text} opacity-60 hover:opacity-100 transition-all duration-500 transform hover:scale-110`}
               >
                 <Search size={18} strokeWidth={1} />
               </button>
             </div>
 
-            <div className="flex flex-col items-center justify-center w-1/3">
+            <div className="hidden md:flex flex-col items-center justify-center w-1/3">
               <div className="flex justify-center relative">
                 <Link href="/" className="flex flex-col items-center justify-center cursor-pointer group relative">
                   <Image
@@ -282,8 +286,9 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               </div>
             </div>
 
-            <div className="hidden md:flex items-center justify-end gap-6 w-1/3">
+            <div className="hidden md:flex items-center justify-end gap-3 xl:gap-6 w-1/3">
               <AccountControl
+                compact
                 user={user}
                 profile={profile}
                 isAdmin={isAdmin}
@@ -327,10 +332,11 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                   width={180}
                   height={72}
                   className={`h-12 w-auto object-contain ${styles.logo}`}
+                  data-intro-target="logo"
                 />
               </Link>
               <div className="flex items-center gap-2">
-                <button className={`p-2 ${styles.text}`} aria-label="Search">
+                <button onClick={() => router.push('/search')} className={`p-2 ${styles.text}`} aria-label="Ürün ara">
                   <Search size={20} strokeWidth={1} />
                 </button>
                 <AccountControl
@@ -354,7 +360,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
             </div>
           </div>
 
-          <div className="hidden md:flex justify-center gap-x-8 -mt-4">
+          <div className="hidden lg:flex flex-wrap justify-center gap-x-6 gap-y-3 -mt-4">
             {navLinks.map((link) => (
               <button
                 key={link.name}

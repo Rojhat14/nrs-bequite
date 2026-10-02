@@ -10,10 +10,13 @@ export default function OrderHistory() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user) return;
+      setLoading(true);
+      setErrorMessage('');
+      if (!user) { setOrders([]); setLoading(false); return; }
       try {
         const { data, error } = await supabase
           .from('orders')
@@ -25,6 +28,7 @@ export default function OrderHistory() {
         setOrders(data || []);
       } catch (err) {
         console.error('Error fetching orders:', err);
+        setErrorMessage('Siparişler yüklenemedi. Lütfen sayfayı yenileyerek tekrar deneyin.');
       } finally {
         setLoading(false);
       }
@@ -40,7 +44,7 @@ export default function OrderHistory() {
         <h2 className="text-2xl font-serif italic text-nrs-black">Order History</h2>
       </div>
 
-      {loading ? (
+      {errorMessage ? <p role="alert" className="text-sm text-red-800">{errorMessage}</p> : loading ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-nrs-black/20 border-t-nrs-black rounded-full animate-spin" />
         </div>
@@ -70,7 +74,7 @@ export default function OrderHistory() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-nrs-black/10">
+              <div className="flex flex-wrap gap-3 justify-between items-center pt-4 border-t border-nrs-black/10">
                 <div className="flex items-center gap-2">
                   <div className={`w-1.5 h-1.5 rounded-full ${
                     order.status === 'delivered' ? 'bg-green-500' : 'bg-amber-500'
@@ -78,7 +82,7 @@ export default function OrderHistory() {
                   <span className="text-xs uppercase tracking-widest text-nrs-black/60">{order.status}</span>
                 </div>
                 <span className="text-sm font-serif text-nrs-black font-medium">
-                  ₺{order.total_amount.toLocaleString('tr-TR')}
+                  ₺{Number(order.total_amount).toLocaleString('tr-TR')}
                 </span>
               </div>
             </motion.div>

@@ -4,10 +4,11 @@ import { notFound } from 'next/navigation'
 import { getStorefrontProduct } from '@/lib/products'
 
 interface ProductPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+export async function generateMetadata({ params: paramsPromise }: ProductPageProps): Promise<Metadata> {
+  const params = await paramsPromise
   const product = await getStorefrontProduct(params.id)
   if (!product) return { title: 'Ürün bulunamadı | NRS' }
   return {
@@ -16,7 +17,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   }
 }
 
-export default async function ProductPage({ params }: ProductPageProps) {
+export default async function ProductPage({ params: paramsPromise }: ProductPageProps) {
+  const params = await paramsPromise
   const product = await getStorefrontProduct(params.id)
   if (!product) notFound()
   return <div className="min-h-screen bg-[#F7F3EE] text-[#050505]"><ProductDetail product={product} /></div>

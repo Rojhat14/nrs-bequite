@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Navigation from '@/components/Navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,7 +8,6 @@ import Image from 'next/image';
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
-      <Navigation />
 
       <main className="max-w-7xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32">
         {/* SECTION 1: NRS HAKKINDA */}

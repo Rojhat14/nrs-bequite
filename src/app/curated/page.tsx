@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Navigation from '@/components/Navigation';
 import { motion } from 'framer-motion';
 import EditorialImage from '@/components/EditorialImage'
 import { getCollectionEditorialImage } from '@/lib/editorialImages'
@@ -9,7 +8,6 @@ import { getCollectionEditorialImage } from '@/lib/editorialImages'
 export default function CuratedPage() {
   return (
     <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
-      <Navigation />
 
       <section className="pb-24 px-6">
         <div className="max-w-7xl mx-auto space-y-20">

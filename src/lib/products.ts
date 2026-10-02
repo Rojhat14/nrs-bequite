@@ -74,7 +74,7 @@ function toStorefrontProduct(
     name: row.name,
     category: category?.name ?? legacy?.category ?? '',
     description: row.description ?? '',
-    image: galleryImages[0]?.url ?? legacy?.image ?? '',
+    image: (galleryImages.find(image => image.isPrimary) ?? galleryImages[0])?.url ?? legacy?.image ?? '',
     hoverImage: galleryImages[1]?.url ?? legacy?.hoverImage,
     price: formatPrice(Number(row.price_amount), row.currency),
     priceAmount: Number(row.price_amount),

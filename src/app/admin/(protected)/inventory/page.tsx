@@ -7,7 +7,8 @@ import { LOW_STOCK_THRESHOLD } from '@/lib/admin/config'
 
 type SearchParams = { page?: string; filter?: string }
 
-export default async function AdminInventoryPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminInventoryPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await searchParamsPromise
   const page = Number(searchParams.page) || 1
   const result = await getInventoryRows({ page, filter: searchParams.filter })
   const filter = ['in-stock', 'low', 'out'].includes(searchParams.filter ?? '') ? searchParams.filter : ''

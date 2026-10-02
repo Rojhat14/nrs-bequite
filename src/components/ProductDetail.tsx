@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { ShoppingBag, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
+import { whatsappNumber } from '@/lib/storefront-config';
 
 interface ProductDetailProps {
   product: Product;
@@ -19,6 +20,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(() => {
     const primaryIndex = product.galleryImages?.findIndex((image) => image.isPrimary) ?? -1
     return Math.max(0, primaryIndex)
@@ -26,43 +28,52 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
   const touchStartX = useRef<number | null>(null);
   useEffect(() => {
+    let active = true;
     const checkWishlist = async () => {
+      setIsWishlisted(false);
       if (!user) return;
       const { data } = await supabase
         .from('wishlist')
         .select('id')
         .eq('user_id', user.id)
         .eq('product_id', product.id)
-        .single();
-      setIsWishlisted(!!data);
+        .maybeSingle();
+      if (active) setIsWishlisted(!!data);
     };
     checkWishlist();
+    return () => { active = false; };
   }, [user, product.id]);
 
   const toggleWishlist = async () => {
+    if (wishlistBusy) return;
     if (!user) {
       alert('Lütfen favorilerinize eklemek için giriş yapın.');
       return;
     }
 
     const prevStatus = isWishlisted;
+    setWishlistBusy(true);
     setIsWishlisted(!prevStatus);
 
     try {
       if (prevStatus) {
-        await supabase
+        const { error } = await supabase
           .from('wishlist')
           .delete()
           .eq('user_id', user.id)
           .eq('product_id', product.id);
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from('wishlist')
           .insert({ user_id: user.id, product_id: product.id });
+        if (error) throw error;
       }
     } catch (error) {
       console.error('Wishlist error:', error);
       setIsWishlisted(prevStatus);
+    } finally {
+      setWishlistBusy(false);
     }
   };
 
@@ -101,20 +112,20 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   return (
     <div className="min-h-screen bg-nrs-ivory flex">
       <main className="w-full flex-1 pb-32">
-        <div className="max-w-7xl mx-auto px-6 pt-32 grid grid-cols-1 lg:grid-cols-12 gap-16">
-          <div className="lg:col-span-7 space-y-6">
+        <div className="max-w-7xl mx-auto px-6 pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-16">
+          <div className="lg:col-span-7 min-w-0 space-y-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="relative"
+              className={`product-gallery relative grid gap-3 ${galleryImages.length > 1 ? 'grid-cols-[3rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
               role="region"
               aria-label="Ürün görsel galerisi"
               tabIndex={galleryImages.length > 1 ? 0 : undefined}
               onKeyDown={handleGalleryKeyDown}
             >
               <div
-                className="relative aspect-[3/4] overflow-hidden bg-nrs-black/5"
+                className="relative h-full min-h-0 min-w-0 overflow-hidden"
                 onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null }}
                 onTouchEnd={(event) => {
                   const startX = touchStartX.current
@@ -132,7 +143,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   fill
                   priority={activeImageIndex === 0}
                   sizes="(max-width: 1024px) 100vw, 60vw"
-                  className="object-cover"
+                  className="object-contain"
                   onError={() => markImageBroken(activeImageIndex)}
                 />
               ) : (
@@ -158,14 +169,16 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               </>}
               <button
                 onClick={toggleWishlist}
+                disabled={wishlistBusy}
                 className="absolute top-6 right-6 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-colors z-10"
-                aria-label="Favorilere ekle"
+                aria-label={isWishlisted ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                aria-pressed={isWishlisted}
               >
                 <Heart size={20} fill={isWishlisted ? 'currentColor' : 'none'} strokeWidth={1.2} />
               </button>
               </div>
 
-              {galleryImages.length > 1 && <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+              {galleryImages.length > 1 && <div className="order-first flex min-h-0 flex-col gap-3 overflow-y-auto overflow-x-hidden">
                 {galleryImages.map((image, index) => (
                   <button
                     type="button"
@@ -173,14 +186,14 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     onClick={() => setActiveImageIndex(index)}
                     aria-label={`${index + 1}. ürün görselini göster`}
                     aria-pressed={activeImageIndex === index}
-                    className={`relative aspect-square overflow-hidden border bg-nrs-black/5 transition ${activeImageIndex === index ? 'border-nrs-black opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
+                    className={`relative h-12 w-12 shrink-0 sm:h-20 sm:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-black opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
                   >
                     {!brokenImages.has(index) ? <Image
                       src={image.url}
                       alt={image.altText || `${product.name} — ${index + 1}`}
                       fill
-                      sizes="(max-width: 640px) 30vw, 15vw"
-                      className="object-cover"
+                      sizes="(max-width: 639px) 48px, 80px"
+                      className="object-contain"
                       onError={() => markImageBroken(index)}
                     /> : <span className="absolute inset-0 bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
                   </button>
@@ -259,14 +272,14 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     <ShoppingBag size={18} />
                     Sepete Ekle
                   </button>
-                  <a
-                    href={`https://wa.me/905000000000?text=Merhaba! Şu ürünle ilgileniyorum:\n\nÜrün: ${product.name}\nBeden: ${selectedVariant?.label || 'Seçilmedi'}\nAdet: ${quantity}\n\nDetaylı bilgi alabilir miyim?`}
+                  {whatsappNumber && <a
+                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Merhaba! Şu ürünle ilgileniyorum:\n\nÜrün: ${product.name}\nBeden: ${selectedVariant?.label || 'Seçilmedi'}\nAdet: ${quantity}\n\nDetaylı bilgi alabilir miyim?`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full bg-[#25D366] text-white py-5 uppercase tracking-widest text-xs font-sans hover:bg-[#128C7E] transition-all duration-700 flex items-center justify-center gap-3"
                   >
                     WhatsApp ile Sipariş
-                  </a>
+                  </a>}
                 </div>
               </div>
 

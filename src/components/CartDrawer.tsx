@@ -6,10 +6,12 @@ import { X, ShoppingBag } from 'lucide-react';
 import { getCartItemId, useCart } from '@/store/useCart';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useDialog } from '@/hooks/useDialog';
 
 const CartDrawer = () => {
   const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
   const router = useRouter();
+  const dialogRef = useDialog(isDrawerOpen, closeDrawer);
 
   return (
     <AnimatePresence>
@@ -18,7 +20,7 @@ const CartDrawer = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-nrs-black/40 backdrop-blur-sm flex justify-end"
+          className="fixed inset-0 z-[150] bg-nrs-black/40 backdrop-blur-sm flex justify-end"
           onClick={closeDrawer}
         >
           <motion.div
@@ -26,16 +28,22 @@ const CartDrawer = () => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 200 }}
-            className="w-full max-w-[450px] bg-nrs-ivory h-full shadow-2xl p-8 flex flex-col"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cart-drawer-title"
+            tabIndex={-1}
+            className="w-full max-w-[450px] bg-nrs-ivory h-[100dvh] overflow-y-auto shadow-2xl p-4 sm:p-8 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-12">
+            <div className="flex shrink-0 justify-between items-center mb-6 sm:mb-12">
               <div className="flex items-center gap-3">
                 <ShoppingBag size={20} strokeWidth={1.5} className="text-nrs-black" />
-                <h2 className="font-serif text-2xl text-nrs-black">Your Bag</h2>
+                <h2 id="cart-drawer-title" className="font-serif text-2xl text-nrs-black">Your Bag</h2>
               </div>
               <button
                 onClick={closeDrawer}
+                aria-label="Sepeti kapat"
                 className="p-2 text-nrs-black hover:text-nrs-rosegold transition-colors rounded-full hover:bg-nrs-black/5"
               >
                 <X size={24} strokeWidth={1.5} />
@@ -60,11 +68,11 @@ const CartDrawer = () => {
               </div>
             ) : (
               <>
-                <div className="flex-1 overflow-y-auto pr-4 space-y-8">
+                <div className="min-h-24 flex-1 overflow-y-auto pr-1 sm:pr-4 space-y-8">
                   {items.map((item) => {
                     const cartItemId = getCartItemId(item)
-                    return <div key={cartItemId} className="flex gap-6 pb-8 border-b border-nrs-black/10">
-                      <div className="w-24 h-32 bg-nrs-black/5 flex-shrink-0 overflow-hidden relative">
+                    return <div key={cartItemId} className="flex gap-3 sm:gap-6 pb-8 border-b border-nrs-black/10">
+                      <div className="w-16 h-24 sm:w-24 sm:h-32 bg-nrs-black/5 flex-shrink-0 overflow-hidden relative">
                         <Image
                           src={item.image || 'https://images.unsplash.com/photo-1515378791000-01714bb6013c?q=80&w=200&auto=format&fit=crop'}
                           alt={item.title}
@@ -73,12 +81,12 @@ const CartDrawer = () => {
                           sizes="96px"
                         />
                       </div>
-                      <div className="flex flex-col justify-between flex-1 py-1">
-                        <div className="flex justify-between items-start">
+                      <div className="min-w-0 flex flex-col justify-between flex-1 py-1">
+                        <div className="flex flex-wrap justify-between gap-2 items-start">
                           <h3 className="text-sm font-serif text-nrs-black">{item.title}</h3>
                           <p className="text-sm font-sans text-nrs-black">{item.price}</p>
                         </div>
-                        <div className="flex justify-between items-center mt-4">
+                        <div className="flex flex-wrap gap-3 justify-between items-center mt-4">
                           <div className="space-y-2">
                             {item.size && <p className="text-xs text-nrs-black/50">Beden: {item.size}</p>}
                             <div className="flex items-center gap-3 text-xs text-nrs-black/50 uppercase tracking-widest">
@@ -99,7 +107,7 @@ const CartDrawer = () => {
                   })}
                 </div>
 
-                  <div className="pt-8 border-t border-nrs-black/20 space-y-6">
+                  <div className="shrink-0 pt-4 sm:pt-8 border-t border-nrs-black/20 space-y-4 sm:space-y-6">
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between items-center">
                         <span className="text-nrs-black/60 uppercase tracking-widest">Ara Toplam</span>

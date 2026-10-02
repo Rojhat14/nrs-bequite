@@ -9,7 +9,8 @@ import { formatDate, formatMoney } from '@/lib/admin/types'
 type SearchParams = { page?: string; q?: string; status?: string }
 const statuses = ['pending', 'payment_pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled']
 
-export default async function AdminOrdersPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminOrdersPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await searchParamsPromise
   const result = await getOrderList({ page: Number(searchParams.page) || 1, query: searchParams.q, status: searchParams.status })
   const params = new URLSearchParams()
   if (searchParams.q) params.set('q', searchParams.q)

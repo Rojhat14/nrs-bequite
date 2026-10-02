@@ -1,10 +1,11 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-let browserClient: ReturnType<typeof createBrowserClient> | undefined
+let browserClient: SupabaseClient | undefined
 
-export function createSupabaseBrowserClient() {
+export function createSupabaseBrowserClient(): SupabaseClient {
   if (browserClient) return browserClient
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

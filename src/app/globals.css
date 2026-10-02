@@ -7,7 +7,7 @@
   --foreground: 5 5 5;       /* #050505 */
   --muted: 139 129 123;     /* #8B817B */
   --accent: 184 137 112;    /* #B88970 */
-  --nrs-header-height: 65px; /* Ultra-compact luxury height */
+  --nrs-header-height: 100px;
 }
 
 body {
@@ -25,6 +25,26 @@ body {
 
 .layout-content {
   padding-top: var(--nrs-header-height);
+}
+
+@media (min-width: 768px) {
+  :root { --nrs-header-height: 135px; }
+}
+
+html { scroll-padding-top: calc(var(--nrs-header-height) + 1rem); }
+
+@media (hover: none) {
+  .product-card-favorite { opacity: 1; transform: translateY(0); }
+  .product-card-quick-add { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 767px) {
+  input, select, textarea, input[class], select[class], textarea[class] { font-size: 16px; }
+}
+
+/* Side thumbnails let the main image use the remaining viewport height. */
+.product-gallery {
+  height: calc(100svh - max(8rem, var(--nrs-header-height) + 1rem) - 1.5rem);
 }
 
 h1, h2, h3, h4, .font-serif {

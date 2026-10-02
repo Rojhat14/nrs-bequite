@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Navigation from '@/components/Navigation'
 import CollectionListing from '@/components/CollectionListing'
 import { getStorefrontCollections } from '@/lib/products'
 
@@ -12,7 +11,6 @@ export default async function CollectionsPage() {
   const collections = await getStorefrontCollections()
   return (
     <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
-      <Navigation />
       <section className="pb-24 px-6">
         <div className="max-w-7xl mx-auto space-y-20">
           <div className="text-center space-y-4">
