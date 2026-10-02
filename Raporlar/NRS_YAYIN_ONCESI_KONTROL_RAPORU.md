@@ -60,7 +60,7 @@ Hosting platformu belirtilmedi. Node.js çalıştırabilen Next.js hosting kulla
 
 Build öncesi hosting ortamına .env.example içindeki NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY değerlerini tanımlayın; anon/publishable anahtar kullanılmalı, service-role anahtar kullanılmamalı. İşletme e-postası ve WhatsApp numarasını NEXT_PUBLIC_CONTACT_EMAIL / NEXT_PUBLIC_WHATSAPP_NUMBER ile ekleyin. NEXT_PUBLIC ayarları değiştiğinde yeniden build/deploy gerekir. Supabase Site URL ve izinli redirect URL'lerini gerçek domain için yapılandırın.
 
-12 kategori/koleksiyon editorial fotoğrafı public/images/editorial altında henüz yok. Beklenen dosya isimleri src/lib/editorialImages.ts içinde duruyor. Fotoğraflar eklendikten sonra yeniden build edin veya dev sunucusunu yeniden başlatın.
+3 Ekim 2026 görsel güncellemesi: 12 kategori/koleksiyon fotoğrafı public/images/editorial altına eklendi. Kaynaklar ve doğrulama ayrıntıları [görsel kaynak raporunda](NRS_EDITORIAL_GORSEL_KAYNAKLARI.md). Önceden açık kalan dev sunucusunu yeniden başlatın; görsel listesi başlangıç/derleme sırasında belirlenir.
 
 Yayından önce gerçek cihazda menü, sepet, giriş penceresi, ürün galerisi ve checkout/profil ekranlarını deneyin. Gerçek hesapla giriş/kayıt/e-posta onayı ve RLS erişimini doğrulayın. Online ödeme ve bülten servisleri entegrasyon tamamlanana kadar kapalıdır.
 

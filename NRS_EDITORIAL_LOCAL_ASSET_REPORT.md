@@ -12,7 +12,7 @@
 - `public/images/editorial/categories/.gitkeep`
 - `public/images/editorial/collections/.gitkeep`
 
-İki klasör oluşturuldu. `.gitkeep` dosyaları yalnızca boş klasörlerin repoda bulunmasını sağlar; görsel değildir. Gerçek görsel dosyası veya sahte placeholder üretilmedi.
+İlk hazırlıkta iki klasör oluşturuldu. 3 Ekim 2026 güncellemesinde beklenen 12 JPEG dosyası eklendi. Fotoğraf kaynakları ve uygulama ayrıntıları [görsel kaynak raporunda](Raporlar/NRS_EDITORIAL_GORSEL_KAYNAKLARI.md) bulunur.
 
 ## Kategori path eşleşmeleri
 
@@ -59,4 +59,4 @@ Kategori/collection görsel fallback’leri olarak kullanılan aynı Unsplash fo
 
 - TypeScript (`npx tsc --noEmit --incremental false`): **PASS**
 - Build (`npm run build`): **PASS**
-- Görsel dosyaları: **Üretilmedi; daha sonra aynı path ve dosya adlarıyla eklenecek.**
+- Görsel dosyaları: **12/12 yerel JPEG eklendi; mevcut path eşleşmeleri kullanılıyor.**
