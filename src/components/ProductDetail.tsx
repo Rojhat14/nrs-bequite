@@ -110,7 +110,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   }
 
   return (
-    <div className="min-h-screen bg-nrs-ivory flex">
+    <div className="min-h-screen bg-nrs-canvas flex">
       <main className="w-full flex-1 pb-32">
         <div className="max-w-7xl mx-auto px-6 pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-16">
           <div className="lg:col-span-7 min-w-0 space-y-6">
@@ -154,7 +154,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   type="button"
                   onClick={() => moveImage(-1)}
                   aria-label="Önceki ürün görseli"
-                  className="absolute left-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-black"
+                  className="absolute left-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
                 >
                   <ArrowLeft size={18} strokeWidth={1.4} />
                 </button>
@@ -162,7 +162,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   type="button"
                   onClick={() => moveImage(1)}
                   aria-label="Sonraki ürün görseli"
-                  className="absolute right-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-black"
+                  className="absolute right-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
                 >
                   <ArrowRight size={18} strokeWidth={1.4} />
                 </button>
@@ -186,7 +186,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     onClick={() => setActiveImageIndex(index)}
                     aria-label={`${index + 1}. ürün görselini göster`}
                     aria-pressed={activeImageIndex === index}
-                    className={`relative h-12 w-12 shrink-0 sm:h-20 sm:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-black opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
+                    className={`relative h-12 w-12 shrink-0 sm:h-20 sm:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-ink opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
                   >
                     {!brokenImages.has(index) ? <Image
                       src={image.url}
@@ -213,20 +213,20 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 <span className="text-xs uppercase tracking-[0.3em] text-nrs-rosegold font-sans">
                   {product.category}
                 </span>
-                <h1 className="text-4xl md:text-6xl font-serif text-nrs-black leading-tight tracking-tight">
+                <h1 className="text-4xl md:text-6xl font-serif text-nrs-ink leading-tight tracking-tight">
                   {product.name}
                 </h1>
                 <div className="flex items-baseline gap-3">
-                  <p className="text-2xl font-serif text-nrs-black/80">{product.price}</p>
-                  {product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-black/40">{product.currency === 'TRY' || !product.currency ? '₺' : `${product.currency} `}{product.compareAtPrice.toLocaleString('en-US')}</del>}
+                  <p className="text-2xl font-serif text-nrs-ink/80">{product.price}</p>
+                  {product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{product.currency === 'TRY' || !product.currency ? '₺' : `${product.currency} `}{product.compareAtPrice.toLocaleString('en-US')}</del>}
                 </div>
-                <p className={`text-[10px] uppercase tracking-[0.18em] ${product.inStock ? 'text-nrs-black/45' : 'text-red-800'}`}>{product.inStock ? 'Stokta' : 'Tükendi'}</p>
+                <p className={`text-[10px] uppercase tracking-[0.18em] ${product.inStock ? 'text-nrs-ink/60' : 'text-red-400'}`}>{product.inStock ? 'Stokta' : 'Tükendi'}</p>
               </div>
 
-              <div className="space-y-8 py-10 border-y border-nrs-black/10">
+              <div className="space-y-8 py-10 border-y border-nrs-ink/10">
                 <div className="space-y-5">
                   {variants.length > 0 && <>
-                  <p className="text-xs uppercase tracking-widest text-nrs-black/40 font-sans">Beden Seçin</p>
+                  <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">Beden Seçin</p>
                   <div className="flex flex-wrap gap-3">
                     {variants.map((variant) => (
                       <button
@@ -237,8 +237,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                         aria-pressed={selectedVariantId === variant.id}
                         className={`min-w-12 h-12 px-3 text-xs font-sans transition-all duration-500 border disabled:cursor-not-allowed disabled:opacity-35 ${
                           selectedVariantId === variant.id
-                            ? 'bg-nrs-black text-nrs-ivory border-nrs-black'
-                            : 'bg-transparent text-nrs-black border-nrs-black/20 hover:border-nrs-black'
+                            ? 'bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory border-nrs-ink'
+                            : 'bg-transparent text-nrs-ink border-nrs-ink/20 hover:border-nrs-ink'
                         }`}
                       >
                         {variant.label}
@@ -267,7 +267,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       openDrawer();
                     }}
                     disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
-                    className="w-full bg-nrs-black text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans hover:bg-nrs-charcoal transition-all duration-700 flex items-center justify-center gap-3"
+                    className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans hover:bg-nrs-charcoal transition-all duration-700 flex items-center justify-center gap-3"
                   >
                     <ShoppingBag size={18} />
                     Sepete Ekle
@@ -285,30 +285,30 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <h3 className="text-xs uppercase tracking-widest text-nrs-black font-medium">Ürün Hikayesi</h3>
-                  <p className="text-nrs-black/60 leading-relaxed font-sans italic">
+                  <h3 className="text-xs uppercase tracking-widest text-nrs-ink font-medium">Ürün Hikayesi</h3>
+                  <p className="text-nrs-ink/60 leading-relaxed font-sans italic">
                     {product.description}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-black/40 font-bold">Detaylar</h4>
-                    <ul className="text-sm font-sans text-nrs-black/70 space-y-2">
+                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">Detaylar</h4>
+                    <ul className="text-sm font-sans text-nrs-ink/70 space-y-2">
                       {product.details.fabric && <li>{product.details.fabric}</li>}
                       {product.category && <li>{product.category}</li>}
                       {variants.length > 0 && <li>{variants.reduce((total, variant) => total + variant.stock, 0)} adet stok</li>}
                     </ul>
                   </div>
                   <div className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-black/40 font-bold">Kalıp & Bakım</h4>
-                    <p className="text-sm font-sans text-nrs-black/70 leading-relaxed">{product.details.care || 'Bakım bilgisi yakında eklenecektir.'}</p>
+                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">Kalıp & Bakım</h4>
+                    <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || 'Bakım bilgisi yakında eklenecektir.'}</p>
                   </div>
                 </div>
 
                 <div className="pt-8 space-y-4">
-                  <h4 className="text-[10px] uppercase tracking-widest text-nrs-black/40 font-bold">Stil Önerisi</h4>
-                  <p className="text-sm font-sans text-nrs-black/70 italic leading-relaxed">
+                  <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">Stil Önerisi</h4>
+                  <p className="text-sm font-sans text-nrs-ink/70 italic leading-relaxed">
                     Ton sür ton bir pantolonla tamamlayarak güçlü bir takım görünümü yaratabilir veya sade bir elbisenin üzerine taşıyarak daha sofistike bir akşam görünümü elde edebilirsiniz.
                   </p>
                 </div>

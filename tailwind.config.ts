@@ -7,6 +7,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        'nrs-canvas': '#000000',
+        'nrs-ink': '#F7F3EE',
+        'nrs-panel': '#151515',
         'nrs-black': '#050505',
         'nrs-ivory': '#F7F3EE',
         'nrs-warm-white': '#FAF9F6',

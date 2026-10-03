@@ -120,20 +120,20 @@ export const ProductCard = ({ product, onProductClick }: ProductCardProps) => {
             addItem({ id: product.id, title: product.name, price: product.price, image: product.image, compareAtPrice: product.compareAtPrice });
             openDrawer();
           }}
-          className="product-card-quick-add absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 px-4 sm:px-6 py-3 bg-nrs-black text-nrs-ivory text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-700 transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 z-20"
+          className="product-card-quick-add absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 px-4 sm:px-6 py-3 bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-700 transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 z-20"
         >
           İncele
         </button>
       </div>
 
       <div className="space-y-3 text-center md:text-left">
-        <span className="text-[9px] uppercase tracking-[0.3em] text-nrs-black/40 font-sans block">
+        <span className="text-[9px] uppercase tracking-[0.3em] text-nrs-ink/60 font-sans block">
           {product.category}
         </span>
-        <h3 className="text-lg font-serif text-nrs-black group-hover:text-nrs-rosegold transition-colors duration-500 leading-tight">
+        <h3 className="text-lg font-serif text-nrs-ink group-hover:text-nrs-rosegold transition-colors duration-500 leading-tight">
           <Link href={`/product/${encodeURIComponent(product.slug || product.id)}`}>{product.name}</Link>
         </h3>
-        <p className="text-sm font-sans text-nrs-black/60 font-light">
+        <p className="text-sm font-sans text-nrs-ink/60 font-light">
           {product.price}
         </p>
       </div>

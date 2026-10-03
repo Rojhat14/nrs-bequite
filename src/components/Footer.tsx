@@ -6,7 +6,7 @@ import Image from 'next/image';
 
 export default function Footer() {
   return (
-    <footer className="bg-nrs-ivory border-t border-nrs-black/5 pt-20 pb-10 px-6 md:px-12">
+    <footer className="bg-nrs-canvas border-t border-nrs-ink/5 pt-20 pb-10 px-6 md:px-12">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
 
@@ -20,18 +20,18 @@ export default function Footer() {
                 height={64}
                 className="h-16 w-auto object-contain transition-transform duration-700 group-hover:scale-105"
               />
-              <span className="text-[10px] uppercase tracking-[0.4em] font-sans text-nrs-black/40 mt-4">
+              <span className="text-[10px] uppercase tracking-[0.4em] font-sans text-nrs-ink/60 mt-4">
                 Zarafetin Sanatı
               </span>
             </Link>
-            <p className="text-sm text-nrs-black/60 font-light leading-relaxed max-w-xs font-sans">
+            <p className="text-sm text-nrs-ink/60 font-light leading-relaxed max-w-xs font-sans">
               Modern kadının özgün duruşu için tasarlanan rafine siluetler ve zamansız detaylar.
             </p>
           </div>
 
           {/* Shopping Section */}
           <div className="flex flex-col space-y-6">
-            <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-black">
+            <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-ink">
               Alışveriş
             </h4>
             <nav className="flex flex-col gap-3">
@@ -49,7 +49,7 @@ export default function Footer() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className="text-sm text-nrs-black/50 hover:text-nrs-black transition-colors font-light font-sans"
+                  className="text-sm text-nrs-ink/65 hover:text-nrs-ink transition-colors font-light font-sans"
                 >
                   {link.name}
                 </Link>
@@ -59,7 +59,7 @@ export default function Footer() {
 
           {/* NRS Section */}
           <div className="flex flex-col space-y-6">
-            <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-black">
+            <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-ink">
               NRS
             </h4>
             <nav className="flex flex-col gap-3">
@@ -73,7 +73,7 @@ export default function Footer() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className="text-sm text-nrs-black/50 hover:text-nrs-black transition-colors font-light font-sans"
+                  className="text-sm text-nrs-ink/65 hover:text-nrs-ink transition-colors font-light font-sans"
                 >
                   {link.name}
                 </Link>
@@ -83,7 +83,7 @@ export default function Footer() {
 
           {/* Customer Service Section */}
           <div className="flex flex-col space-y-6">
-            <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-black">
+            <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-ink">
               Müşteri Hizmetleri
             </h4>
             <nav className="flex flex-col gap-3">
@@ -97,7 +97,7 @@ export default function Footer() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className="text-sm text-nrs-black/50 hover:text-nrs-black transition-colors font-light font-sans"
+                  className="text-sm text-nrs-ink/65 hover:text-nrs-ink transition-colors font-light font-sans"
                 >
                   {link.name}
                 </Link>
@@ -106,16 +106,16 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="pt-10 border-t border-nrs-black/5 flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans">
+        <div className="pt-10 border-t border-nrs-ink/5 flex flex-col md:flex-row justify-between items-center gap-6">
+          <p className="text-[10px] uppercase tracking-widest text-nrs-ink/30 font-sans">
             © {new Date().getFullYear()} NRS. Tüm Hakları Saklıdır.
           </p>
           <div className="flex gap-6">
             {/* Social icons would go here */}
-            <span className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans transition-colors">
+            <span className="text-[10px] uppercase tracking-widest text-nrs-ink/30 font-sans transition-colors">
               Instagram
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-nrs-black/30 font-sans transition-colors">
+            <span className="text-[10px] uppercase tracking-widest text-nrs-ink/30 font-sans transition-colors">
               Pinterest
             </span>
           </div>

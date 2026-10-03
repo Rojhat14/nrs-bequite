@@ -26,7 +26,7 @@ export default function CategoryHero({ title, description, image }: CategoryHero
           alt={title}
           onError={() => setImageUnavailable(true)}
           className="h-full w-full object-cover"
-        /> : <div className="absolute inset-0 bg-[#EAE6DF]" role="img" aria-label={`${title} — görsel henüz eklenmedi`} />}
+        /> : <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${title} — görsel henüz eklenmedi`} />}
       <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4 pb-8 pt-[calc(var(--nrs-header-height)+2rem)]">
         <motion.h1
           initial={{ opacity: 0, y: 20 }}

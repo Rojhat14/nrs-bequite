@@ -7,7 +7,7 @@ import Image from 'next/image';
 
 const BrandStory = () => {
   return (
-    <section className="py-32 bg-nrs-ivory overflow-hidden">
+    <section className="py-32 bg-nrs-canvas overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
           {/* Image Side */}
@@ -37,20 +37,20 @@ const BrandStory = () => {
             className="space-y-16"
           >
             <div className="space-y-6">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-black/40 font-sans">Manifesto</span>
-              <h2 className="text-5xl md:text-7xl font-serif text-nrs-black leading-tight tracking-tight">
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">Manifesto</span>
+              <h2 className="text-5xl md:text-7xl font-serif text-nrs-ink leading-tight tracking-tight">
                 NRS KADINI
               </h2>
-              <p className="text-lg md:text-xl text-nrs-black/70 leading-relaxed font-sans italic">
+              <p className="text-lg md:text-xl text-nrs-ink/70 leading-relaxed font-sans italic">
                 &ldquo;Dikkat çekmek için giyinmez. Kendi duruşunu ifade etmek için giyinir. Kendinden emin, özgün ve rafine. NRS kadını, zarafet ile modernlik arasında kendi çizgisini oluşturur. Onun için stil, başkalarının gördüğü bir görüntüden çok kişisel bir ifade biçimidir.&rdquo;
               </p>
             </div>
 
-            <div className="space-y-6 pt-8 border-t border-nrs-black/10">
-              <h3 className="text-2xl font-serif text-nrs-black tracking-wide">
+            <div className="space-y-6 pt-8 border-t border-nrs-ink/10">
+              <h3 className="text-2xl font-serif text-nrs-ink tracking-wide">
                 DAHA AZ. DAHA ÖZEL.
               </h3>
-              <p className="text-sm text-nrs-black/60 leading-relaxed font-sans max-w-lg">
+              <p className="text-sm text-nrs-ink/60 leading-relaxed font-sans max-w-lg">
                 Gerçek zarafetin fazlalıkta değil, detaylarda olduğuna inanıyoruz. Bir kumaşın dokusu, bir kesimin dengesi, bir siluetin duruşu ve bir tasarımın üzerinizde yarattığı his. NRS için lüks; yalnızca görünmek değil, hissettirmektir.
               </p>
             </div>
@@ -58,10 +58,10 @@ const BrandStory = () => {
             <div className="pt-4">
               <Link
                 href="/about"
-                className="group flex items-center gap-4 text-xs uppercase tracking-[0.3em] text-nrs-black font-medium"
+                className="group flex items-center gap-4 text-xs uppercase tracking-[0.3em] text-nrs-ink font-medium"
               >
                 Hakkımızda
-                <span className="h-px w-0 group-hover:w-12 bg-nrs-black transition-all duration-500"></span>
+                <span className="h-px w-0 group-hover:w-12 bg-nrs-ink transition-all duration-500"></span>
               </Link>
             </div>
           </motion.div>

@@ -45,7 +45,7 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
         initial={{ opacity: 1 }}
         animate={{ opacity: 0 }}
         transition={{ delay: 0.8, duration: 0.4 }}
-        className="fixed inset-0 z-[200] bg-nrs-ivory flex items-center justify-center pointer-events-none"
+        className="fixed inset-0 z-[200] bg-nrs-canvas flex items-center justify-center pointer-events-none"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
@@ -70,7 +70,7 @@ export default function IntroAnimation({ onComplete }: IntroAnimationProps) {
       initial={{ opacity: 1 }}
       animate={{ opacity: 0 }}
       transition={{ delay: 3.4, duration: 0.4 }}
-      className="fixed inset-0 z-[200] bg-nrs-ivory flex items-center justify-center pointer-events-none overflow-hidden"
+      className="fixed inset-0 z-[200] bg-nrs-canvas flex items-center justify-center pointer-events-none overflow-hidden"
     >
       {/* Jewelry Sparkles */}
       <div className="absolute inset-0 flex items-center justify-center">

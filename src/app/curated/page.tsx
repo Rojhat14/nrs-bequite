@@ -7,7 +7,7 @@ import { getCollectionEditorialImage } from '@/lib/editorialImages'
 
 export default function CuratedPage() {
   return (
-    <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
+    <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
       <section className="pb-24 px-6">
         <div className="max-w-7xl mx-auto space-y-20">
@@ -20,7 +20,7 @@ export default function CuratedPage() {
               SÖZEL SEÇKİLER
             </motion.h1>
             <div className="h-px w-20 bg-nrs-black/20 mx-auto"></div>
-            <p className="text-nrs-black/60 font-sans italic text-sm max-w-xl mx-auto">
+            <p className="text-nrs-ink/60 font-sans italic text-sm max-w-xl mx-auto">
               NRS küratörleri tarafından belirlenen, sezonun ruhunu yansıtan özel kombinler ve zamansız parçalar.
             </p>
           </div>
@@ -60,11 +60,11 @@ export default function CuratedPage() {
                   />
                   <div className="absolute inset-0 bg-nrs-black/10 group-hover:bg-transparent transition-all duration-500" />
                 </div>
-                <h3 className="text-xl font-serif text-nrs-black mb-3 tracking-wide">{item.title}</h3>
-                <p className="text-sm text-nrs-black/60 font-sans leading-relaxed mb-6">
+                <h3 className="text-xl font-serif text-nrs-ink mb-3 tracking-wide">{item.title}</h3>
+                <p className="text-sm text-nrs-ink/60 font-sans leading-relaxed mb-6">
                   {item.desc}
                 </p>
-                <span className="text-[10px] uppercase tracking-widest text-nrs-black font-medium border-b border-nrs-black pb-1 group-hover:text-nrs-rosegold group-hover:border-nrs-rosegold transition-all duration-500">
+                <span className="text-[10px] uppercase tracking-widest text-nrs-ink font-medium border-b border-nrs-ink pb-1 group-hover:text-nrs-rosegold group-hover:border-nrs-rosegold transition-all duration-500">
                   Keşfet
                 </span>
               </motion.div>

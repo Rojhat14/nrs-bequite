@@ -35,14 +35,14 @@ const CategoryMood = () => {
   ];
 
   return (
-    <section className="py-32 bg-nrs-ivory">
+    <section className="py-32 bg-nrs-canvas">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-20 space-y-4">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl md:text-6xl font-serif text-nrs-black tracking-tight"
+            className="text-4xl md:text-6xl font-serif text-nrs-ink tracking-tight"
           >
             TARZINI KEŞFET
           </motion.h2>

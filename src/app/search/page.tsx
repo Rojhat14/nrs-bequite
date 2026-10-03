@@ -15,8 +15,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     <h1 className="mb-8 font-serif text-4xl">Ürün Ara</h1>
     <form action="/search" method="get" className="mb-12 flex gap-3">
       <label htmlFor="product-search-query" className="sr-only">Ürün adı veya kategori</label>
-      <input id="product-search-query" name="q" type="search" maxLength={120} defaultValue={query} placeholder="Ürün adı veya kategori" className="min-w-0 flex-1 border-b border-nrs-black/20 bg-transparent px-2 py-3" />
-      <button type="submit" className="bg-nrs-black px-6 py-3 text-sm text-nrs-ivory">Ara</button>
+      <input id="product-search-query" name="q" type="search" maxLength={120} defaultValue={query} placeholder="Ürün adı veya kategori" className="min-w-0 flex-1 border-b border-nrs-ink/20 bg-transparent px-2 py-3" />
+      <button type="submit" className="bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 px-6 py-3 text-sm text-nrs-ivory">Ara</button>
     </form>
     <ProductListing products={results} title={query ? `“${query}” sonuçları` : 'Tüm Ürünler'} />
   </main>;

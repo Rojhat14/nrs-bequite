@@ -7,7 +7,7 @@ import Image from 'next/image';
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
+    <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
       <main className="max-w-7xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32">
         {/* SECTION 1: NRS HAKKINDA */}
@@ -37,13 +37,13 @@ export default function AboutPage() {
             className="space-y-8"
           >
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-black/40 font-sans">NRS Hakkında</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">NRS Hakkında</span>
               <h1 className="text-4xl md:text-6xl font-serif leading-tight">
                 MODERN ZARAFETİN YENİ YORUMU
               </h1>
             </div>
 
-            <div className="space-y-6 text-nrs-black/70 font-light text-lg leading-relaxed">
+            <div className="space-y-6 text-nrs-ink/70 font-light text-lg leading-relaxed">
               <p>
                 NRS, modern kadının stilini özgün bir tasarım diliyle ifade etme tutkusundan doğdu.
                 Çağdaş kadın modasını; güçlü silüetler, rafine detaylar ve seçkin kumaşların kusursuz dengesiyle yeniden yorumlayan premium bir kadın giyim markasıyız.
@@ -91,13 +91,13 @@ export default function AboutPage() {
             className="order-1 md:order-2 space-y-8"
           >
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-black/40 font-sans">NRS Kadını</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">NRS Kadını</span>
               <h2 className="text-4xl md:text-6xl font-serif leading-tight">
                 KENDİ TARZININ ÖZNESİ
               </h2>
             </div>
 
-            <div className="space-y-6 text-nrs-black/70 font-light text-lg leading-relaxed">
+            <div className="space-y-6 text-nrs-ink/70 font-light text-lg leading-relaxed">
               <p>
                 NRS kadını, dikkat çekmek için değil, kendisini ifade etmek için giyinir.
                 Onun için stil, geçici bir görünümden ziyade, dünyaya karşı takındığı bilinçli bir duruş biçimidir.
@@ -144,13 +144,13 @@ export default function AboutPage() {
             className="space-y-8"
           >
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-black/40 font-sans">Atölye</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">Atölye</span>
               <h2 className="text-4xl md:text-6xl font-serif leading-tight">
                 TASARIMIN DETAYA DÖNÜŞTÜĞÜ YER
               </h2>
             </div>
 
-            <div className="space-y-6 text-nrs-black/70 font-light text-lg leading-relaxed">
+            <div className="space-y-6 text-nrs-ink/70 font-light text-lg leading-relaxed">
               <p>
                 NRS Atölyesi, bir fikrin somut bir sanat eserine dönüştüğü, sabrın ve titizliğin ön planda olduğu bir üretim merkezidir.
                 Her tasarım, önce zihinde bir silüet olarak belirir; ardından oranlar, kumaş seçimi ve kesim aşamalarıyla hayat bulur.

@@ -21,5 +21,5 @@ export default async function ProductPage({ params: paramsPromise }: ProductPage
   const params = await paramsPromise
   const product = await getStorefrontProduct(params.id)
   if (!product) notFound()
-  return <div className="min-h-screen bg-[#F7F3EE] text-[#050505]"><ProductDetail product={product} /></div>
+  return <div className="min-h-screen bg-nrs-canvas text-nrs-ink"><ProductDetail product={product} /></div>
 }

@@ -121,17 +121,17 @@ export default function WishlistGrid() {
   return (
     <div id="wishlist" className="space-y-8 scroll-mt-32">
       <div className="flex items-center gap-4">
-        <Heart size={20} className="text-nrs-black/40" />
-        <h2 className="text-2xl font-serif italic text-nrs-black">My Wishlist</h2>
+        <Heart size={20} className="text-nrs-ink/60" />
+        <h2 className="text-2xl font-serif italic text-nrs-ink">My Wishlist</h2>
       </div>
 
-      {errorMessage ? <p role="alert" className="text-sm text-red-800">{errorMessage}</p> : loading ? (
+      {errorMessage ? <p role="alert" className="text-sm text-red-400">{errorMessage}</p> : loading ? (
         <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-nrs-black/20 border-t-nrs-black rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-nrs-ink/20 border-t-nrs-ink rounded-full animate-spin" />
         </div>
       ) : wishlistProducts.length === 0 ? (
-        <div className="text-center py-12 px-6 bg-white/30 border border-dashed border-nrs-black/20">
-          <p className="text-sm text-nrs-black/50 font-light italic">Your wishlist is currently empty.</p>
+        <div className="text-center py-12 px-6 bg-nrs-panel/30 border border-dashed border-nrs-ink/20">
+          <p className="text-sm text-nrs-ink/65 font-light italic">Your wishlist is currently empty.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -140,7 +140,7 @@ export default function WishlistGrid() {
               key={product.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="group relative bg-white border border-nrs-black/10 p-4 hover:border-nrs-black/30 transition-all duration-500"
+              className="group relative bg-nrs-panel border border-nrs-ink/10 p-4 hover:border-nrs-ink/30 transition-all duration-500"
             >
               <Link href={`/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden mb-4">
                 <Image
@@ -154,9 +154,9 @@ export default function WishlistGrid() {
               <div className="flex justify-between items-end">
                 <div>
                   <Link href={`/product/${product.id}`}>
-                    <h3 className="text-sm font-serif text-nrs-black hover:text-nrs-rosegold transition-colors">{product.name}</h3>
+                    <h3 className="text-sm font-serif text-nrs-ink hover:text-nrs-rosegold transition-colors">{product.name}</h3>
                   </Link>
-                  <p className="text-xs text-nrs-black/60">{product.price}</p>
+                  <p className="text-xs text-nrs-ink/60">{product.price}</p>
                 </div>
                 <button
                   onClick={() => toggleFavorite(product.id)}

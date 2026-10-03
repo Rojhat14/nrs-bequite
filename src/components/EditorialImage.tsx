@@ -18,7 +18,7 @@ export default function EditorialImage({ src, alt, sizes, className = 'object-co
   }, [src])
 
   if (!src || unavailable) {
-    return <div className="absolute inset-0 bg-[#EAE6DF]" role="img" aria-label={`${alt} — görsel henüz eklenmedi`} />
+    return <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${alt} — görsel henüz eklenmedi`} />
   }
 
   return <Image

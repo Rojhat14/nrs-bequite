@@ -24,7 +24,7 @@ export default function FAQPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-nrs-ivory text-nrs-black layout-content">
+    <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
       <section className="pb-24 px-6">
         <div className="max-w-3xl mx-auto space-y-16">
@@ -37,18 +37,18 @@ export default function FAQPage() {
               S.S.S.
             </motion.h1>
             <div className="h-px w-20 bg-nrs-black/20 mx-auto"></div>
-            <p className="text-nrs-black/60 font-sans italic text-sm">
+            <p className="text-nrs-ink/60 font-sans italic text-sm">
               Sıkça sorulan sorular ve yanıtları.
             </p>
           </div>
 
           <div className="space-y-8">
             {faqs.map((faq, index) => (
-              <div key={index} className="space-y-2 border-b border-nrs-black/10 pb-8">
-                <h3 className="text-lg font-serif text-nrs-black leading-snug">
+              <div key={index} className="space-y-2 border-b border-nrs-ink/10 pb-8">
+                <h3 className="text-lg font-serif text-nrs-ink leading-snug">
                   {faq.q}
                 </h3>
-                <p className="text-sm text-nrs-black/60 font-sans leading-relaxed">
+                <p className="text-sm text-nrs-ink/60 font-sans leading-relaxed">
                   {faq.a}
                 </p>
               </div>

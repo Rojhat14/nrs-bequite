@@ -22,7 +22,7 @@ export default async function RootLayout({
   const navigationData = await getStorefrontNavigationData()
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-ivory text-nrs-black`}>
+      <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-canvas text-nrs-ink`}>
         <AuthProvider>
           <StorefrontShell categories={navigationData.categories} collections={navigationData.collections}>{children}</StorefrontShell>
         </AuthProvider>

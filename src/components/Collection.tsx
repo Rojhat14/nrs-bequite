@@ -25,7 +25,7 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
   }, [activeCategory, products]);
 
   return (
-    <section id="collection" className="py-32 bg-nrs-ivory">
+    <section id="collection" className="py-32 bg-nrs-canvas">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-24 gap-12">
           <div className="space-y-6">
@@ -33,7 +33,7 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-6xl font-serif text-nrs-black tracking-tight"
+              className="text-4xl md:text-6xl font-serif text-nrs-ink tracking-tight"
             >
               NRS KOLEKSİYONU
             </motion.h2>
@@ -43,7 +43,7 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
-              className="max-w-2xl text-nrs-black/60 text-lg font-sans leading-relaxed"
+              className="max-w-2xl text-nrs-ink/60 text-lg font-sans leading-relaxed"
             >
               Modern kadın için yeniden yorumlanan zarafet. NRS koleksiyonu; güçlü siluetleri, rafine detayları ve zamansız tasarım anlayışını bir araya getirir.
               <br />
@@ -59,8 +59,8 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
                   onClick={() => setActiveCategory(cat)}
                   className={`text-[10px] uppercase tracking-[0.3em] transition-all duration-700 font-sans relative group ${
                     activeCategory === cat
-                      ? 'text-nrs-black'
-                      : 'text-nrs-black/40 hover:text-nrs-black'
+                      ? 'text-nrs-ink'
+                      : 'text-nrs-ink/60 hover:text-nrs-ink'
                   }`}
                 >
                   {cat}
@@ -92,7 +92,7 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
                 exit={{ opacity: 0 }}
                 className="col-span-full py-20 text-center"
               >
-                <p className="text-nrs-black/40 italic font-serif">Bu kategoride henüz bir parça bulunmuyor.</p>
+                <p className="text-nrs-ink/60 italic font-serif">Bu kategoride henüz bir parça bulunmuyor.</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -101,7 +101,7 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
         <div className="mt-24 text-center">
           <Link
             href="/collections"
-            className="inline-block px-12 py-5 border border-nrs-black uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-700"
+            className="inline-block px-12 py-5 border border-nrs-ink uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-700"
           >
             Koleksiyonu Keşfet
           </Link>

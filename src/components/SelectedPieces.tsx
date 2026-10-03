@@ -48,7 +48,7 @@ const SELECTED_PRODUCTS: Product[] = [
 
 export default function SelectedPieces() {
   return (
-    <section className="py-24 px-6 bg-white/50">
+    <section className="py-24 px-6 bg-nrs-panel/50">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-4">
           <div>
@@ -57,7 +57,7 @@ export default function SelectedPieces() {
               A curated selection of our most-loved essentials. Each piece is crafted to endure.
             </p>
           </div>
-          <button className="text-nrs-black border-b border-nrs-black pb-1 hover:border-nrs-black/50 transition-all duration-500">
+          <button className="text-nrs-ink border-b border-nrs-ink pb-1 hover:border-nrs-ink/50 transition-all duration-500">
             View All
           </button>
         </div>

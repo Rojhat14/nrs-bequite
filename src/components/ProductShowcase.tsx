@@ -21,7 +21,7 @@ const ProductShowcase = ({ introFinished, products }: ProductShowcaseProps) => {
       className="absolute inset-0 z-0 overflow-hidden pointer-events-none"
     >
       {/* Gradient Mask for Elegant Fade at Edges */}
-      <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-r from-nrs-ivory via-transparent to-nrs-ivory opacity-70" />
+      <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-r from-nrs-canvas via-transparent to-nrs-canvas opacity-70" />
 
       <div className="relative h-full w-full flex items-center">
         <motion.div

@@ -25,8 +25,8 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-nrs-ivory flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-nrs-black/20 border-t-nrs-black rounded-full animate-spin" />
+      <div className="min-h-screen bg-nrs-canvas flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-nrs-ink/20 border-t-nrs-ink rounded-full animate-spin" />
       </div>
     );
   }
@@ -34,9 +34,9 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-nrs-ivory flex">
+    <div className="min-h-screen bg-nrs-canvas flex">
       {/* LEFT SIDEBAR NAVIGATION - Consistent with Checkout */}
-      <aside className="fixed left-0 top-[var(--nrs-header-height)] bottom-0 w-64 bg-white border-r border-nrs-black/10 hidden md:flex flex-col items-center py-12 px-6 z-50">
+      <aside className="fixed left-0 top-[var(--nrs-header-height)] bottom-0 w-64 bg-nrs-panel border-r border-nrs-ink/10 hidden md:flex flex-col items-center py-12 px-6 z-50">
         <div className="mb-12">
           <Link href="/" className="flex flex-col items-center gap-1">
             <Image
@@ -46,7 +46,7 @@ export default function ProfilePage() {
               height={56}
               className="h-10 md:h-14 w-auto object-contain"
             />
-            <span className="hidden md:block text-[9px] uppercase tracking-[0.4em] font-sans text-nrs-black/60 mt-1 text-center">
+            <span className="hidden md:block text-[9px] uppercase tracking-[0.4em] font-sans text-nrs-ink/60 mt-1 text-center">
               Boutique Luminous
             </span>
           </Link>
@@ -55,21 +55,21 @@ export default function ProfilePage() {
         <nav className="flex flex-col gap-8 w-full">
           <Link
             href="/"
-            className="flex items-center gap-4 text-nrs-black/40 hover:text-nrs-black transition-colors group"
+            className="flex items-center gap-4 text-nrs-ink/60 hover:text-nrs-ink transition-colors group"
           >
             <Home size={20} className="group-hover:scale-110 transition-transform" />
             <span className="hidden md:block text-xs uppercase tracking-widest">Home</span>
           </Link>
           <Link
             href="/profile"
-            className="flex items-center gap-4 text-nrs-black hover:text-nrs-black transition-colors group"
+            className="flex items-center gap-4 text-nrs-ink hover:text-nrs-ink transition-colors group"
           >
             <User size={20} className="group-hover:scale-110 transition-transform" />
             <span className="hidden md:block text-xs uppercase tracking-widest font-medium">My Account</span>
           </Link>
           <button
             onClick={openDrawer}
-            className="flex items-center gap-4 text-nrs-black/40 hover:text-nrs-black transition-colors group"
+            className="flex items-center gap-4 text-nrs-ink/60 hover:text-nrs-ink transition-colors group"
           >
             <ShoppingBag size={20} className="group-hover:scale-110 transition-transform" />
             <span className="hidden md:block text-xs uppercase tracking-widest">Bag</span>
@@ -79,7 +79,7 @@ export default function ProfilePage() {
         <div className="mt-auto">
           <button
             onClick={() => router.push('/')}
-            className="hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-nrs-black/40 hover:text-nrs-black transition-colors"
+            className="hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors"
           >
             <ArrowLeft size={14} />
             Return to Atelier
@@ -93,13 +93,13 @@ export default function ProfilePage() {
           <div className="mb-12">
             <button
               onClick={() => router.push('/')}
-              className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-black/40 hover:text-nrs-black transition-colors mb-6 group"
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors mb-6 group"
             >
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
               Back to Atelier
             </button>
-            <h1 className="font-serif text-4xl md:text-5xl mb-3 text-nrs-black">My Account</h1>
-            <p className="text-nrs-black/50">Manage your personal details, view orders and your curated wishlist.</p>
+            <h1 className="font-serif text-4xl md:text-5xl mb-3 text-nrs-ink">My Account</h1>
+            <p className="text-nrs-ink/65">Manage your personal details, view orders and your curated wishlist.</p>
           </div>
 
           <div className="space-y-20">

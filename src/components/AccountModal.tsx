@@ -114,23 +114,23 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
               tabIndex={-1}
               aria-modal="true"
               aria-labelledby="account-modal-title"
-              className="pointer-events-auto relative max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-[420px] border border-[#DCD6CA] bg-nrs-ivory p-7 shadow-[0_18px_60px_rgba(15,14,12,0.2)] sm:p-10"
+              className="pointer-events-auto relative max-h-[calc(100dvh-2rem)] overflow-y-auto w-full max-w-[420px] border border-nrs-ink/20 bg-nrs-canvas p-7 shadow-[0_18px_60px_rgba(15,14,12,0.2)] sm:p-10"
             >
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Pencereyi kapat"
-                className="absolute right-5 top-5 flex size-10 items-center justify-center text-nrs-black/45 transition-colors hover:text-nrs-black focus-visible:outline focus-visible:outline-1"
+                className="absolute right-5 top-5 flex size-10 items-center justify-center text-nrs-ink/60 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
               >
                 <X size={20} />
               </button>
 
-              <div className="mb-8 border-b border-nrs-black/10 pb-6 text-center">
-                <p className="mb-3 text-[9px] uppercase tracking-[0.28em] text-nrs-black/45">NRS · HESABIM</p>
+              <div className="mb-8 border-b border-nrs-ink/10 pb-6 text-center">
+                <p className="mb-3 text-[9px] uppercase tracking-[0.28em] text-nrs-ink/60">NRS · HESABIM</p>
                 <h2 id="account-modal-title" className="mb-3 font-serif text-3xl">
                   {isLogin ? 'Tekrar Hoş Geldiniz' : 'NRS Dünyasına Katılın'}
                 </h2>
-                <p className="text-xs leading-5 text-nrs-black/55">Kişisel seçkinize ve siparişlerinize ulaşın.</p>
+                <p className="text-xs leading-5 text-nrs-ink/55">Kişisel seçkinize ve siparişlerinize ulaşın.</p>
               </div>
 
               {message && (
@@ -146,7 +146,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label htmlFor="account-first-name" className="text-[10px] uppercase tracking-widest text-nrs-black/50 block text-left ml-1">
+                        <label htmlFor="account-first-name" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
                           Ad
                         </label>
                         <input
@@ -154,13 +154,13 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                           type="text"
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          className="w-full bg-transparent border-b border-nrs-black/20 py-2 px-1 focus:border-nrs-black outline-none transition-all duration-500 font-light text-sm"
+                          className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
                           placeholder="Adınız"
                           required
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="account-last-name" className="text-[10px] uppercase tracking-widest text-nrs-black/50 block text-left ml-1">
+                        <label htmlFor="account-last-name" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
                           Soyad
                         </label>
                         <input
@@ -168,14 +168,14 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                           type="text"
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
-                          className="w-full bg-transparent border-b border-nrs-black/20 py-2 px-1 focus:border-nrs-black outline-none transition-all duration-500 font-light text-sm"
+                          className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
                           placeholder="Soyadınız"
                           required
                         />
                       </div>
                     </div>
                     <div className="space-y-1">
-                        <label htmlFor="account-phone" className="text-[10px] uppercase tracking-widest text-nrs-black/50 block text-left ml-1">
+                        <label htmlFor="account-phone" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
                           Telefon
                         </label>
                         <input
@@ -183,7 +183,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                         type="text"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-transparent border-b border-nrs-black/20 py-2 px-1 focus:border-nrs-black outline-none transition-all duration-500 font-light text-sm"
+                        className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
                           placeholder="+90 5xx xxx xx xx"
                         required
                       />
@@ -192,7 +192,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                 )}
 
                 <div className="space-y-1">
-                  <label htmlFor="account-email" className="text-[10px] uppercase tracking-widest text-nrs-black/50 block text-left ml-1">
+                  <label htmlFor="account-email" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
                     E-posta
                   </label>
                   <input
@@ -200,14 +200,14 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-transparent border-b border-nrs-black/20 py-2 px-1 focus:border-nrs-black outline-none transition-all duration-500 font-light text-sm"
+                    className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
                     placeholder="eposta@ornek.com"
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label htmlFor="account-password" className="text-[10px] uppercase tracking-widest text-nrs-black/50 block text-left ml-1">
+                  <label htmlFor="account-password" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
                     Şifre
                   </label>
                   <input
@@ -217,7 +217,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                     minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-transparent border-b border-nrs-black/20 py-2 px-1 focus:border-nrs-black outline-none transition-all duration-500 font-light text-sm"
+                    className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
                     placeholder="••••••••"
                     required
                   />
@@ -226,7 +226,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="mt-4 min-h-12 w-full border border-nrs-black bg-nrs-black px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-nrs-ivory transition-colors duration-300 hover:bg-nrs-black/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-black disabled:bg-nrs-black/40"
+                  className="mt-4 min-h-12 w-full border border-nrs-ink bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-nrs-ivory transition-colors duration-300 hover:bg-nrs-black/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink disabled:bg-nrs-black/40"
                 >
                   {loading ? 'İşleniyor…' : (isLogin ? 'Giriş Yap' : 'Hesap Oluştur')}
                 </button>
@@ -239,7 +239,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                     setIsLogin(!isLogin);
                     setMessage(null);
                   }}
-                  className="min-h-11 px-2 text-[11px] text-nrs-black/60 underline underline-offset-4 transition-colors hover:text-nrs-black focus-visible:outline focus-visible:outline-1"
+                  className="min-h-11 px-2 text-[11px] text-nrs-ink/60 underline underline-offset-4 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
                 >
                   {isLogin ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten hesabınız var mı? Giriş yapın'}
                 </button>

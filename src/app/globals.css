@@ -3,19 +3,26 @@
 @tailwind utilities;
 
 :root {
-  --background: 247 243 238; /* #F7F3EE */
-  --foreground: 5 5 5;       /* #050505 */
+  --background: 0 0 0;       /* #000000 */
+  --foreground: 247 243 238; /* #F7F3EE */
   --muted: 139 129 123;     /* #8B817B */
   --accent: 184 137 112;    /* #B88970 */
   --nrs-header-height: 100px;
 }
 
 body {
-  background-color: #F7F3EE;
-  color: #050505;
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
+}
+
+/* Native form controls follow the storefront's dark surfaces. */
+@layer utilities {
+  .bg-nrs-canvas:not(body) {
+    color-scheme: dark;
+  }
 }
 
 /* Layout Wrappers */
@@ -68,7 +75,7 @@ a, button {
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #F7F3EE;
+  background: #000000;
 }
 ::-webkit-scrollbar-thumb {
   background: #D2B48C;

@@ -59,7 +59,7 @@ export default async function CategoryPage({ params: paramsPromise }: CategoryPa
   const image = getCategoryEditorialImage(params.slug) ?? getCategoryEditorialImage(category.slug)
 
   return (
-    <div className="min-h-screen bg-nrs-ivory text-nrs-black">
+    <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
       <CategoryHero title={banner.title} description={banner.description} image={image} />
 
       <section className="max-w-7xl mx-auto px-6 py-24">

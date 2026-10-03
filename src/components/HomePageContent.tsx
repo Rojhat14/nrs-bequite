@@ -23,7 +23,7 @@ export default function HomePageContent({ products }: { products: Product[] }) {
   }, [])
 
   return (
-    <main className="relative min-h-screen bg-[#F7F3EE] text-[#050505]">
+    <main className="relative min-h-screen bg-nrs-canvas text-nrs-ink">
       {showIntro && <IntroAnimation onComplete={() => {
         setIntroFinished(true)
         setShowIntro(false)
@@ -36,7 +36,7 @@ export default function HomePageContent({ products }: { products: Product[] }) {
         <section className="py-24 max-w-7xl mx-auto px-6">
           <div className="text-center mb-16 space-y-4">
             <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-4xl md:text-5xl font-serif">The Luminous Edit</motion.h2>
-            <motion.p initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="text-gray-500 font-light text-lg max-w-2xl mx-auto">
+            <motion.p initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="text-nrs-ink/60 font-light text-lg max-w-2xl mx-auto">
               A curated selection of our most exclusive pieces, designed for those who appreciate the art of elegance.
             </motion.p>
           </div>
