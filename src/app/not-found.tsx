@@ -31,7 +31,7 @@ export default function NotFound() {
             Ana Sayfaya Dön
           </Link>
           <Link
-            href="/category/dresses"
+            href="/category/elbiseler"
             className="px-10 py-4 border border-nrs-ink text-nrs-ink uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-700 w-full md:w-auto"
           >
             Alışverişe Başla

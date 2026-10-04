@@ -4,6 +4,41 @@ const base = new URL(process.argv[2] || 'http://localhost:3100');
 assert.ok(['localhost', '127.0.0.1'].includes(base.hostname), 'Run only against a local test server.');
 
 async function main() {
+  const categoryRedirects = [
+    ['dresses', 'elbiseler'], ['tops', 'ust-giyim'],
+    ['blazers', 'ceketler-blazerlar'], ['bottoms', 'alt-giyim'], ['suits', 'takimlar'],
+  ];
+  for (const [alias, slug] of categoryRedirects) {
+    const target = `/category/${slug}`;
+    const response = await fetch(new URL(`/category/${alias}`, base), { redirect: 'manual' });
+    assert.equal(response.status, 308, `${alias} must permanently redirect.`);
+    assert.equal(response.headers.get('location'), target);
+    const direct = await fetch(new URL(target, base), { redirect: 'manual' });
+    assert.equal(direct.status, 200, `${target} must not redirect.`);
+    const followed = await fetch(new URL(`/category/${alias}`, base));
+    assert.equal(followed.status, 200);
+    assert.equal(new URL(followed.url).pathname, target);
+    const html = await followed.text();
+    const canonicals = [...html.matchAll(/<link\b[^>]*rel="canonical"[^>]*href="([^"]+)"/g)];
+    assert.deepEqual(canonicals.map(match => match[1]), [`https://nrsbequiteluminous.com${target}`]);
+    console.log(`PASS redirect ${alias} → ${slug}, target 200 and canonical`);
+  }
+  for (const source of ['/category/dresses?test=1', '/category/dresses/']) {
+    const response = await fetch(new URL(source, base), { redirect: 'manual' });
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get('location'), source.endsWith('/')
+      ? '/category/dresses' : '/category/elbiseler?test=1');
+    const followed = await fetch(new URL(source, base));
+    assert.equal(followed.status, 200);
+    assert.equal(new URL(followed.url).pathname, '/category/elbiseler');
+    assert.equal(new URL(followed.url).search, source.includes('?') ? '?test=1' : '');
+    console.log(`PASS redirect query/trailing slash ${source}`);
+  }
+  for (const route of ['/category/sale', '/category/indirim', '/collections/indirim']) {
+    const response = await fetch(new URL(route, base), { redirect: 'manual' });
+    assert.equal(response.status, 200, `${route} must remain unchanged.`);
+    assert.equal(response.headers.get('location'), null);
+  }
   const routes = new Set(['/', '/about', '/contact', '/shipping', '/returns', '/faq', '/size-guide', '/care-guide', '/curated', '/collections',
     '/category/dresses', '/category/tops', '/category/blazers', '/category/bottoms', '/category/suits', '/category/sale',
     '/search', '/search?q=elbise', '/checkout', '/checkout/verify', '/checkout/success', '/profile']);

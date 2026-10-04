@@ -104,8 +104,8 @@ export default function AboutPage() {
                 Özgüvenini detayların gücünden alan, başkalarının onayına ihtiyaç duymayan modern bir zarafeti temsil eder.
               </p>
               <p>
-                Günlük hayatın dinamizminde keskin hatlı bir <Link href="/category/blazers" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">kadın blazer</Link>,
-                özel bir akşamda akışkan bir <Link href="/category/dresses" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">kadın elbise</Link>
+                Günlük hayatın dinamizminde keskin hatlı bir <Link href="/category/ceketler-blazerlar" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">kadın blazer</Link>,
+                özel bir akşamda akışkan bir <Link href="/category/elbiseler" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">kadın elbise</Link>
                 ya da bir davette zamansız bir siluet...
                 Her parça, onun hayatının farklı anlarına eşlik eden birer imza niteliğindedir.
               </p>

@@ -12,19 +12,19 @@ const CategoryMood = () => {
       name: 'GÜNDÜZ',
       collectionSlug: 'gunduz',
       description: 'Günün zarafeti. Günün her anına eşlik eden sade, modern ve rafine siluetler.',
-      href: '/category/tops'
+      href: '/category/ust-giyim'
     },
     {
       name: 'GECE',
       collectionSlug: 'gece',
       description: 'Gecenin kendine özgü hali. Işığı yakalayan dokular ve güçlü siluetlerle akşamın ritmine uyum sağlayan tasarımlar.',
-      href: '/category/dresses'
+      href: '/category/elbiseler'
     },
     {
       name: 'DAVET',
       collectionSlug: 'davet',
       description: 'Anın kendisi için. Hatırlanmaya değer anlar için tasarlanan özel parçalar.',
-      href: '/category/dresses'
+      href: '/category/elbiseler'
     },
     {
       name: 'İMZA',

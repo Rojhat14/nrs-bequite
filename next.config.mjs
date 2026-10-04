@@ -17,6 +17,15 @@ const nextConfig = {
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   env: { NRS_EDITORIAL_ASSETS: JSON.stringify(editorialAssets) },
   poweredByHeader: false,
+  async redirects() {
+    return [
+      { source: '/category/dresses', destination: '/category/elbiseler', permanent: true },
+      { source: '/category/tops', destination: '/category/ust-giyim', permanent: true },
+      { source: '/category/blazers', destination: '/category/ceketler-blazerlar', permanent: true },
+      { source: '/category/bottoms', destination: '/category/alt-giyim', permanent: true },
+      { source: '/category/suits', destination: '/category/takimlar', permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: '/:path*', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

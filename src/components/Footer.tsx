@@ -35,11 +35,11 @@ export default function Footer() {
             <nav className="flex flex-col gap-3">
               {[
                 { name: 'Yeni Gelenler', href: '/' },
-                { name: 'Elbiseler', href: '/category/dresses' },
-                { name: 'Üst Giyim', href: '/category/tops' },
-                { name: 'Ceketler & Blazerlar', href: '/category/blazers' },
-                { name: 'Alt Giyim', href: '/category/bottoms' },
-                { name: 'Takımlar', href: '/category/suits' },
+                { name: 'Elbiseler', href: '/category/elbiseler' },
+                { name: 'Üst Giyim', href: '/category/ust-giyim' },
+                { name: 'Ceketler & Blazerlar', href: '/category/ceketler-blazerlar' },
+                { name: 'Alt Giyim', href: '/category/alt-giyim' },
+                { name: 'Takımlar', href: '/category/takimlar' },
                 { name: 'Koleksiyonlar', href: '/collections' },
                 { name: 'Seçkiler', href: '/curated' },
                 { name: 'İndirim', href: '/category/sale' },
