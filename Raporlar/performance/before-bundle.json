@@ -1,0 +1,251 @@
+{
+  "routes": {
+    "/_not-found/page": {
+      "files": 14,
+      "raw": 798999,
+      "gzip": 233853
+    },
+    "/about/page": {
+      "files": 14,
+      "raw": 807080,
+      "gzip": 236618
+    },
+    "/care-guide/page": {
+      "files": 14,
+      "raw": 801197,
+      "gzip": 234687
+    },
+    "/category/[slug]/page": {
+      "files": 15,
+      "raw": 810654,
+      "gzip": 238590
+    },
+    "/checkout/success/page": {
+      "files": 14,
+      "raw": 799030,
+      "gzip": 233876
+    },
+    "/checkout/page": {
+      "files": 14,
+      "raw": 815398,
+      "gzip": 238799
+    },
+    "/checkout/verify/page": {
+      "files": 14,
+      "raw": 799030,
+      "gzip": 233876
+    },
+    "/contact/page": {
+      "files": 14,
+      "raw": 804311,
+      "gzip": 235671
+    },
+    "/curated/page": {
+      "files": 14,
+      "raw": 804321,
+      "gzip": 235969
+    },
+    "/profile/page": {
+      "files": 14,
+      "raw": 823598,
+      "gzip": 241439
+    },
+    "/faq/page": {
+      "files": 14,
+      "raw": 800825,
+      "gzip": 234707
+    },
+    "/product/[id]/page": {
+      "files": 14,
+      "raw": 816518,
+      "gzip": 240208
+    },
+    "/returns/page": {
+      "files": 14,
+      "raw": 801043,
+      "gzip": 234659
+    },
+    "/collections/[slug]/page": {
+      "files": 15,
+      "raw": 807886,
+      "gzip": 237424
+    },
+    "/shipping/page": {
+      "files": 14,
+      "raw": 801193,
+      "gzip": 234610
+    },
+    "/page": {
+      "files": 15,
+      "raw": 828695,
+      "gzip": 244105
+    },
+    "/size-guide/page": {
+      "files": 14,
+      "raw": 801750,
+      "gzip": 234848
+    },
+    "/collections/page": {
+      "files": 14,
+      "raw": 803469,
+      "gzip": 235725
+    },
+    "/search/page": {
+      "files": 15,
+      "raw": 809450,
+      "gzip": 238156
+    },
+    "/admin/login/page": {
+      "files": 15,
+      "raw": 802965,
+      "gzip": 235526
+    },
+    "/admin/(protected)/orders/[id]/page": {
+      "files": 16,
+      "raw": 812441,
+      "gzip": 239345
+    },
+    "/admin/(protected)/categories/page": {
+      "files": 16,
+      "raw": 814515,
+      "gzip": 239745
+    },
+    "/admin/(protected)/favorites/page": {
+      "files": 16,
+      "raw": 809080,
+      "gzip": 237887
+    },
+    "/admin/(protected)/products/new/page": {
+      "files": 17,
+      "raw": 830557,
+      "gzip": 244576
+    },
+    "/admin/(protected)/orders/page": {
+      "files": 16,
+      "raw": 809080,
+      "gzip": 237887
+    },
+    "/admin/(protected)/products/page": {
+      "files": 16,
+      "raw": 813917,
+      "gzip": 240046
+    },
+    "/admin/(protected)/products/[id]/page": {
+      "files": 17,
+      "raw": 830557,
+      "gzip": 244576
+    },
+    "/admin/(protected)/page": {
+      "files": 16,
+      "raw": 809114,
+      "gzip": 237889
+    },
+    "/admin/(protected)/settings/page": {
+      "files": 16,
+      "raw": 809037,
+      "gzip": 237856
+    },
+    "/admin/(protected)/users/[id]/page": {
+      "files": 16,
+      "raw": 809080,
+      "gzip": 237887
+    },
+    "/admin/(protected)/users/page": {
+      "files": 16,
+      "raw": 809080,
+      "gzip": 237887
+    },
+    "/admin/(protected)/inventory/page": {
+      "files": 16,
+      "raw": 812961,
+      "gzip": 239453
+    }
+  },
+  "chunks": [
+    {
+      "file": "6140-a334b45d42ed85a7.js",
+      "raw": 195246,
+      "gzip": 55110
+    },
+    {
+      "file": "4bd1b696-f785427dddbba9fb.js",
+      "raw": 173020,
+      "gzip": 54359
+    },
+    {
+      "file": "1255-5cd2fe06309409a0.js",
+      "raw": 173934,
+      "gzip": 46609
+    },
+    {
+      "file": "framework-f31701c9d93f12a4.js",
+      "raw": 139835,
+      "gzip": 44881
+    },
+    {
+      "file": "polyfills-42372ed130431b0a.js",
+      "raw": 112594,
+      "gzip": 39627
+    },
+    {
+      "file": "main-35b333977c09376f.js",
+      "raw": 126458,
+      "gzip": 36404
+    },
+    {
+      "file": "5937-5cb8535eaa7e9da9.js",
+      "raw": 109957,
+      "gzip": 35833
+    },
+    {
+      "file": "44530001-53400ccc9247390b.js",
+      "raw": 67482,
+      "gzip": 14301
+    },
+    {
+      "file": "3121-f88cf4d843d03958.js",
+      "raw": 21531,
+      "gzip": 6726
+    },
+    {
+      "file": "1356-853f784b705afa15.js",
+      "raw": 13618,
+      "gzip": 5200
+    },
+    {
+      "file": "5875-24a55ce1ff5e9fbd.js",
+      "raw": 12829,
+      "gzip": 4505
+    },
+    {
+      "file": "3252-d3c6f283f9810af1.js",
+      "raw": 8839,
+      "gzip": 3535
+    },
+    {
+      "file": "2619-3c9e02e22d10480a.js",
+      "raw": 8538,
+      "gzip": 3388
+    },
+    {
+      "file": "6150-543bfadba19a7f3f.js",
+      "raw": 6451,
+      "gzip": 2828
+    },
+    {
+      "file": "1315-169163c68a30d919.js",
+      "raw": 3723,
+      "gzip": 1783
+    },
+    {
+      "file": "webpack-9f152f242e82e7e4.js",
+      "raw": 3422,
+      "gzip": 1707
+    },
+    {
+      "file": "main-app-eb536bc533740da9.js",
+      "raw": 560,
+      "gzip": 227
+    }
+  ]
+}

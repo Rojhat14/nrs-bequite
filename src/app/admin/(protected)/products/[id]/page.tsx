@@ -14,6 +14,6 @@ export default async function AdminProductDetailPage({ params: paramsPromise, se
     <AdminPageHeader title={data.product?.name ?? 'Ürün düzenle'} description={`Ürün ID: ${params.id}`} />
     {searchParams?.duplicated === '1' && <p role="status" className="mb-5 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Ürün başarıyla kopyalandı. Yeni ürün taslak durumundadır.</p>}
     {data.error && <p role="alert" className="mb-5 border border-rose-200 bg-white p-4 text-sm text-rose-800">Ürün bilgileri yüklenirken hata oluştu. Tablo ve admin RLS izinlerini kontrol edin.</p>}
-    {data.product && <AdminProductForm product={data.product} categories={data.categories} collections={data.collections} selectedCollectionIds={data.selectedCollectionIds} variants={data.variants} />}
+    {data.product && <AdminProductForm product={data.product} categories={data.categories} collections={data.collections} selectedCollectionIds={data.selectedCollectionIds} variants={data.variants} images={data.error ? undefined : data.images} />}
   </div>
 }

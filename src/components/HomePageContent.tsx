@@ -7,7 +7,7 @@ import BrandStory from '@/components/BrandStory'
 import CategoryMood from '@/components/CategoryMood'
 import IntroAnimation from '@/components/IntroAnimation'
 import type { Product } from '@/data/products'
-import { motion } from 'framer-motion'
+import { m as motion } from 'framer-motion'
 
 export default function HomePageContent({ products }: { products: Product[] }) {
   const [introFinished, setIntroFinished] = useState(false)

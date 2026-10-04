@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { PRODUCTS } from '@/data/products';
 import Image from 'next/image';
 import Link from 'next/link';

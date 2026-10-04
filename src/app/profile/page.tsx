@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/store/useCart';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { ArrowLeft, Home, ShoppingBag, User } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';

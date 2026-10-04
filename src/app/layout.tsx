@@ -3,6 +3,8 @@ import { Inter, Playfair_Display } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import StorefrontShell from '@/components/StorefrontShell'
+import MotionProvider from '@/components/MotionProvider'
+import Footer from '@/components/Footer'
 import { getStorefrontNavigationData } from '@/lib/products'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -24,7 +26,9 @@ export default async function RootLayout({
     <html lang="tr" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-canvas text-nrs-ink`}>
         <AuthProvider>
-          <StorefrontShell categories={navigationData.categories} collections={navigationData.collections}>{children}</StorefrontShell>
+          <MotionProvider>
+            <StorefrontShell categories={navigationData.categories} collections={navigationData.collections} footer={<Footer />}>{children}</StorefrontShell>
+          </MotionProvider>
         </AuthProvider>
       </body>
     </html>

@@ -1,0 +1,63 @@
+
+> boutique-luxury@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.27
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2.2s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/31) ...
+   Generating static pages (7/31) 
+   Generating static pages (15/31) 
+   Generating static pages (23/31) 
+ ✓ Generating static pages (31/31)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ƒ /                                    6.95 kB         201 kB
+├ ƒ /_not-found                            144 B         103 kB
+├ ƒ /about                               2.91 kB         121 kB
+├ ƒ /admin                                 177 B         111 kB
+├ ƒ /admin/categories                    2.03 kB         108 kB
+├ ƒ /admin/favorites                       175 B         106 kB
+├ ƒ /admin/inventory                     1.74 kB         108 kB
+├ ƒ /admin/login                         1.64 kB         174 kB
+├ ƒ /admin/orders                          175 B         106 kB
+├ ƒ /admin/orders/[id]                   1.63 kB         108 kB
+├ ƒ /admin/products                      2.33 kB         114 kB
+├ ƒ /admin/products/[id]                   138 B         187 kB
+├ ƒ /admin/products/new                    138 B         187 kB
+├ ƒ /admin/settings                        144 B         103 kB
+├ ƒ /admin/users                           175 B         106 kB
+├ ƒ /admin/users/[id]                      175 B         106 kB
+├ ƒ /api/admin/products/images             144 B         103 kB
+├ ƒ /api/payment/callback                  144 B         103 kB
+├ ƒ /api/payment/create                    144 B         103 kB
+├ ƒ /care-guide                            980 B         111 kB
+├ ƒ /category/[slug]                     1.42 kB         195 kB
+├ ƒ /checkout                             5.1 kB         199 kB
+├ ƒ /checkout/success                      167 B         106 kB
+├ ƒ /checkout/verify                       167 B         106 kB
+├ ƒ /collections                         2.02 kB         120 kB
+├ ƒ /collections/[slug]                    183 B         194 kB
+├ ƒ /contact                             1.96 kB         112 kB
+├ ƒ /curated                             2.26 kB         117 kB
+├ ƒ /faq                                   998 B         111 kB
+├ ƒ /product/[id]                        6.54 kB         193 kB
+├ ƒ /profile                              7.4 kB         197 kB
+├ ƒ /returns                               951 B         111 kB
+├ ƒ /search                                916 B         195 kB
+├ ƒ /shipping                              902 B         111 kB
+└ ƒ /size-guide                          1.14 kB         111 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/1255-5cd2fe06309409a0.js      46.5 kB
+  ├ chunks/4bd1b696-f785427dddbba9fb.js  54.2 kB
+  └ other shared chunks (total)          1.93 kB
+
+
+ƒ  (Dynamic)  server-rendered on demand
+

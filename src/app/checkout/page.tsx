@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { m as motion } from 'framer-motion'
 import { useCart } from '@/store/useCart'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'

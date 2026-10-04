@@ -1,7 +1,9 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { m as motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import { canOptimizeImage } from '@/lib/imageOptimization'
 
 interface CategoryHeroProps {
   title: string
@@ -18,15 +20,16 @@ export default function CategoryHero({ title, description, image }: CategoryHero
 
   return (
     <section className="relative h-[60svh] min-h-[calc(var(--nrs-header-height)+22rem)] w-full overflow-hidden">
-      {image && !imageUnavailable ? <motion.img
+      {image && !imageUnavailable ? <motion.div
           initial={{ scale: 1.1 }}
           animate={{ scale: 1 }}
           transition={{ duration: 1.5 }}
-          src={image}
-          alt={title}
-          onError={() => setImageUnavailable(true)}
-          className="h-full w-full object-cover"
-        /> : <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${title} — görsel henüz eklenmedi`} />}
+          className="absolute inset-0"
+        >
+          <Image src={image} alt={title} fill sizes="100vw" priority
+            unoptimized={!canOptimizeImage(image)}
+            onError={() => setImageUnavailable(true)} className="object-cover" />
+        </motion.div> : <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${title} — görsel henüz eklenmedi`} />}
       <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4 pb-8 pt-[calc(var(--nrs-header-height)+2rem)]">
         <motion.h1
           initial={{ opacity: 0, y: 20 }}

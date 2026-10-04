@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import Image from 'next/image';
+import { canOptimizeImage } from '@/lib/imageOptimization';
+import { m as motion } from 'framer-motion';
 import { ShoppingBag, Heart } from 'lucide-react';
 import { useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { lookupWishlist } from '@/lib/wishlistClient';
 import { Product } from '@/data/products';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,12 +16,15 @@ import { useRouter } from 'next/navigation';
 interface ProductCardProps {
   product: Product;
   onProductClick?: (id: string) => void;
+  sizes?: string;
 }
 
-export const ProductCard = ({ product, onProductClick }: ProductCardProps) => {
-  const { addItem, openDrawer } = useCart();
+export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767px) 50vw, (max-width: 1023px) 33vw, (max-width: 1279px) 25vw, 288px' }: ProductCardProps) => {
+  const addItem = useCart(state => state.addItem);
+  const openDrawer = useCart(state => state.openDrawer);
   const router = useRouter();
   const { user } = useAuth();
+  const userId = user?.id;
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
 
@@ -26,18 +32,17 @@ export const ProductCard = ({ product, onProductClick }: ProductCardProps) => {
     let active = true;
     const checkWishlist = async () => {
       setIsWishlisted(false);
-      if (!user) return;
-      const { data } = await supabase
-        .from('wishlist')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('product_id', product.id)
-        .maybeSingle();
-      if (active) setIsWishlisted(!!data);
+      if (!userId) return;
+      try {
+        const favorite = await lookupWishlist(userId, product.id);
+        if (active) setIsWishlisted(favorite);
+      } catch {
+        if (active) setIsWishlisted(false);
+      }
     };
     checkWishlist();
     return () => { active = false; };
-  }, [user, product.id]);
+  }, [userId, product.id]);
 
   const toggleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -78,14 +83,22 @@ export const ProductCard = ({ product, onProductClick }: ProductCardProps) => {
   return (
     <div className="group cursor-pointer block">
       <div className="relative aspect-[3/4] overflow-hidden bg-nrs-black/5 mb-8">
-        {product.image ? <motion.img
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+        {product.image ? <motion.div
+          className="absolute inset-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
-        /> : <div className="h-full w-full bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
+        >
+          <Image
+            src={product.image}
+            alt={product.name}
+            fill
+            sizes={sizes}
+            loading="lazy"
+            unoptimized={!canOptimizeImage(product.image)}
+            className="object-cover transition-transform duration-1000 group-hover:scale-105"
+          />
+        </motion.div> : <div className="h-full w-full bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-nrs-black/0 group-hover:bg-nrs-black/5 transition-all duration-700" />

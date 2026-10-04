@@ -1,0 +1,142 @@
+[
+  {
+    "file": "public/images/products/tops/kirmizi-saten.png",
+    "bytes": 2559421,
+    "width": 1086,
+    "height": 1448,
+    "sha256": "e6f03556704d51f9b3d47d170dd6ace20b61ef59e8a3a91edd5380231a274f32"
+  },
+  {
+    "file": "public/images/products/tops/mavi-ceket.png",
+    "bytes": 2364411,
+    "width": 1122,
+    "height": 1402,
+    "sha256": "e7e3b936a158df172feb3e6fa5aa3ce7f7c655e54cefdc4f37df80a4137ebd07"
+  },
+  {
+    "file": "public/images/products/tops/bordo-ceket.png",
+    "bytes": 2318528,
+    "width": 1086,
+    "height": 1448,
+    "sha256": "5eed24aaf09558b34124e354daae16d179bb297a7da48eddc4e005d5e66ae200"
+  },
+  {
+    "file": "public/images/products/tops/mavi-ceket-2.png",
+    "bytes": 2301886,
+    "width": 1122,
+    "height": 1402,
+    "sha256": "25a8760a526f47edcec43f7610b61a2d85f3029a4201bd792772de74b70f22c4"
+  },
+  {
+    "file": "public/images/products/tops/ceket-kare.png",
+    "bytes": 2284115,
+    "width": 1122,
+    "height": 1402,
+    "sha256": "51e2fc97ea47909c3f4010059cf2c3de88cdac4aa2342dc38327ffa368015b1c"
+  },
+  {
+    "file": "public/images/editorial/categories/dresses.jpg",
+    "bytes": 526514,
+    "width": 1600,
+    "height": 2400,
+    "sha256": "185eb45d7edd22dd458947ce8d749fb59318a8b20833db7132c35b208ec0d1b6"
+  },
+  {
+    "file": "public/images/editorial/collections/new-arrivals.jpg",
+    "bytes": 448646,
+    "width": 1600,
+    "height": 2400,
+    "sha256": "14e11b0601d564437a3551ca0554413590636546192573cecf30de7b54c65b8a"
+  },
+  {
+    "file": "public/images/editorial/collections/daytime.jpg",
+    "bytes": 424345,
+    "width": 1600,
+    "height": 2277,
+    "sha256": "a2d4fa4a643081dd8f20c77101ec744a131cda051337751f1a5c007a370b137c"
+  },
+  {
+    "file": "public/images/editorial/collections/occasion.jpg",
+    "bytes": 360450,
+    "width": 1600,
+    "height": 2400,
+    "sha256": "78ca7689bade8dff66e55ba2650063cede4c9c9405c8b55c4ef16bf9d09fe9df"
+  },
+  {
+    "file": "public/images/editorial/collections/signature.jpg",
+    "bytes": 332752,
+    "width": 1600,
+    "height": 2400,
+    "sha256": "2629d40a6890209e5e20be0cd3cfb6f67f3f5c1ac87ef7895af50ef277028c5e"
+  },
+  {
+    "file": "public/images/editorial/collections/sale.jpg",
+    "bytes": 309784,
+    "width": 1600,
+    "height": 2400,
+    "sha256": "bf076954ac680879ca81c7e3e5dd6e2fc690c2cc7499458cc7abd6a94b97ec4e"
+  },
+  {
+    "file": "public/images/editorial/categories/tops.jpg",
+    "bytes": 226680,
+    "width": 1600,
+    "height": 2397,
+    "sha256": "f78bb2ea049a66affabc9903a71b68e487a7288e1cfc2a27540882058e8ed23f"
+  },
+  {
+    "file": "public/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.jpeg",
+    "bytes": 182479,
+    "width": 1024,
+    "height": 1024,
+    "sha256": "807b3602e326a7409c2c83ed8ba14551ce4af22db1e6d483c2758a0fd95ab235"
+  },
+  {
+    "file": "public/images/editorial/collections/evening.jpg",
+    "bytes": 171025,
+    "width": 1600,
+    "height": 2000,
+    "sha256": "a505d38415536bd72f23d12714277f0190a2c50853ac8a62ddac03b78cf53959"
+  },
+  {
+    "file": "public/images/editorial/categories/blazers.jpg",
+    "bytes": 167276,
+    "width": 1600,
+    "height": 2228,
+    "sha256": "6991b6dde3465811775cebbf2fcecdf70dab6a23f18e29af7c2a847909200c2c"
+  },
+  {
+    "file": "public/images/editorial/categories/bottoms.jpg",
+    "bytes": 132537,
+    "width": 1600,
+    "height": 2400,
+    "sha256": "2186886230a9a074224ebfa2bb67759826a1f55d30a2373577456abbc5e07bb1"
+  },
+  {
+    "file": "public/images/editorial/categories/suits.jpg",
+    "bytes": 89691,
+    "width": 1600,
+    "height": 2202,
+    "sha256": "83624e3d9ba156638723eb4cb1bb7ca436d931ed7331fe1cb9753d9577ebb0b5"
+  },
+  {
+    "file": "public/images/editorial/collections/curated.jpg",
+    "bytes": 71634,
+    "width": 1600,
+    "height": 1067,
+    "sha256": "78d942233846a4c25bb06e13bf636db2b321481606ecce0a44671972dee3d3f9"
+  },
+  {
+    "file": "public/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png",
+    "bytes": 30031,
+    "width": 1024,
+    "height": 1024,
+    "sha256": "26d40a1bf2eeffbdef5387282a4042a308a70ee9cf513f8f18199ee42211a22d"
+  },
+  {
+    "file": "public/images/logo.jpeg",
+    "bytes": 22696,
+    "width": 1024,
+    "height": 1024,
+    "sha256": "da0dee81b531d8a09e351027561efcc8ffe34eda92c621bd1744d805d9b7f6f9"
+  }
+]

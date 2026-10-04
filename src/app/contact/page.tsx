@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { contactEmail } from '@/lib/storefront-config';
 
 export default function ContactPage() {

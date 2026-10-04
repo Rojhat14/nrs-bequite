@@ -1,0 +1,434 @@
+[
+  {
+    "file": "src/app/not-found.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/AccountModal.tsx",
+    "motion": true,
+    "hooks": [
+      "useState",
+      "useReducedMotion",
+      "useDialog"
+    ],
+    "fromCallSites": 1
+  },
+  {
+    "file": "src/components/Atelier.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/BrandStory.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/CartDrawer.tsx",
+    "motion": true,
+    "hooks": [
+      "useCart",
+      "useRouter",
+      "useDialog"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/CategoryHero.tsx",
+    "motion": true,
+    "hooks": [
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/CategoryMood.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/Collection.tsx",
+    "motion": true,
+    "hooks": [
+      "useState",
+      "useMemo"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/CollectionListing.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/EditorialImage.tsx",
+    "motion": false,
+    "hooks": [
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/Hero.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/HomePageContent.tsx",
+    "motion": true,
+    "hooks": [
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/IntroAnimation.tsx",
+    "motion": true,
+    "hooks": [
+      "useState",
+      "useReducedMotion",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/MotionProvider.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/Navigation.tsx",
+    "motion": true,
+    "hooks": [
+      "useState",
+      "useCart",
+      "useAuth",
+      "useStorefrontCatalog",
+      "useRouter",
+      "usePathname",
+      "useRef",
+      "useId",
+      "useReducedMotion",
+      "useCallback",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/Newsletter.tsx",
+    "motion": false,
+    "hooks": [
+      "usePathname"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/ProductCard.tsx",
+    "motion": true,
+    "hooks": [
+      "useCart",
+      "useRouter",
+      "useAuth",
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 2
+  },
+  {
+    "file": "src/components/ProductDetail.tsx",
+    "motion": true,
+    "hooks": [
+      "useCart",
+      "useAuth",
+      "useState",
+      "useRef",
+      "useEffect"
+    ],
+    "fromCallSites": 2
+  },
+  {
+    "file": "src/components/ProductListing.tsx",
+    "motion": false,
+    "hooks": [
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/ProductShowcase.tsx",
+    "motion": true,
+    "hooks": [
+      "useRef",
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/Selected.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/SelectedPieces.tsx",
+    "motion": false,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/StorefrontShell.tsx",
+    "motion": false,
+    "hooks": [
+      "usePathname"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/context/AuthContext.tsx",
+    "motion": false,
+    "hooks": [
+      "useState",
+      "useEffect",
+      "useContext"
+    ],
+    "fromCallSites": 2
+  },
+  {
+    "file": "src/context/StorefrontCatalogContext.tsx",
+    "motion": false,
+    "hooks": [
+      "useContext"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/hooks/useDialog.ts",
+    "motion": false,
+    "hooks": [
+      "useRef",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/lib/wishlistClient.ts",
+    "motion": false,
+    "hooks": [],
+    "fromCallSites": 1
+  },
+  {
+    "file": "src/app/about/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/care-guide/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/checkout/page.tsx",
+    "motion": true,
+    "hooks": [
+      "useCart",
+      "useAuth",
+      "useState",
+      "useRouter",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/contact/page.tsx",
+    "motion": true,
+    "hooks": [
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/curated/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/faq/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/profile/page.tsx",
+    "motion": true,
+    "hooks": [
+      "useAuth",
+      "useCart",
+      "useRouter",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/returns/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/shipping/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/size-guide/page.tsx",
+    "motion": true,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/AdminCategoryManager.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/AdminLoginForm.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/AdminProductForm.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/AdminShell.tsx",
+    "motion": false,
+    "hooks": [
+      "usePathname",
+      "useRouter",
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/DuplicateProductButton.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState",
+      "useRef",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/InventoryTable.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/OrderStatusForm.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/ProductImageManager.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState",
+      "useMemo",
+      "useCallback",
+      "useEffect"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/components/admin/ProductVariantManager.tsx",
+    "motion": false,
+    "hooks": [
+      "useRouter",
+      "useState"
+    ],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/lib/supabase/client.ts",
+    "motion": false,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/admin/(protected)/error.tsx",
+    "motion": false,
+    "hooks": [],
+    "fromCallSites": 0
+  },
+  {
+    "file": "src/app/profile/components/OrderHistory.tsx",
+    "motion": true,
+    "hooks": [
+      "useAuth",
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 1
+  },
+  {
+    "file": "src/app/profile/components/ProfileHeader.tsx",
+    "motion": true,
+    "hooks": [
+      "useAuth",
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 1
+  },
+  {
+    "file": "src/app/profile/components/WishlistGrid.tsx",
+    "motion": true,
+    "hooks": [
+      "useAuth",
+      "useState",
+      "useEffect"
+    ],
+    "fromCallSites": 3
+  }
+]

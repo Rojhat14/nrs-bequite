@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import type { Product } from '@/data/products';
 import { useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { lookupWishlist } from '@/lib/wishlistClient';
 import { ShoppingBag, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { whatsappNumber } from '@/lib/storefront-config';
@@ -15,8 +16,10 @@ interface ProductDetailProps {
 }
 
 export default function ProductDetail({ product }: ProductDetailProps) {
-  const { addItem, openDrawer } = useCart();
+  const addItem = useCart(state => state.addItem);
+  const openDrawer = useCart(state => state.openDrawer);
   const { user } = useAuth();
+  const userId = user?.id;
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -31,18 +34,17 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     let active = true;
     const checkWishlist = async () => {
       setIsWishlisted(false);
-      if (!user) return;
-      const { data } = await supabase
-        .from('wishlist')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('product_id', product.id)
-        .maybeSingle();
-      if (active) setIsWishlisted(!!data);
+      if (!userId) return;
+      try {
+        const favorite = await lookupWishlist(userId, product.id);
+        if (active) setIsWishlisted(favorite);
+      } catch {
+        if (active) setIsWishlisted(false);
+      }
     };
     checkWishlist();
     return () => { active = false; };
-  }, [user, product.id]);
+  }, [userId, product.id]);
 
   const toggleWishlist = async () => {
     if (wishlistBusy) return;
@@ -141,8 +143,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   src={activeImage.url}
                   alt={activeImage.altText || product.name}
                   fill
-                  priority={activeImageIndex === 0}
-                  sizes="(max-width: 1024px) 100vw, 60vw"
+                  priority={activeImageIndex === Math.max(0, primaryImageIndex)}
+                  sizes="(max-width: 639px) calc(100vw - 108px), (max-width: 1023px) calc(100vw - 140px), (max-width: 1279px) 50vw, 590px"
                   className="object-contain"
                   onError={() => markImageBroken(activeImageIndex)}
                 />

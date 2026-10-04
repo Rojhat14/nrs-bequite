@@ -1,0 +1,18 @@
+{
+  "before": {
+    "bytes": 453859,
+    "gzip": 44926,
+    "images": 71,
+    "lazy": 7,
+    "backgrounds": 183,
+    "productLinks": 61
+  },
+  "after": {
+    "bytes": 544033,
+    "gzip": 47559,
+    "images": 93,
+    "lazy": 90,
+    "backgrounds": 0,
+    "productLinks": 61
+  }
+}

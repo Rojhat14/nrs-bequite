@@ -8,9 +8,9 @@ import type { ProductImageRow } from '@/lib/admin/types'
 import { deleteProductImage, setImagePrimary, updateImageMetadata } from '@/app/admin/(protected)/actions'
 import { getProductImageUrl } from '@/lib/storage/products'
 
-export default function ProductImageManager({ productId }: { productId: string }) {
+export default function ProductImageManager({ productId, initialImages }: { productId: string; initialImages?: ProductImageRow[] }) {
   const router = useRouter()
-  const [images, setImages] = useState<ProductImageRow[]>([])
+  const [images, setImages] = useState<ProductImageRow[]>(initialImages ?? [])
   const [variant, setVariant] = useState('main')
   const [files, setFiles] = useState<File[]>([])
   const [progress, setProgress] = useState(0)
@@ -29,7 +29,10 @@ export default function ProductImageManager({ productId }: { productId: string }
     }
   }, [productId])
 
-  useEffect(() => { void refreshImages() }, [refreshImages])
+  useEffect(() => {
+    if (initialImages) setImages(initialImages)
+    else void refreshImages()
+  }, [initialImages, refreshImages])
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

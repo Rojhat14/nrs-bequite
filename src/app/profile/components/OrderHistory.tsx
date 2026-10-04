@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { Package, Clock, CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 
 export default function OrderHistory() {
   const { user } = useAuth();
@@ -20,7 +20,7 @@ export default function OrderHistory() {
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select(`*, order_items(*)`)
+          .select('id,created_at,status,total_amount')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 

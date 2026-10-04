@@ -5,7 +5,7 @@ import { useCart } from '@/store/useCart';
 import { Search, User, Heart, ShoppingBag, Menu, X, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { m as motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import AccountModal from '@/components/AccountModal';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
@@ -28,7 +28,8 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
-  const { items, openDrawer } = useCart();
+  const items = useCart(state => state.items);
+  const openDrawer = useCart(state => state.openDrawer);
   const { user, profile, signOut } = useAuth();
   const { categories, collections } = useStorefrontCatalog();
   const router = useRouter();

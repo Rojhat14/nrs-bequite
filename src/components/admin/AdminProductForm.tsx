@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { archiveProduct, saveProduct } from '@/app/admin/(protected)/actions'
-import type { CategoryRow, CollectionRow, ProductRow, ProductVariantRow } from '@/lib/admin/types'
+import type { CategoryRow, CollectionRow, ProductRow, ProductVariantRow, ProductImageRow } from '@/lib/admin/types'
 import { DEFAULT_ADMIN_SETTINGS } from '@/lib/admin/config'
 import ProductImageManager from '@/components/admin/ProductImageManager'
 import ProductVariantManager from '@/components/admin/ProductVariantManager'
@@ -11,7 +11,7 @@ import ProductVariantManager from '@/components/admin/ProductVariantManager'
 const EMPTY_COLLECTIONS: CollectionRow[] = []
 const EMPTY_COLLECTION_IDS: string[] = []
 
-export default function AdminProductForm({ product, categories, collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [] }: { product?: ProductRow; categories: CategoryRow[]; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[] }) {
+export default function AdminProductForm({ product, categories, collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [], images }: { product?: ProductRow; categories: CategoryRow[]; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[]; images?: ProductImageRow[] }) {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -112,7 +112,7 @@ export default function AdminProductForm({ product, categories, collections = EM
       </form>
 
       {product && <>
-        <ProductImageManager productId={product.id} />
+        <ProductImageManager productId={product.id} initialImages={images} />
         <ProductVariantManager productId={product.id} initialVariants={variants} />
       </>}
       {!product && <p className="border border-dashed border-[#D8D0C3] bg-white/50 p-4 text-xs leading-5 text-[#777165]">Önce ürünü kaydedin. Ardından görsel yükleme ve beden/varyant stok yönetimi açılır.</p>}

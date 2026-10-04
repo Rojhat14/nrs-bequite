@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import type { Product } from '@/data/products';
 import { ProductCard } from '@/components/ProductCard';
 import Link from 'next/link';
@@ -80,6 +80,7 @@ const Collection = ({ products, onProductClick }: CollectionProps) => {
                 <ProductCard
                   key={product.id}
                   product={product}
+                  sizes="(max-width: 639px) calc(100vw - 48px), (max-width: 1023px) 50vw, (max-width: 1279px) 25vw, 284px"
                   onProductClick={onProductClick}
                 />
               ))
