@@ -13,6 +13,7 @@ export async function generateMetadata({ params: paramsPromise }: CollectionPage
   if (!collection) return { title: 'Koleksiyon bulunamadı | NRS' }
   return {
     title: `NRS | ${collection.name}`,
+    alternates: { canonical: `/collections/${encodeURIComponent(collection.slug)}` },
     description: collection.description || `${collection.name} koleksiyonundaki NRS tasarımlarını keşfedin.`,
   }
 }

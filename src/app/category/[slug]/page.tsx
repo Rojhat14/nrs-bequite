@@ -44,6 +44,8 @@ export async function generateMetadata({ params: paramsPromise }: CategoryPagePr
   if (!category) return { title: 'Kategori bulunamadı | NRS' }
   return {
     title: `NRS | ${category.name}`,
+    // Keep aliases self-referencing; category consolidation is a separate phase.
+    alternates: { canonical: `/category/${encodeURIComponent(params.slug)}` },
     description: category.description || `${category.name} kategorisindeki NRS tasarımlarını keşfedin.`,
   }
 }

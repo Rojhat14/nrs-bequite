@@ -13,6 +13,7 @@ export async function generateMetadata({ params: paramsPromise }: ProductPagePro
   if (!product) return { title: 'Ürün bulunamadı | NRS' }
   return {
     title: `NRS | ${product.name}`,
+    alternates: { canonical: `/product/${encodeURIComponent(product.slug || product.id)}` },
     description: product.description || `${product.name} ürününü NRS'de keşfedin.`,
   }
 }

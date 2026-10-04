@@ -4,6 +4,7 @@ import { getStorefrontCollections } from '@/lib/products'
 
 export const metadata: Metadata = {
   title: 'NRS | Koleksiyonlar',
+  alternates: { canonical: '/collections' },
   description: 'NRS koleksiyonlarını ve seçkin tasarımlarını keşfedin.',
 }
 
