@@ -21,9 +21,9 @@ const CategoryMood = () => {
       href: '/category/elbiseler'
     },
     {
-      name: 'DAVET',
+      name: 'TESETTÜR',
       collectionSlug: 'davet',
-      description: 'Anın kendisi için. Hatırlanmaya değer anlar için tasarlanan özel parçalar.',
+      description: 'Tesettür stiline eşlik eden zarif siluetler ve özenle seçilmiş parçalar.',
       href: '/category/elbiseler'
     },
     {

@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useStorefrontCatalog } from '@/context/StorefrontCatalogContext';
+import { getCollectionPresentation } from '@/lib/collectionPresentation';
 
 // Navigation Mode Definition for Adaptive UI
 type NavigationMode = 'transparent' | 'solid' | 'dark' | 'adaptive';
@@ -447,7 +448,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                       onClick={() => closeMenu()}
                       className="group flex min-h-11 items-center justify-between border-b border-nrs-ink/[0.06] py-2 text-[15px] font-serif tracking-wide text-nrs-ink/75 transition-all duration-300 hover:translate-x-1 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
                     >
-                      <span>{collection.name}</span><span className="text-xs opacity-0 transition-opacity group-hover:opacity-60">→</span>
+                      <span>{getCollectionPresentation(collection).name}</span><span className="text-xs opacity-0 transition-opacity group-hover:opacity-60">→</span>
                     </Link>)}
                   </nav>
                 </section>

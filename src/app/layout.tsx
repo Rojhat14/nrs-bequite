@@ -15,6 +15,20 @@ export const metadata: Metadata = {
   title: "NRS | Çağdaş Kadın Modası",
   description: 'NRS — modern kadın için tasarlanan rafine siluetler, seçkin dokular ve zamansız tasarımlar.',
   keywords: ['luxury fashion', 'NRS moda', 'premium kadın giyim', 'contemporary fashion', 'lüks giyim'],
+  openGraph: {
+    type: 'website',
+    siteName: 'NRS Bequite Luminous',
+    title: 'NRS Bequite Luminous | Çağdaş Kadın Modası',
+    description: 'NRS — modern kadın için tasarlanan rafine siluetler, seçkin dokular ve zamansız tasarımlar.',
+    url: 'https://nrsbequiteluminous.com/',
+    images: [{
+      url: 'https://nrsbequiteluminous.com/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png',
+      width: 1024,
+      height: 1024,
+      alt: 'NRS Bequite Luminous',
+    }],
+  },
+  twitter: { card: 'summary_large_image' },
 }
 
 export default async function RootLayout({

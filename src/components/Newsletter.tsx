@@ -16,7 +16,7 @@ export default function Newsletter() {
       <div className="max-w-3xl mx-auto space-y-8">
         <h2 className="text-3xl md:text-4xl font-serif">NRS Özel Liste</h2>
         <p className="text-nrs-ivory/60 font-light text-lg">
-          Yeni koleksiyonları, özel davetleri ve sınırlı sayıdaki parçaları ilk keşfeden siz olun.
+          Yeni koleksiyonları, tesettür seçkisini ve sınırlı sayıdaki parçaları ilk keşfeden siz olun.
         </p>
         <p className="text-sm text-nrs-ivory/60">Bülten aboneliği yakında açılacak.</p>
       </div>

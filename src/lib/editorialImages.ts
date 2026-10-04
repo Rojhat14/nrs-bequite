@@ -20,7 +20,7 @@ const collectionImages: Record<string, string> = {
   'yeni-gelenler': '/images/editorial/collections/new-arrivals.jpg',
   gunduz: '/images/editorial/collections/daytime.jpg',
   gece: '/images/editorial/collections/evening.jpg',
-  davet: '/images/editorial/collections/occasion.jpg',
+  davet: '/images/editorial/categories/dresses.jpg',
   imza: '/images/editorial/collections/signature.jpg',
   seckiler: '/images/editorial/collections/curated.jpg',
   indirim: '/images/editorial/collections/sale.jpg',

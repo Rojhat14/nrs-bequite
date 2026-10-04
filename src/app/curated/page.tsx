@@ -33,8 +33,8 @@ export default function CuratedPage() {
                 collectionSlug: 'imza',
               },
               {
-                title: 'Gece Işıltısı',
-                desc: 'Davetlerin odak noktası olacak, iddialı ve rafine gece tasarımları.',
+                title: 'Tesettür Zarafeti',
+                desc: 'Tesettür stiline eşlik eden zarif siluetler ve özenle seçilmiş parçalar.',
                 collectionSlug: 'davet',
               },
               {
