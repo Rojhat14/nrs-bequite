@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import StorefrontShell from '@/components/StorefrontShell'
 import MotionProvider from '@/components/MotionProvider'
 import Footer from '@/components/Footer'
+import MetaPixel from '@/components/MetaPixel'
 import { getStorefrontNavigationData } from '@/lib/products'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -40,6 +41,7 @@ export default async function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-canvas text-nrs-ink`}>
+        <MetaPixel />
         <AuthProvider>
           <MotionProvider>
             <StorefrontShell categories={navigationData.categories} collections={navigationData.collections} footer={<Footer />}>{children}</StorefrontShell>
