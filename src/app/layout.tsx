@@ -13,6 +13,7 @@ const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://nrsbequiteluminous.com'),
+  other: { 'facebook-domain-verification': 'dquxm83v1pw19h4ju9sq2g64ikxq7g' },
   title: "NRS | Çağdaş Kadın Modası",
   description: 'NRS — modern kadın için tasarlanan rafine siluetler, seçkin dokular ve zamansız tasarımlar.',
   keywords: ['luxury fashion', 'NRS moda', 'premium kadın giyim', 'contemporary fashion', 'lüks giyim'],
