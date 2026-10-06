@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 export interface Item {
   /** Product ID; retained for checkout/order compatibility. */
   id: string
+  slug?: string
   title: string
   price: string
   compareAtPrice?: number | string | null
@@ -125,6 +126,7 @@ function restoreItems(value: unknown): Item[] {
     if (!quantity) return []
     return [{
       id: candidate.id,
+      slug: typeof candidate.slug === 'string' ? candidate.slug : undefined,
       title: candidate.title,
       price: candidate.price,
       quantity,

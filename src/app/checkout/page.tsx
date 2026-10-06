@@ -9,6 +9,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import AccountModal from '@/components/AccountModal'
+import CartWhatsappOrder from '@/components/CartWhatsappOrder'
 
 export default function Checkout() {
   const { items, totalAmount, openDrawer } = useCart()
@@ -244,7 +245,7 @@ export default function Checkout() {
                 <h2 className="font-serif text-2xl">Ödeme</h2>
                 <p role="status" className="text-nrs-ink/60">Online ödeme henüz kullanılamıyor. Sipariş için bizimle iletişime geçebilirsiniz. Sepetiniz korunur.</p>
                 <p>Toplam: ₺{totalAmount.toLocaleString('tr-TR')}</p>
-                <Link href="/contact" className="inline-block bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 px-8 py-4 text-nrs-ivory">İletişime geç</Link>
+                <CartWhatsappOrder items={items} total={totalAmount} customer={formData} />
               </div>
             )}
 

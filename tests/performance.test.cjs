@@ -138,6 +138,18 @@ function catalogFixture() {
   return { api, tables, calls };
 }
 
+test('Outerwear uses category UUID filtering and remains separate from collections', async () => {
+  const { api, tables } = catalogFixture();
+  tables.categories.push({ id: 'outerwear-id', name: 'Dış Giyim', slug: 'dis-giyim', description: null, sort_order: 2, is_active: true });
+  tables.products.push({ ...tables.products[0], id: 'outerwear-product', slug: 'outerwear-product', category_id: 'outerwear-id' });
+  const outerwear = await api.getCategoryCatalog('dis-giyim');
+  assert.equal(outerwear.category.id, 'outerwear-id');
+  assert.deepEqual(outerwear.products.map(product => product.id), ['outerwear-product']);
+  assert.deepEqual((await api.getCategoryCatalog('elbiseler')).products.map(product => product.id), ['p1']);
+  assert.ok((await api.getStorefrontProducts()).some(product => product.category === 'Dış Giyim'));
+  assert.ok(!(await api.getStorefrontCollections()).some(collection => collection.slug === 'dis-giyim'));
+});
+
 test('catalog mapping preserves primary image, variants, price, aliases and collections', async () => {
   const { api } = catalogFixture();
   const product = await api.getStorefrontProduct('dress');

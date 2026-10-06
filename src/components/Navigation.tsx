@@ -112,6 +112,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     { slugs: ['ceketler-blazerlar', 'blazers'], names: ['ceketler & blazerlar'], fallback: 'ceketler-blazerlar', label: 'CEKETLER & BLAZERLAR' },
     { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM' },
     { slugs: ['takimlar', 'suits'], names: ['takımlar'], fallback: 'takimlar', label: 'TAKIMLAR' },
+    { slugs: ['dis-giyim'], names: ['dış giyim'], fallback: 'dis-giyim', label: 'DIŞ GİYİM' },
   ];
   const categoryLinks = categoryOrder.map((item) => {
     const category = categories.find((entry) => item.slugs.includes(entry.slug) || item.names.includes(entry.name.toLocaleLowerCase('tr-TR')))
@@ -125,7 +126,6 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     { name: 'YENİ GELENLER', href: collectionHref('yeni-gelenler', '/') },
     ...categoryLinks,
     { name: 'KOLEKSİYONLAR', href: '/collections' },
-    { name: 'SEÇKİLER', href: collectionHref('seckiler', '/curated') },
     { name: 'İNDİRİM', href: collectionHref('indirim', '/category/sale') },
   ];
 
@@ -442,7 +442,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                     <Link href="/collections" onClick={() => closeMenu()} className="text-[9px] uppercase tracking-[0.15em] text-nrs-ink/60 transition-colors hover:text-nrs-ink">Tümünü gör</Link>
                   </div>
                   <nav className="space-y-1">
-                    {collections.map((collection) => <Link
+                    {collections.filter(collection => collection.slug !== 'seckiler').map((collection) => <Link
                       key={collection.id || collection.slug}
                       href={`/collections/${encodeURIComponent(collection.slug)}`}
                       onClick={() => closeMenu()}

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { m as motion } from 'framer-motion';
-import { contactEmail } from '@/lib/storefront-config';
+import { contactEmail, contactPhone, contactPhoneLabel, contactAddress, whatsappUrl } from '@/lib/storefront-config';
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -31,8 +31,16 @@ export default function ContactPage() {
                 <p className="text-sm font-sans text-nrs-ink/70 break-all">{contactEmail ? <a href={`mailto:${contactEmail}`}>{contactEmail}</a> : 'İletişim bilgilerimiz yakında paylaşılacak.'}</p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-xs uppercase tracking-widest font-medium">Atölye</h3>
-                <p className="text-sm font-sans text-nrs-ink/70">Nişantaşı, İstanbul / Türkiye</p>
+                <h3 className="text-xs uppercase tracking-widest font-medium">Telefon / WhatsApp</h3>
+                {contactPhone && <a className="inline-flex min-h-11 items-center text-sm text-nrs-ink/70" href={`tel:${contactPhone}`}>{contactPhoneLabel}</a>}
+                {whatsappUrl() && <a href={whatsappUrl('Merhaba NRS, web siteniz üzerinden iletişime geçiyorum.')!} target="_blank" rel="noopener noreferrer"
+                  className="flex min-h-12 items-center justify-center border border-nrs-ink/30 px-4 py-4 text-xs uppercase tracking-widest hover:bg-nrs-ink/5 focus-visible:outline focus-visible:outline-2">
+                  WhatsApp&apos;tan bize ulaşın
+                </a>}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xs uppercase tracking-widest font-medium">Adres</h3>
+                <p className="text-sm font-sans text-nrs-ink/70">{contactAddress}</p>
               </div>
               <div className="space-y-2">
                 <h3 className="text-xs uppercase tracking-widest font-medium">Çalışma Saatleri</h3>

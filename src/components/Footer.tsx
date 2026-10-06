@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { contactEmail, contactPhone, contactPhoneLabel, contactAddress, whatsappUrl } from '@/lib/storefront-config';
 
 export default function Footer() {
   return (
@@ -25,6 +26,12 @@ export default function Footer() {
             <p className="text-sm text-nrs-ink/60 font-light leading-relaxed max-w-xs font-sans">
               Modern kadının özgün duruşu için tasarlanan rafine siluetler ve zamansız detaylar.
             </p>
+            <address className="space-y-3 text-sm leading-6 not-italic text-nrs-ink/65 break-words">
+              {contactEmail && <a className="block break-all hover:text-nrs-ink" href={`mailto:${contactEmail}`}>{contactEmail}</a>}
+              {contactPhone && <a className="block hover:text-nrs-ink" href={`tel:${contactPhone}`}>{contactPhoneLabel}</a>}
+              {whatsappUrl() && <a className="inline-flex min-h-11 items-center hover:text-nrs-ink" href={whatsappUrl()!} target="_blank" rel="noopener noreferrer">WhatsApp&apos;tan iletişime geç</a>}
+              <p>{contactAddress}</p>
+            </address>
           </div>
 
           {/* Shopping Section */}
@@ -40,8 +47,8 @@ export default function Footer() {
                 { name: 'Ceketler & Blazerlar', href: '/category/ceketler-blazerlar' },
                 { name: 'Alt Giyim', href: '/category/alt-giyim' },
                 { name: 'Takımlar', href: '/category/takimlar' },
+                { name: 'Dış Giyim', href: '/category/dis-giyim' },
                 { name: 'Koleksiyonlar', href: '/collections' },
-                { name: 'Seçkiler', href: '/curated' },
                 { name: 'İndirim', href: '/category/sale' },
               ].map((link) => (
                 <Link

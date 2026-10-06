@@ -130,7 +130,7 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
               router.push(`/product/${encodeURIComponent(product.slug || product.id)}`);
               return;
             }
-            addItem({ id: product.id, title: product.name, price: product.price, image: product.image, compareAtPrice: product.compareAtPrice });
+            addItem({ id: product.id, slug: product.slug, title: product.name, price: product.price, image: product.image, compareAtPrice: product.compareAtPrice });
             openDrawer();
           }}
           className="product-card-quick-add absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 px-4 sm:px-6 py-3 bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-700 transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 z-20"

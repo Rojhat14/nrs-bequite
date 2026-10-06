@@ -16,15 +16,15 @@ const collectionVisuals: Record<string, { description: string }> = {
   gunduz: { description: 'Günün her anına eşlik eden rafine ve zamansız parçalar.' },
   gece: { description: 'Işığın değiştiği saatler için akışkan dokular ve güçlü siluetler.' },
   imza: { description: 'NRS karakterini taşıyan ikonik siluetler ve detaylar.' },
-  seckiler: { description: 'NRS tarafından sizin için bir araya getirilen özel parçalar.' },
   indirim: { description: 'NRS seçkisinden avantajlı fiyatlarla sunulan tasarımlar.' },
 }
 
 export default function CollectionListing({ collections }: CollectionListingProps) {
+  const visibleCollections = collections.filter(collection => collection.slug !== 'seckiler')
   return (
     <>
-      {collections.length > 0 ? <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        {collections.map((collection, index) => {
+      {visibleCollections.length > 0 ? <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        {visibleCollections.map((collection, index) => {
           const visual = collectionVisuals[collection.slug]
           const presentation = getCollectionPresentation(collection)
           const image = getCollectionEditorialImage(collection.slug)

@@ -10,6 +10,7 @@ interface CategoryPageProps {
 }
 
 const categoryBanners: Record<string, { title: string; description: string }> = {
+  'dis-giyim': { title: 'DIŞ GİYİM', description: 'Dış giyim kategorisindeki NRS tasarımlarını keşfedin.' },
   elbiseler: { title: 'KADIN ELBİSELERİ', description: 'Modern siluetleri, rafine detayları ve zamansız kadınsılığı bir araya getiren seçkin koleksiyon.' },
   dresses: { title: 'KADIN ELBİSELERİ', description: 'Modern siluetleri, rafine detayları ve zamansız kadınsılığı bir araya getiren seçkin koleksiyon.' },
   'ust-giyim': { title: 'KADIN ÜST GİYİM', description: 'Zarif bluzlardan akışkan saten tasarımlara kadar modern gardırobun tamamlayıcı parçaları.' },

@@ -3,13 +3,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { m as motion } from 'framer-motion';
 import type { Product } from '@/data/products';
-import { useCart } from '@/store/useCart';
+import { parsePrice, useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { lookupWishlist } from '@/lib/wishlistClient';
 import { ShoppingBag, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
-import { whatsappNumber } from '@/lib/storefront-config';
+import { whatsappNumber, whatsappUrl } from '@/lib/storefront-config';
+import { buildWhatsappOrderMessage, whatsappSelectionError } from '@/lib/whatsapp-order';
+import BankTransferInfo from '@/components/BankTransferInfo';
 
 interface ProductDetailProps {
   product: Product;
@@ -22,6 +24,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const userId = user?.id;
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [orderError, setOrderError] = useState('');
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(() => {
@@ -222,7 +225,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   <p className="text-2xl font-serif text-nrs-ink/80">{product.price}</p>
                   {product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{product.currency === 'TRY' || !product.currency ? '₺' : `${product.currency} `}{product.compareAtPrice.toLocaleString('en-US')}</del>}
                 </div>
-                <p className={`text-[10px] uppercase tracking-[0.18em] ${product.inStock ? 'text-nrs-ink/60' : 'text-red-400'}`}>{product.inStock ? 'Stokta' : 'Tükendi'}</p>
               </div>
 
               <div className="space-y-8 py-10 border-y border-nrs-ink/10">
@@ -235,7 +237,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                         key={variant.id}
                         type="button"
                         disabled={variant.stock < 1}
-                        onClick={() => setSelectedVariantId(variant.id)}
+                        onClick={() => { setSelectedVariantId(variant.id); setOrderError(''); setQuantity(1); }}
                         aria-pressed={selectedVariantId === variant.id}
                         className={`min-w-12 h-12 px-3 text-xs font-sans transition-all duration-500 border disabled:cursor-not-allowed disabled:opacity-35 ${
                           selectedVariantId === variant.id
@@ -251,14 +253,24 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 </div>
 
                 <div className="flex flex-col gap-4 pt-4">
+                  <label className="flex items-center justify-between gap-4 text-xs text-nrs-ink/65">
+                    Adet
+                    <input type="number" min={1} value={quantity}
+                      onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
+                      className="min-h-12 w-20 border border-nrs-ink/20 bg-transparent px-3 text-nrs-ink" />
+                  </label>
                   <button
                     onClick={() => {
                       if (variants.length > 0 && !selectedVariant) {
                         alert('Lütfen bir beden seçin');
                         return;
                       }
+                      if (selectedVariant && quantity > selectedVariant.stock) {
+                        setOrderError('Seçilen adet için yeterli stok bulunmuyor.'); return;
+                      }
                       addItem({
                         id: product.id,
+                        slug: product.slug,
                         title: product.name,
                         price: product.price,
                         image: product.image,
@@ -274,14 +286,26 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     <ShoppingBag size={18} />
                     Sepete Ekle
                   </button>
-                  {whatsappNumber && <a
-                    href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Merhaba! Şu ürünle ilgileniyorum:\n\nÜrün: ${product.name}\nBeden: ${selectedVariant?.label || 'Seçilmedi'}\nAdet: ${quantity}\n\nDetaylı bilgi alabilir miyim?`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-[#25D366] text-white py-5 uppercase tracking-widest text-xs font-sans hover:bg-[#128C7E] transition-all duration-700 flex items-center justify-center gap-3"
-                  >
-                    WhatsApp ile Sipariş
-                  </a>}
+                  <button type="button" disabled={!product.inStock || !whatsappNumber}
+                    aria-label={`${product.name} için WhatsApp'tan sipariş ver`}
+                    aria-describedby={orderError ? 'whatsapp-order-error' : undefined}
+                    onClick={() => {
+                      const variant = selectedVariant || variants.find(variant => !variant.size);
+                      const error = whatsappSelectionError({ requiresSize: variants.some(variant => Boolean(variant.size)),
+                        selected: Boolean(selectedVariant), stock: variant?.stock, quantity });
+                      if (error) { setOrderError(error); return; }
+                      const message = buildWhatsappOrderMessage([{
+                        id: product.id, slug: product.slug, name: product.name, size: variant?.size || undefined, quantity,
+                        unitPrice: product.priceAmount ?? parsePrice(product.price), currency: product.currency,
+                      }]);
+                      const href = whatsappUrl(message || undefined);
+                      if (href) { setOrderError(''); window.open(href, '_blank', 'noopener,noreferrer'); }
+                    }}
+                    className="min-h-12 w-full border border-nrs-ink/30 px-4 py-5 uppercase tracking-widest text-xs text-nrs-ink hover:bg-nrs-ink/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    WhatsApp&apos;tan Sipariş Ver
+                  </button>
+                  {orderError && <p id="whatsapp-order-error" role="alert" className="text-sm text-red-700">{orderError}</p>}
+                  <BankTransferInfo />
                 </div>
               </div>
 
@@ -299,7 +323,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     <ul className="text-sm font-sans text-nrs-ink/70 space-y-2">
                       {product.details.fabric && <li>{product.details.fabric}</li>}
                       {product.category && <li>{product.category}</li>}
-                      {variants.length > 0 && <li>{variants.reduce((total, variant) => total + variant.stock, 0)} adet stok</li>}
                     </ul>
                   </div>
                   <div className="space-y-4">

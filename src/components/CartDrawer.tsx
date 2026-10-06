@@ -7,6 +7,7 @@ import { getCartItemId, useCart } from '@/store/useCart';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useDialog } from '@/hooks/useDialog';
+import CartWhatsappOrder from '@/components/CartWhatsappOrder';
 
 const CartDrawer = () => {
   const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
@@ -126,6 +127,7 @@ const CartDrawer = () => {
                         <span className="text-lg font-serif text-nrs-ink">₺{totalAmount.toLocaleString('tr-TR')}</span>
                       </div>
                     </div>
+                  <CartWhatsappOrder items={items} total={totalAmount} />
                   <button
                     onClick={() => {
                       closeDrawer();

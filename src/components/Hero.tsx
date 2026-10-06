@@ -81,12 +81,6 @@ const Hero = ({ introFinished, products }: HeroProps) => {
                 >
                   Koleksiyonu Keşfet
                 </Link>
-                <Link
-                  href="/#collection"
-                  className="px-10 py-4 border border-nrs-ink text-nrs-ink uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-black hover:text-nrs-ivory transition-all duration-700"
-                >
-                  Yeni Gelenler
-                </Link>
               </motion.div>
             </div>
           </motion.div>
