@@ -55,18 +55,18 @@ test('Contact defaults, number normalization and Turkish message encoding round-
   try {
     for (const key of keys) delete process.env[key];
     const config = loadSource('src/lib/storefront-config.ts');
-    assert.equal(config.whatsappNumber, '905320568643');
-    assert.equal(config.contactPhoneLabel, '+90 532 056 86 43');
+    assert.equal(config.whatsappNumber, '905454227919');
+    assert.equal(config.contactPhoneLabel, '+90 545 422 79 19');
     assert.equal(config.contactEmail, 'nursineerkus4@gmail.com');
-    assert.equal(config.whatsappUrl(), 'https://wa.me/905320568643');
-    assert.equal(config.normalizeWhatsappNumber('+90 (532) 056 86 43'), '905320568643');
-    assert.equal(config.normalizeWhatsappNumber('0090 532 056 86 43'), '905320568643');
+    assert.equal(config.whatsappUrl(), 'https://wa.me/905454227919');
+    assert.equal(config.normalizeWhatsappNumber('+90 (545) 422 79 19'), '905454227919');
+    assert.equal(config.normalizeWhatsappNumber('0090 545 422 79 19'), '905454227919');
     assert.equal(config.normalizeWhatsappNumber('123'), null);
     assert.equal(config.bankTransfer.iban, '');
     const message = buildWhatsappOrderMessage([{ id: 'test', name: 'İpek & Şık #1', size: 'M', quantity: 1, unitPrice: 4500 }], undefined,
       { firstName: 'Çağla', lastName: 'Şen', email: 'test@example.com' });
     const url = new URL(config.whatsappUrl(message));
-    assert.equal(url.pathname, '/905320568643');
+    assert.equal(url.pathname, '/905454227919');
     assert.equal(url.searchParams.get('text'), message);
     assert.match(message, /Ad Soyad: Çağla Şen/); assert.doesNotMatch(message, /Telefon:/);
     process.env.NEXT_PUBLIC_IBAN = ' supplied-account-value ';

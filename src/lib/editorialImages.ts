@@ -2,6 +2,7 @@
 const availableAssets = new Set<string>(JSON.parse(process.env.NRS_EDITORIAL_ASSETS || '[]'))
 
 const categoryImages: Record<string, string> = {
+  'dis-giyim': '/images/editorial/categories/outerwear.jpg',
   elbiseler: '/images/editorial/categories/dresses.jpg',
   dresses: '/images/editorial/categories/dresses.jpg',
   'ust-giyim': '/images/editorial/categories/tops.jpg',

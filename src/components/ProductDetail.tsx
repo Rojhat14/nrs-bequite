@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { whatsappNumber, whatsappUrl } from '@/lib/storefront-config';
 import { buildWhatsappOrderMessage, whatsappSelectionError } from '@/lib/whatsapp-order';
 import BankTransferInfo from '@/components/BankTransferInfo';
+import WhatsAppIcon from '@/components/WhatsAppIcon';
 
 interface ProductDetailProps {
   product: Product;
@@ -281,7 +282,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       openDrawer();
                     }}
                     disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
-                    className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans hover:bg-nrs-charcoal transition-all duration-700 flex items-center justify-center gap-3"
+                    className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans enabled:hover:bg-white enabled:hover:text-nrs-ink transition-all duration-700 flex items-center justify-center gap-3"
                   >
                     <ShoppingBag size={18} />
                     Sepete Ekle
@@ -301,7 +302,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       const href = whatsappUrl(message || undefined);
                       if (href) { setOrderError(''); window.open(href, '_blank', 'noopener,noreferrer'); }
                     }}
-                    className="min-h-12 w-full border border-nrs-ink/30 px-4 py-5 uppercase tracking-widest text-xs text-nrs-ink hover:bg-nrs-ink/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    className="flex min-h-12 w-full items-center justify-center gap-3 bg-[#25D366] px-4 py-5 uppercase tracking-widest text-xs text-nrs-ink enabled:hover:bg-[#20bd5a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    <WhatsAppIcon />
                     WhatsApp&apos;tan Sipariş Ver
                   </button>
                   {orderError && <p id="whatsapp-order-error" role="alert" className="text-sm text-red-700">{orderError}</p>}
