@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { m as motion } from 'framer-motion';
+import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags';
 
 export default function FAQPage() {
   const faqs = [
@@ -15,7 +16,9 @@ export default function FAQPage() {
     },
     {
       q: 'Ödeme yöntemleriniz nelerdir?',
-      a: 'Kredi kartı ve banka kartları ile güvenli ödeme yapabilirsiniz. Tüm işlemler PayTR altyapısı ile şifrelenmiş olarak gerçekleştirilir.'
+      a: ENABLE_CARD_PAYMENT
+        ? 'Kredi kartı ve banka kartları ile güvenli ödeme yapabilirsiniz. Tüm işlemler PayTR altyapısı ile şifrelenmiş olarak gerçekleştirilir.'
+        : 'WhatsApp üzerinden sipariş verebilirsiniz. Havale / EFT ve IBAN bilgileri sipariş onayı sırasında paylaşılır.'
     },
     {
       q: 'Kişiye özel ölçü ile üretim yapıyor musunuz?',

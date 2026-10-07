@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useDialog } from '@/hooks/useDialog';
 import CartWhatsappOrder from '@/components/CartWhatsappOrder';
+import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags';
 
 const CartDrawer = () => {
   const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
@@ -128,7 +129,7 @@ const CartDrawer = () => {
                       </div>
                     </div>
                   <CartWhatsappOrder items={items} total={totalAmount} />
-                  <button
+                  {ENABLE_CARD_PAYMENT && <button
                     onClick={() => {
                       closeDrawer();
                       router.push('/checkout');
@@ -137,7 +138,7 @@ const CartDrawer = () => {
                   >
                     Proceed to Checkout
                     <ShoppingBag size={16} />
-                  </button>
+                  </button>}
                 </div>
               </>
             )}

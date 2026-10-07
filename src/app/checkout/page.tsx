@@ -10,6 +10,7 @@ import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import AccountModal from '@/components/AccountModal'
 import CartWhatsappOrder from '@/components/CartWhatsappOrder'
+import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags'
 
 export default function Checkout() {
   const { items, totalAmount, openDrawer } = useCart()
@@ -98,7 +99,7 @@ export default function Checkout() {
       <main className="min-w-0 flex-1 md:ml-64 pt-[var(--nrs-header-height)]">
         <div className="max-w-3xl mx-auto py-20 px-6">
           <div className="mb-12">
-            {step <= 3 && (
+            {ENABLE_CARD_PAYMENT && step <= 3 && (
               <button
                 onClick={() => (step === 1 ? router.push('/') : setStep(step - 1))}
                 className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors mb-6 group"
@@ -107,12 +108,12 @@ export default function Checkout() {
                 {step === 1 ? 'Back to Atelier' : 'Previous Step'}
               </button>
             )}
-            <h1 className="font-serif text-4xl md:text-5xl mb-3 text-nrs-ink">Checkout</h1>
-            <p className="text-nrs-ink/65">Complete your acquisition of the selected pieces.</p>
+            <h1 className="font-serif text-4xl md:text-5xl mb-3 text-nrs-ink">{ENABLE_CARD_PAYMENT ? 'Checkout' : 'Sipariş'}</h1>
+            {ENABLE_CARD_PAYMENT && <p className="text-nrs-ink/65">Complete your acquisition of the selected pieces.</p>}
           </div>
 
           <div className="space-y-12">
-            {step === 1 && (
+            {ENABLE_CARD_PAYMENT && step === 1 && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
                 <h2 className="font-serif text-2xl text-nrs-ink text-center">How would you like to proceed?</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -140,7 +141,7 @@ export default function Checkout() {
               </motion.div>
             )}
 
-            {step === 2 && (
+            {ENABLE_CARD_PAYMENT && step === 2 && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                 <h2 className="font-serif text-2xl text-nrs-ink">Shipping Details</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,10 +241,12 @@ export default function Checkout() {
               </motion.div>
             )}
 
-            {step === 3 && (
+            {(!ENABLE_CARD_PAYMENT || step === 3) && (
               <div className="space-y-6">
-                <h2 className="font-serif text-2xl">Ödeme</h2>
-                <p role="status" className="text-nrs-ink/60">Online ödeme henüz kullanılamıyor. Sipariş için bizimle iletişime geçebilirsiniz. Sepetiniz korunur.</p>
+                {ENABLE_CARD_PAYMENT && <>
+                  <h2 className="font-serif text-2xl">Ödeme</h2>
+                  <p role="status" className="text-nrs-ink/60">Online ödeme henüz kullanılamıyor. Sipariş için bizimle iletişime geçebilirsiniz. Sepetiniz korunur.</p>
+                </>}
                 <p>Toplam: ₺{totalAmount.toLocaleString('tr-TR')}</p>
                 <CartWhatsappOrder items={items} total={totalAmount} customer={formData} />
               </div>
