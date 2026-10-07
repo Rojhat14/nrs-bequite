@@ -16,7 +16,7 @@ const Hero = ({ introFinished, products }: HeroProps) => {
   return (
     <section className="relative min-h-[100svh] w-full bg-nrs-canvas flex flex-col items-center justify-center overflow-hidden pt-[var(--nrs-header-height)] pb-8">
       {/* Ambient Background Element */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-nrs-rosegold/5 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-nrs-champagne/30 blur-[150px] rounded-full pointer-events-none" />
 
       {/* Editorial Background Image - Soft, high-end fashion feel */}
       <motion.div
@@ -29,7 +29,7 @@ const Hero = ({ introFinished, products }: HeroProps) => {
           src="https://images.unsplash.com/photo-1490481651818-503f6c70611d?q=80&w=2070&auto=format&fit=crop"
           alt="Luxury Fashion Background"
           fill
-          className="object-cover opacity-40"
+          className="object-cover opacity-40 mix-blend-multiply"
           priority
         />
       </motion.div>

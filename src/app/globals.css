@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0 0;       /* #000000 */
-  --foreground: 247 243 238; /* #F7F3EE */
+  --background: 247 243 238; /* #F7F3EE */
+  --foreground: 5 5 5;      /* #050505 */
   --muted: 139 129 123;     /* #8B817B */
   --accent: 184 137 112;    /* #B88970 */
   --nrs-header-height: 100px;
@@ -18,10 +18,10 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Native form controls follow the storefront's dark surfaces. */
+/* Native form controls follow the storefront's light surfaces. */
 @layer utilities {
   .bg-nrs-canvas:not(body) {
-    color-scheme: dark;
+    color-scheme: light;
   }
 }
 
@@ -75,7 +75,7 @@ a, button {
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: #F7F3EE;
 }
 ::-webkit-scrollbar-thumb {
   background: #D2B48C;
