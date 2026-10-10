@@ -1,5 +1,6 @@
 'use client'
 
+import { DELIVERY_TERMS } from '@/lib/delivery-policy'
 import { m as motion } from 'framer-motion'
 import { useCart } from '@/store/useCart'
 import { useState, useEffect } from 'react'
@@ -248,6 +249,7 @@ export default function Checkout() {
                   <p role="status" className="text-nrs-ink/60">Online ödeme henüz kullanılamıyor. Sipariş için bizimle iletişime geçebilirsiniz. Sepetiniz korunur.</p>
                 </>}
                 <p>Toplam: ₺{totalAmount.toLocaleString('tr-TR')}</p>
+                <p className="text-sm leading-6">{DELIVERY_TERMS}</p>
                 <CartWhatsappOrder items={items} total={totalAmount} customer={formData} />
               </div>
             )}

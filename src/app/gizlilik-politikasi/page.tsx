@@ -9,6 +9,6 @@ export const metadata: Metadata = {
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ version?: string | string[] }> }) {
   const params = await searchParams
-  const version = typeof params.version === 'string' ? params.version : 'v1.2'
+  const version = typeof params.version === 'string' ? params.version : 'v1.3'
   return <LegalDocumentPage slug="gizlilik-politikasi" version={version} />
 }

@@ -6,13 +6,14 @@ import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags';
 
 export default function FAQPage() {
   const faqs = [
+    { q: 'Kargo ücreti ve teslimat süresi nedir?', a: 'Türkiye genelinde ücretsiz kargo. Sipariş onayından itibaren özel dikim üretimi ve kargo taşımacılığı dahil toplam 7–10 iş günü içerisinde teslimat. Ek kargo süresi eklenmez.' },
     {
       q: 'Siparişimi nasıl takip edebilirim?',
       a: 'Siparişiniz kargoya verildiğinde taşıyıcı ve takip bilgilerini mevcut iletişim kanalınızdan talep edebilirsiniz.'
     },
     {
       q: 'İade süreci nasıl işliyor?',
-      a: 'Standart ürünlerde teslimat tarihinden itibaren 14 gün içinde cayma bildiriminizi rojhat1maman@gmail.com adresine iletebilirsiniz. Ayrıntılar İade ve Değişim Koşulları sayfasındadır.'
+      a: 'Kıyafetler müşterinin ölçülerine göre özel dikilir. Cayma hakkı istisnası yalnızca mevzuattaki koşullar oluştuğunda uygulanır; ayıplı ürün hakları korunur. Cayma hakkının geçerli olduğu ürünlerde teslimden itibaren 14 gün içinde bildirim yapılabilir. İletişim ve ayrıntılar İade ve Değişim Koşulları sayfasındadır.'
     },
     {
       q: 'Ödeme yöntemleriniz nelerdir?',
@@ -22,7 +23,7 @@ export default function FAQPage() {
     },
     {
       q: 'Kişiye özel ölçü ile üretim yapıyor musunuz?',
-      a: 'Belirli parçalarımızda özel ölçü hizmeti sunmaktayız. Detaylar için bizimle iletişime geçebilirsiniz.'
+      a: 'Bütün kıyafetler ürün bazında ilettiğiniz zorunlu beden ölçülerine göre özel dikilir.'
     },
   ];
 

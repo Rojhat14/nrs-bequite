@@ -1,4 +1,5 @@
-'use client';
+'use client'
+import { DELIVERY_TERMS } from '@/lib/delivery-policy'
 
 import React from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
@@ -121,13 +122,14 @@ const CartDrawer = () => {
                       </div>}
                       <div className="flex justify-between items-center text-nrs-ink/55">
                         <span className="uppercase tracking-widest">Kargo</span>
-                        <span>{shippingAmount === 0 ? 'Henüz tanımlanmadı' : `₺${shippingAmount.toLocaleString('tr-TR')}`}</span>
+                        <span>{shippingAmount === 0 ? 'Ücretsiz' : `₺${shippingAmount.toLocaleString('tr-TR')}`}</span>
                       </div>
                       <div className="flex justify-between items-center border-t border-nrs-ink/10 pt-3">
                         <span className="text-nrs-ink/60 uppercase tracking-widest">Genel Toplam</span>
                         <span className="text-lg font-serif text-nrs-ink">₺{totalAmount.toLocaleString('tr-TR')}</span>
                       </div>
                     </div>
+                  <p className="text-xs leading-6">{DELIVERY_TERMS}</p>
                   <CartWhatsappOrder items={items} total={totalAmount} />
                   {ENABLE_CARD_PAYMENT && <button
                     onClick={() => {
