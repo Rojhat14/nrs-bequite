@@ -7,6 +7,8 @@ import MotionProvider from '@/components/MotionProvider'
 import Footer from '@/components/Footer'
 import MetaPixel from '@/components/MetaPixel'
 import CookieConsent from '@/components/CookieConsent'
+import { CardPaymentProvider } from '@/lib/feature-flags'
+import { paymentAvailable } from '@/lib/payment/provider'
 import { getStorefrontNavigationData } from '@/lib/products'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -44,11 +46,11 @@ export default async function RootLayout({
     <html lang="tr" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-canvas text-nrs-ink`}>
         <MetaPixel /><CookieConsent />
-        <AuthProvider>
+        <CardPaymentProvider value={paymentAvailable()}><AuthProvider>
           <MotionProvider>
             <StorefrontShell categories={navigationData.categories} collections={navigationData.collections} footer={<Footer />}>{children}</StorefrontShell>
           </MotionProvider>
-        </AuthProvider>
+        </AuthProvider></CardPaymentProvider>
       </body>
     </html>
   )

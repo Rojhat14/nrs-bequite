@@ -1,3 +1,4 @@
+import { parseMeasurements, type Measurements } from '@/lib/order-measurements'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -10,6 +11,8 @@ export interface Item {
   compareAtPrice?: number | string | null
   quantity: number
   variantId?: string
+  measurements?: Measurements
+  category?: string
   size?: string
   image?: string
 }
@@ -29,6 +32,7 @@ interface CartStore extends CartTotals {
   isDrawerOpen: boolean
   addItem: (product: NewCartItem, quantity?: number) => void
   removeItem: (cartItemId: string) => void
+  updateMeasurements: (cartItemId: string, measurements: Measurements) => void
   updateQuantity: (cartItemId: string, quantity: number) => void
   toggleWishlist: (id: string) => void
   openDrawer: () => void
@@ -99,8 +103,7 @@ function calculateCartTotals(items: Item[]): CartTotals {
 
   const subtotalAmount = fromMinorUnits(subtotalMinor)
   const discountAmount = fromMinorUnits(discountMinor)
-  // The project has no configured cart shipping price. Keep current checkout
-  // behavior and do not invent a fee; shipping remains zero until configured.
+  // Confirmed business policy: shipping throughout Turkey is free.
   const shippingAmount = 0
 
   return {
@@ -131,6 +134,8 @@ function restoreItems(value: unknown): Item[] {
       price: candidate.price,
       quantity,
       image: typeof candidate.image === 'string' ? candidate.image : undefined,
+      measurements: (() => { try { return parseMeasurements(candidate.measurements) } catch { return {} } })(),
+      category: typeof candidate.category === 'string' ? candidate.category : undefined,
       size: typeof candidate.size === 'string' ? candidate.size : undefined,
       variantId: typeof candidate.variantId === 'string' ? candidate.variantId : undefined,
       compareAtPrice: typeof candidate.compareAtPrice === 'number' || typeof candidate.compareAtPrice === 'string' ? candidate.compareAtPrice : null,
@@ -173,6 +178,8 @@ export const useCart = create<CartStore>()(
         const items = state.items.filter((item) => getCartItemId(item) !== cartItemId)
         return { items, ...calculateCartTotals(items) }
       }),
+
+      updateMeasurements: (cartItemId, measurements) => set(state => ({ items: state.items.map(item => getCartItemId(item) === cartItemId ? { ...item, measurements } : item) })),
 
       updateQuantity: (cartItemId, requestedQuantity) => set((state) => {
         const quantity = validQuantity(requestedQuantity)

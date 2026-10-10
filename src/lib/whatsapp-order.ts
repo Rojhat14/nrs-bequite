@@ -1,7 +1,9 @@
+import { formatMeasurements, type Measurements } from '@/lib/order-measurements'
 export interface WhatsappOrderItem {
   id: string
   slug?: string
   name: string
+  measurements?: Measurements
   size?: string
   quantity: number
   unitPrice: number
@@ -13,6 +15,11 @@ export interface OrderCustomer {
   lastName?: string
   phone?: string
   email?: string
+  address?: string
+  city?: string
+  district?: string
+  orderNote?: string
+  orderId?: string
 }
 
 export function whatsappSelectionError({ requiresSize, selected, stock, quantity }: {
@@ -37,6 +44,7 @@ export function buildWhatsappOrderMessage(items: WhatsappOrderItem[], total?: nu
   items.forEach((item, index) => {
     lines.push(`${index + 1}. ${item.name}`, `Ürün Kodu: ${item.id}`)
     lines.push(`Ürün Linki: https://nrsbequiteluminous.com/product/${encodeURIComponent(item.slug || item.id)}`)
+    if (item.measurements && Object.keys(item.measurements).length) lines.push(`Ölçüler: ${formatMeasurements(item.measurements)}`)
     if (item.size) lines.push(`Beden: ${item.size}`)
     lines.push(`Adet: ${item.quantity}`, `Birim Fiyat: ${formatOrderPrice(item.unitPrice, item.currency)}`,
       `Ara toplam: ${formatOrderPrice(Math.round(item.unitPrice * 100) * item.quantity / 100, item.currency)}`, '')
@@ -49,6 +57,9 @@ export function buildWhatsappOrderMessage(items: WhatsappOrderItem[], total?: nu
   const name = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ').trim()
   const details = [name && `Ad Soyad: ${name}`, customer?.phone && `Telefon: ${customer.phone}`, customer?.email && `E-posta: ${customer.email}`].filter(Boolean)
   if (details.length) lines.push('Müşteri:', ...details as string[], '')
+  if (customer?.address) lines.push(`Teslimat: ${[customer.address, customer.district, customer.city].filter(Boolean).join(', ')}`)
+  if (customer?.orderNote) lines.push(`Sipariş notu: ${customer.orderNote}`)
+  if (customer?.orderId) lines.push(`Kayıtlı sipariş talebi: ${customer.orderId}`)
   lines.push('Ödeme yöntemi: Havale / EFT', '', 'Sipariş bilgilerimi ve IBAN bilgilerini paylaşabilir misiniz?', '', 'Teşekkürler.')
   return lines.join('\n')
 }

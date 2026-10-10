@@ -1,10 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { Package, Clock, CheckCircle2 } from 'lucide-react';
 import { m as motion } from 'framer-motion';
+import OrderLegalDocuments from '@/components/legal/OrderLegalDocuments';
 
 export default function OrderHistory() {
   const { user } = useAuth();
@@ -85,6 +87,8 @@ export default function OrderHistory() {
                   ₺{Number(order.total_amount).toLocaleString('tr-TR')}
                 </span>
               </div>
+              <Link href={`/checkout/verify?orderId=${encodeURIComponent(order.id)}`} className="mt-3 inline-flex min-h-11 items-center text-xs underline text-nrs-ink/65">Ödeme durumu ve sipariş özeti</Link>
+              <OrderLegalDocuments orderId={order.id} />
             </motion.div>
           ))}
         </div>

@@ -245,7 +245,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
       <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} />
 
       <div className={`${styles.announcement} py-2 text-center text-[9px] uppercase tracking-[0.3em] font-sans transition-colors duration-500`}>
-        3.000 TL Üzeri Alışverişlerde Ücretsiz Kargo
+        Kargo ve Teslimat Bilgileri Sipariş Teyidinde Paylaşılır
       </div>
 
       <nav className={`transition-all duration-500 ease-in-out ${styles.container}`}>

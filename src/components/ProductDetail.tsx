@@ -274,6 +274,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                         id: product.id,
                         slug: product.slug,
                         title: product.name,
+                        category: product.category,
                         price: product.price,
                         image: product.image,
                         size: selectedVariant?.size ?? undefined,

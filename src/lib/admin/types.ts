@@ -76,6 +76,9 @@ export interface OrderRow {
   shipping_city: string | null
   shipping_district: string | null
   shipping_postal_code: string | null
+  manual_request_key?: string | null
+  manual_paid_at?: string | null
+  manual_payment_reference?: string | null
   payment_id: string | null
   created_at: string
 }

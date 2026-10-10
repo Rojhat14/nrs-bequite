@@ -364,3 +364,20 @@ export async function deleteProductImage(form: FormData): Promise<ActionResult> 
   revalidatePath('/admin')
   return { ok: true, message: 'Görsel silindi.' }
 }
+
+
+export async function confirmManualTransfer(form: FormData): Promise<ActionResult> {
+  const actor = await requireAdmin()
+  if (form.get('confirmed') !== 'on' || process.env.ORDER_DATABASE_VERIFIED !== 'true') return { ok: false, message: 'Gerçek banka hesabında tutarı doğrulayın. Sipariş veritabanı hazır olmalıdır.' }
+  const id = String(form.get('order_id') || '')
+  const amount = Number(form.get('amount'))
+  const reference = String(form.get('reference') || '').trim()
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !Number.isFinite(amount) || amount <= 0 || reference.length < 6 || reference.length > 200) return { ok: false, message: 'Sipariş, tutar ve banka işlem referansını kontrol edin.' }
+  try {
+    const { paymentDatabase } = await import('@/lib/payment/repository')
+    const { error } = await paymentDatabase().rpc('nrs_confirm_manual_transfer', { p_order_id: id, p_actor: actor.id, p_amount: amount, p_reference: reference })
+    if (error) return { ok: false, message: 'Havale onayı kaydedilemedi; siparişin güncel durumunu kontrol edin.' }
+    revalidatePath(`/admin/orders/${id}`)
+    return { ok: true, message: 'Yetkili tarafından doğrulanan havale kaydedildi; sipariş üretime alınabilir.' }
+  } catch { return { ok: false, message: 'Havale onayı kaydedilemedi.' } }
+}
