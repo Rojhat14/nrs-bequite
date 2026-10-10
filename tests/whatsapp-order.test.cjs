@@ -5,16 +5,7 @@ const path = require('node:path');
 const Module = require('node:module');
 const ts = require('typescript');
 
-function loadSource(relativePath) {
-  const filename = path.resolve(__dirname, '..', relativePath);
-  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText;
-  const loaded = new Module(filename, module);
-  loaded.paths = Module._nodeModulePaths(path.dirname(filename));
-  loaded._compile(output, filename);
-  return loaded.exports;
-}
+const loadSource = file => require('./source-loader.cjs').loader()(file);
 const { buildWhatsappOrderMessage, whatsappSelectionError } = loadSource('src/lib/whatsapp-order.ts');
 
 test('Product links use public slugs and old carts fall back to supported product IDs', () => {
@@ -57,7 +48,7 @@ test('Contact defaults, number normalization and Turkish message encoding round-
     const config = loadSource('src/lib/storefront-config.ts');
     assert.equal(config.whatsappNumber, '905454227919');
     assert.equal(config.contactPhoneLabel, '+90 545 422 79 19');
-    assert.equal(config.contactEmail, 'nursineerkus4@gmail.com');
+    assert.equal(config.contactEmail, 'rojhat1maman@gmail.com');
     assert.equal(config.whatsappUrl(), 'https://wa.me/905454227919');
     assert.equal(config.normalizeWhatsappNumber('+90 (545) 422 79 19'), '905454227919');
     assert.equal(config.normalizeWhatsappNumber('0090 545 422 79 19'), '905454227919');

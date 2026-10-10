@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { m as motion } from 'framer-motion';
-import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags';
+import { useCardPaymentEnabled } from '@/lib/feature-flags';
 
 export default function FAQPage() {
+  const ENABLE_CARD_PAYMENT = useCardPaymentEnabled();
   const faqs = [
     { q: 'Kargo ücreti ve teslimat süresi nedir?', a: 'Türkiye genelinde ücretsiz kargo. Sipariş onayından itibaren özel dikim üretimi ve kargo taşımacılığı dahil toplam 7–10 iş günü içerisinde teslimat. Ek kargo süresi eklenmez.' },
     {

@@ -120,9 +120,11 @@ export async function getOrderList(options: { page?: number; status?: string; qu
 
 export async function getOrderDetail(id: string) {
   const supabase = await createSupabaseServerClient()
-  const [orderResult, itemsResult] = await Promise.all([
+  const [orderResult, itemsResult, paymentResult, legalResult] = await Promise.all([
     supabase.from('orders').select('*').eq('id', id).maybeSingle(),
     supabase.from('order_items').select('*').eq('order_id', id),
+    supabase.rpc('nrs_admin_payment_summary', { p_order_id: id }),
+    supabase.from('order_legal_records').select('order_summary,accepted_at,contract_version,pre_information_version').eq('order_id', id).maybeSingle(),
   ])
   const items = (itemsResult.data ?? []) as unknown as OrderItemRow[]
   const productIds = Array.from(new Set(items.map((item) => item.product_id)))
@@ -131,7 +133,9 @@ export async function getOrderDetail(id: string) {
     const result = await supabase.from('products').select('*').in('id', productIds)
     products = (result.data ?? []) as unknown as ProductRow[]
   }
-  return { order: orderResult.data as unknown as OrderRow | null, items, products, error: orderResult.error ?? itemsResult.error }
+  // Missing new RPC preserves legacy orders UI until the reviewed migration is applied.
+  const payment = paymentResult.error ? null : paymentResult.data as { state: string; transactionId: string | null; provider: string; amountMinor: number; currency: string } | null
+  return { legal: legalResult.error ? null : legalResult.data, payment, order: orderResult.data as unknown as OrderRow | null, items, products, error: orderResult.error ?? itemsResult.error }
 }
 
 export async function getAdminUsers(options: { page?: number; query?: string } = {}) {

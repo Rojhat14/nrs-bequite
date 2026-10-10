@@ -9,9 +9,10 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useDialog } from '@/hooks/useDialog';
 import CartWhatsappOrder from '@/components/CartWhatsappOrder';
-import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags';
+import { useCardPaymentEnabled } from '@/lib/feature-flags';
 
 const CartDrawer = () => {
+  const ENABLE_CARD_PAYMENT = useCardPaymentEnabled();
   const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
   const router = useRouter();
   const dialogRef = useDialog(isDrawerOpen, closeDrawer);
@@ -131,14 +132,14 @@ const CartDrawer = () => {
                     </div>
                   <p className="text-xs leading-6">{DELIVERY_TERMS}</p>
                   <CartWhatsappOrder items={items} total={totalAmount} />
-                  {ENABLE_CARD_PAYMENT && <button
+                  {<button
                     onClick={() => {
                       closeDrawer();
                       router.push('/checkout');
                     }}
                     className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 text-xs uppercase tracking-widest hover:bg-nrs-rosegold transition-all duration-500 flex items-center justify-center gap-3"
                   >
-                    Proceed to Checkout
+                    Ölçülerle Sipariş Oluştur
                     <ShoppingBag size={16} />
                   </button>}
                 </div>
