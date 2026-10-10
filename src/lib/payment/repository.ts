@@ -9,6 +9,7 @@ import { assertFinalLegalOrderSummary, type LegalOrderSummary, type OrderLegalRe
 import type { Buyer, CheckoutItem, CheckoutRequest, PaymentOrder, PaymentRedirect, PaymentRepository, Quote, VerifiedPayment } from './types'
 import { requirePaymentDeployment } from './config'
 import { UUID } from './request'
+import { canonicalCheckoutItems } from './items'
 import { GUEST_COOKIE, hashGuestToken } from './access'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
@@ -20,7 +21,7 @@ export function paymentDatabase() {
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 function requestHash(request: CheckoutRequest) {
-  return digest({ items: [...request.items].sort((a, b) => a.variantId.localeCompare(b.variantId)), customer: request.customer,
+  return digest({ items: canonicalCheckoutItems(request.items), customer: request.customer,
     quoteHash: request.quoteHash, contractVersion: request.contractVersion, preInformationVersion: request.preInformationVersion })
 }
 // Exclude volatile quote date; bind all commercial and delivery fields. The final
@@ -47,7 +48,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       return { id: data.order_id, merchantReference: data.merchant_reference, amountMinor: Number(data.amount_minor), currency: data.currency, state: data.state } as PaymentOrder
     },
     async quote(items: CheckoutItem[], customer: Buyer): Promise<Quote> {
-      const sorted = [...items].sort((a, b) => a.variantId.localeCompare(b.variantId))
+      const sorted = canonicalCheckoutItems(items)
       const [products, variants] = await Promise.all([
         db.from('products').select('id,name,description,price_amount,compare_at_price,currency,status,in_stock,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
         db.from('product_variants').select('id,product_id,size,stock_quantity,is_active').in('id', sorted.map(i => i.variantId)),
@@ -90,7 +91,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       const { data, error } = await db.rpc('nrs_create_payment_order', {
         p_order_id: id, p_user_id: userId, p_guest_hash: guestHash, p_key: request.idempotencyKey,
         p_request_hash: requestHash(request),
-        p_items: [...request.items].sort((a, b) => a.variantId.localeCompare(b.variantId)), p_customer: request.customer, p_legal: record,
+        p_items: canonicalCheckoutItems(request.items), p_customer: request.customer, p_legal: record,
         p_provider: process.env.PAYMENT_PROVIDER,
       })
       if (error || !data?.order) throw new Error('Sipariş oluşturulamadı. Sepetinizi kontrol edin.')

@@ -176,3 +176,88 @@ test('Real cart persistence keeps separate product measurements through reload a
   assert.equal(restored.items[0].quantity,2);assert.equal(restored.shippingAmount,0);
  }finally{if(previous===undefined)delete global.localStorage;else global.localStorage=previous;if(previousWindow===undefined)delete global.window;else global.window=previousWindow}
 });
+
+// Exercise real quote/parser/create code against the real, unchanged manual RPC.
+async function orderedOrderHarness() {
+ const db=await setup();
+ const ids=[variantId,'55555555-5555-4555-8555-555555555555','aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa'];
+ await db.exec(`UPDATE public.products SET name='Test Elbise'; UPDATE public.product_variants SET stock_quantity=10;
+ INSERT INTO public.products(id,name,description,price_amount,compare_at_price,currency,status,in_stock) VALUES
+ ('pants','Test Pantolon','Pamuk',200,220,'TRY','active',true),('top','Test Bluz','Pamuk',300,320,'TRY','active',true);
+ INSERT INTO public.product_variants(id,product_id,size,stock_quantity,is_active) VALUES
+ ('${ids[1]}','pants','L',10,true),('${ids[2]}','top','S',10,true)`);
+ const lines=[{...items[0]}, {productId:'pants',variantId:ids[1],quantity:2,measurements:{waist:80,hips:104,inseam:78,length:108}},
+ {productId:'top',variantId:ids[2],quantity:3,measurements:{chest:100,waist:82,shoulder:42,sleeve:62,length:68}}];
+ const calls=[];
+ const serviceDb={from(table){return {select(){return this},in(column,keys){this.column=column;this.keys=keys;return this},eq(column,key){this.key=key;return this},
+ async maybeSingle(){const r=await db.query('SELECT id,user_id,manual_request_hash FROM public.orders WHERE manual_request_key=$1::uuid',[this.key]);return {data:r.rows[0]||null,error:null}},
+ then(resolve,reject){return db.query(`SELECT * FROM public.${table}`).then(r=>({data:r.rows.filter(row=>this.keys.includes(row[this.column])).map(row=>table==='products'?{...row,price_amount:Number(row.price_amount),compare_at_price:Number(row.compare_at_price),categories:[],product_images:[]}:row),error:null})).then(resolve,reject)}
+ }},async rpc(name,args){calls.push(structuredClone(args));try{const r=await db.query('SELECT public.nrs_create_manual_order($1::uuid,$2::uuid,$3::uuid,$4,$5::jsonb,$6::jsonb,$7::jsonb) AS result',
+ [args.p_order_id,args.p_user_id,args.p_key,args.p_hash,JSON.stringify(args.p_items),JSON.stringify(args.p_customer),JSON.stringify(args.p_legal)]);return {data:r.rows[0].result,error:null}}catch(error){return {data:null,error}}}};
+ const saved=Object.fromEntries(['ORDER_DATABASE_VERIFIED','SUPABASE_SERVICE_ROLE_KEY','NEXT_PUBLIC_SUPABASE_URL'].map(k=>[k,process.env[k]]));
+ Object.assign(process.env,{ORDER_DATABASE_VERIFIED:'true',SUPABASE_SERVICE_ROLE_KEY:'local-synthetic-only',NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1'});
+ const repository=loader({'@supabase/supabase-js':{createClient:()=>serviceDb}})('src/lib/payment/repository.ts');
+ const mocks={'@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user:{id:fixture.userId}}})}})},'@/lib/payment/repository':repository};
+ const quoteApi=loader(mocks)('src/app/api/orders/quote/route.ts');const createApi=loader(mocks)('src/app/api/orders/create/route.ts');
+ const req=(path,body)=>new Request('https://example.com/api/orders/'+path,{method:'POST',headers:{origin:'https://example.com','content-type':'application/json'},body:JSON.stringify(body)});
+ await db.exec('SET ROLE service_role');
+ return {db,lines,calls,repository,
+ async quote(input){const r=await quoteApi.POST(req('quote',{items:input,customer}));assert.equal(r.status,200);return r.json()},
+ async create(input,quote,extra={}){return createApi.POST(req('create',{items:input,customer,...createLegalAcceptance(true),quoteHash:quote.hash,idempotencyKey:fixture.orderId,...extra}))},
+ async close(){for(const [k,v]of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v}await db.close()}};
+}
+for(const [name,indexes]of [['single product',[0]],['two products added in reverse order',[1,0]],['three distinct products in mixed order',[2,0,1]]]) {
+ test(`Canonical order: actual quote and create endpoints + SQL preserve ${name}`,async()=>{
+ const h=await orderedOrderHarness();try{
+ const input=indexes.map(i=>structuredClone(h.lines[i]));const untouched=structuredClone(input);const quote=await h.quote(input);
+ const forward=await h.quote([...input].reverse());assert.equal(quote.hash,forward.hash);
+ const r=await h.create(input,quote);assert.equal(r.status,200);
+ assert.deepEqual(input,untouched);const sent=h.calls[0];
+ assert.deepEqual(sent.p_items.map(i=>i.variantId),quote.summary.items.map(i=>i.variantId));
+ for(const line of quote.summary.items){const original=input.find(i=>i.variantId===line.variantId);assert.equal(line.productId,original.productId);assert.equal(line.quantity,original.quantity);assert.deepEqual(line.measurements,original.measurements);}
+ const legal=(await h.db.query('SELECT * FROM public.order_legal_records')).rows[0];
+ assert.deepEqual(legal.order_summary,sent.p_legal.order_summary);
+ const commercial=s=>{const {orderedAt,...rest}=s;return rest};assert.deepEqual(commercial(legal.order_summary),commercial(quote.summary));
+ assert.equal(legal.contract_version,'v1.4');assert.equal(legal.pre_information_version,'v1.4');
+ const crypto=require('node:crypto');assert.equal(legal.summary_hash,crypto.createHash('sha256').update(JSON.stringify(sent.p_legal.order_summary)).digest('hex'));
+ assert.equal(legal.document_hash,prepareOrderLegalRecord(sent.p_order_id,createLegalAcceptance(true),quote.summary).document_hash);
+ const rows=(await h.db.query('SELECT product_id,quantity,price_at_purchase FROM public.order_items')).rows;
+ for(const line of quote.summary.items){const row=rows.find(i=>i.product_id===line.productId);assert.equal(row.quantity,line.quantity);assert.equal(Number(row.price_at_purchase),line.unitPrice);}
+ assert.ok((await h.db.query('SELECT stock_quantity FROM public.product_variants')).rows.every(v=>v.stock_quantity===10));
+ // A reordered retry is the same request and does not create another order.
+ assert.equal((await h.create([...input].reverse(),quote)).status,200);assert.equal(h.calls.length,1);
+ }finally{await h.close()}
+ });
+}
+test('Canonical order: duplicate variant and UUID case collision reject instead of merging measurements',async()=>{
+ const h=await orderedOrderHarness();try{
+ const a=h.lines[2];const duplicate={...structuredClone(a),measurements:{...a.measurements,chest:110}};
+ for(const variant of [a.variantId,a.variantId.toUpperCase()]){
+ assert.throws(()=>parseCheckoutInput({items:[a,{...duplicate,variantId:variant}],customer}));
+ await assert.rejects(()=>h.repository.createPaymentRepository(true).quote([a,{...duplicate,variantId:variant}],customer));
+ }
+ assert.equal((await h.db.query('SELECT count(*)::int n FROM public.orders')).rows[0].n,0);
+ }finally{await h.close()}
+});
+test('Canonical order: stale price, altered measurements and forged legal summary are rejected atomically',async()=>{
+ const h=await orderedOrderHarness();try{
+ const input=[h.lines[1],h.lines[0]];const quote=await h.quote(input);
+ const changed=structuredClone(input);changed[0].measurements.waist=85;
+ assert.equal((await h.create(changed,quote)).status,409);
+ assert.equal((await h.create(input,quote,{contractVersion:'v1.3',preInformationVersion:'v1.3'})).status,409);
+ const forged=structuredClone(quote.summary);forged.items[0].unitPrice=1;
+ assert.equal((await h.create(input,{...quote,hash:h.repository.quoteHash(forged)})).status,409);
+ const sorted=parseCheckoutInput({items:input,customer}).items;
+ const legal=prepareOrderLegalRecord(fixture.orderId,createLegalAcceptance(true),quote.summary);
+ for(const edit of [l=>{l.order_summary.items[0].unitPrice=1},l=>{l.order_summary.items[0].measurements.chest=105},l=>{l.order_summary.buyer.address='forged address'}]){
+ const altered=structuredClone(legal);edit(altered);
+ await assert.rejects(()=>create(h.db,{items:sorted,legal:altered}),/quote changed|invalid summary/);
+ }
+ const duplicate=[sorted[0],{...sorted[0],measurements:{...sorted[0].measurements,chest:105}}];
+ await assert.rejects(()=>create(h.db,{items:duplicate,legal}),/invalid acceptance\/items/);
+ await h.db.query('UPDATE public.products SET price_amount=price_amount+1 WHERE id=$1',['pants']);
+ assert.equal((await h.create(input,quote)).status,409);
+ for(const table of ['orders','order_items','order_legal_records'])assert.equal((await h.db.query(`SELECT count(*)::int n FROM public.${table}`)).rows[0].n,0);
+ assert.ok((await h.db.query('SELECT stock_quantity FROM public.product_variants')).rows.every(v=>v.stock_quantity===10));
+ }finally{await h.close()}
+});

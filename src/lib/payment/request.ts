@@ -1,6 +1,7 @@
 import { parseMeasurements } from '@/lib/order-measurements'
 import type { Buyer, CheckoutItem, CheckoutRequest } from './types'
 import { validateLegalAcceptance } from '@/lib/legal/acceptance'
+import { canonicalCheckoutItems } from './items'
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function parseCheckoutInput(value: unknown): { items: CheckoutItem[]; customer: Buyer } {
   if (!value || typeof value !== 'object') throw new Error('Geçersiz sepet.')
@@ -30,7 +31,7 @@ export function parseCheckoutInput(value: unknown): { items: CheckoutItem[]; cus
   if (typeof note === 'string') customer.orderNote = note.trim()
   if (!/^[+()\d\s-]{10,25}$/.test(customer.phone)) throw new Error('Geçerli telefon girin.')
   if (!/^\d{5}$/.test(customer.postalCode)) throw new Error('Beş haneli posta kodu girin.')
-  return { items, customer }
+  return { items: canonicalCheckoutItems(items), customer }
 }
 export function parsePaymentRequest(value: unknown): CheckoutRequest {
   const error = validateLegalAcceptance(value)

@@ -14,6 +14,8 @@ export async function POST(request: Request) {
     const { data: { user } } = await auth.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Siparişi kaydetmek için hesabınıza giriş yapın.' }, { status: 401 })
     const input = parsePaymentRequest(await boundedJson(request))
+    // Parsing canonicalizes whole item records: the quote and index-checked RPC
+    // receive the same UUID order, including each variant's own measurements.
     const id = randomUUID()
     const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
     // Check retries before repricing: stock/price may change after a committed order.

@@ -1,6 +1,7 @@
 import { formatMeasurements } from '@/lib/order-measurements'
 import type { LegalOrderSummary as Summary } from '@/lib/legal/order-summary'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function LegalOrderSummary({ summary, preview = false }: { summary: Summary; preview?: boolean }) {
   const money = (amount: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: summary.currency }).format(amount)
@@ -9,7 +10,7 @@ export default function LegalOrderSummary({ summary, preview = false }: { summar
     {preview && <p className="text-sm text-nrs-ink/65">Bu özet sipariş talebidir; ödeme veya kesin sipariş onayı değildir. Fiyat, stok ve teslimat bedeli sipariş teyidinde bildirilir.</p>}
     <ul className="divide-y divide-nrs-ink/10">
       {summary.items.map((item, index) => <li key={`${item.productId}-${index}`} className="py-3 space-y-1 text-sm">
-        {item.image && <img src={item.image} alt={item.name} width={80} height={100} className="h-24 w-20 object-cover" />}
+        {item.image && <Image unoptimized src={item.image} alt={item.name} width={80} height={100} className="h-24 w-20 object-cover" />}
         <p className="font-medium">{item.name}{item.size ? ` — Beden: ${item.size}` : ''}</p>
         <p className="text-nrs-ink/65">{item.description}</p>
         {item.measurements && <p>Özel ölçüler: {formatMeasurements(item.measurements) || 'Belirtilmedi'}</p>}
