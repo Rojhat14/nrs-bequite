@@ -30,8 +30,12 @@ export async function GET() {
     const db = createClient(rawUrl, key, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       global: { fetch: async (url, options) => {
+        const headers = new Headers(options?.headers)
+        // Secret API keys are not JWTs. The installed SDK's REST wrapper can
+        // still use them as Bearer fallback; legacy service_role JWTs keep it.
+        if (key.startsWith('sb_secret_')) headers.delete('Authorization')
         const response = await fetch(url, {
-          ...options, signal, redirect: 'error', cache: 'no-store',
+          ...options, headers, signal, redirect: 'error', cache: 'no-store',
         })
         transportStatus = response.status
         return response
@@ -52,7 +56,7 @@ export async function GET() {
       const { error, status, data } = await db.from(table).select(columns, { head: true }).limit(0)
       // Check raw HTTP too: the client can normalize an empty-body HEAD 404.
       const httpStatus = transportStatus || status
-      if (error || httpStatus < 200 || httpStatus >= 300) return reply('BLOCKED', httpStatus === 401 || httpStatus === 403 ? 'AUTHORIZATION'
+      if (error || httpStatus < 200 || httpStatus >= 300) return reply('BLOCKED', httpStatus === 401 || httpStatus === 403 ? `AUTHORIZATION_${httpStatus}_${table.toUpperCase()}`
         : httpStatus === 400 || httpStatus === 404 ? 'SCHEMA_ACCESS' : 'CONNECTION', 503)
       if (data !== null) return reply('BLOCKED', 'UNEXPECTED_RESPONSE', 503)
     }

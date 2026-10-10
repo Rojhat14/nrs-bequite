@@ -31,8 +31,20 @@ test('Preview probe uses only authenticated HEAD limit=0 REST requests and retur
  });
 });
 test('Preview probe returns short safe categories for auth, schema and network errors',async()=>{
- for(const [status,category]of [[401,'AUTHORIZATION'],[403,'AUTHORIZATION'],[400,'SCHEMA_ACCESS'],[404,'SCHEMA_ACCESS'],[500,'CONNECTION']])await check({},()=>new Response(null,{status}),({body,calls})=>{assert.deepEqual(body,{status:'BLOCKED',category});assert.equal(calls.length,1)});
+ for(const [status,category]of [[401,'AUTHORIZATION_401_PRODUCTS'],[403,'AUTHORIZATION_403_PRODUCTS'],[400,'SCHEMA_ACCESS'],[404,'SCHEMA_ACCESS'],[500,'CONNECTION']])await check({},()=>new Response(null,{status}),({body,calls})=>{assert.deepEqual(body,{status:'BLOCKED',category});assert.equal(calls.length,1)});
  await check({},()=>{throw Error('synthetic-preview-secret private failure')},({body})=>assert.deepEqual(body,{status:'BLOCKED',category:'CONNECTION'}));
+});
+test('Preview REST headers preserve legacy service_role JWT and omit secret API key Bearer fallback',async()=>{
+ // Synthetic credentials only; no real key is loaded or transmitted.
+ const jwt=[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),Buffer.from(JSON.stringify({role:'service_role',ref:'moiynemxthkmgpgnfajd'})).toString('base64url'),'synthetic-signature'].join('.');
+ for(const key of [jwt,'sb_secret_synthetic-preview-secret'])await check({SUPABASE_SERVICE_ROLE_KEY:key},()=>new Response(null,{status:200}),({body,calls})=>{
+  assert.deepEqual(body,{status:'PASS'});
+  assert.ok(!JSON.stringify(body).includes(key));
+  for(const {options}of calls){const headers=new Headers(options.headers);assert.equal(headers.get('apikey'),key);assert.equal(headers.get('authorization'),key===jwt?`Bearer ${jwt}`:null);assert.equal(options.method,'HEAD')}
+ });
+});
+test('Preview auth diagnostics identify the raw status and later failing control without error body',async()=>{
+ let n=0;await check({},()=>new Response(null,{status:++n===3?403:200}),({body,calls})=>{assert.deepEqual(body,{status:'BLOCKED',category:'AUTHORIZATION_403_ORDERS'});assert.equal(calls.length,3)});
 });
 test('Preview probe fails closed on malformed URL and later schema failure',async()=>{
  await check({NEXT_PUBLIC_SUPABASE_URL:'not a url'},()=>{throw Error('Must not connect')},({body,calls})=>{assert.deepEqual(body,{status:'BLOCKED',category:'PROJECT_MISMATCH'});assert.equal(calls.length,0)});
