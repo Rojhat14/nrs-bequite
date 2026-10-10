@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
+import { LEGAL_ROUTES } from '@/lib/legal/documents'
 
 const SITE_URL = 'https://nrsbequiteluminous.com'
 const PAGE_SIZE = 500
@@ -41,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ])
   const staticPaths = [
     '/', '/collections', '/curated', '/about', '/contact',
-    '/shipping', '/returns', '/size-guide', '/care-guide', '/faq',
+    '/size-guide', '/care-guide', '/faq', ...LEGAL_ROUTES,
   ]
   const entries: MetadataRoute.Sitemap = staticPaths.map(path => ({ url: `${SITE_URL}${path}` }))
 

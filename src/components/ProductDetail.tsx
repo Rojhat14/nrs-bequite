@@ -1,4 +1,5 @@
-'use client';
+'use client'
+import { DELIVERY_TERMS } from '@/lib/delivery-policy'
 
 import React, { useState, useEffect, useRef } from 'react';
 import { m as motion } from 'framer-motion';
@@ -287,6 +288,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     <ShoppingBag size={18} />
                     Sepete Ekle
                   </button>
+                  <p className="mt-3 text-sm leading-6">Bütün kıyafetler özel dikilir; gerekli beden ölçüleri sipariş kesinleştirilmeden önce alınır. {DELIVERY_TERMS}</p>
                   <button type="button" disabled={!product.inStock || !whatsappNumber}
                     aria-label={`${product.name} için WhatsApp'tan sipariş ver`}
                     aria-describedby={orderError ? 'whatsapp-order-error' : undefined}

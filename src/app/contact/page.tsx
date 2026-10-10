@@ -1,5 +1,6 @@
 'use client';
 
+import { LEGAL_SELLER } from '@/lib/legal/documents';
 import React, { useState } from 'react';
 import { m as motion } from 'framer-motion';
 import { contactEmail, contactPhone, contactPhoneLabel, contactAddress, whatsappUrl } from '@/lib/storefront-config';
@@ -26,6 +27,11 @@ export default function ContactPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-16 mt-20 text-left">
             <div className="space-y-8">
+              <div className="space-y-2 text-sm leading-6">
+                <h2 className="text-xs uppercase tracking-widest font-medium">Şirket bilgileri</h2>
+                <p>{LEGAL_SELLER.name}</p>
+                <p>Vergi dairesi: {LEGAL_SELLER.taxOffice} · Vergi numarası: {LEGAL_SELLER.taxNumber}</p>
+              </div>
               <div className="space-y-2">
                 <h3 className="text-xs uppercase tracking-widest font-medium">E-posta</h3>
                 <p className="text-sm font-sans text-nrs-ink/70 break-all">{contactEmail ? <a href={`mailto:${contactEmail}`}>{contactEmail}</a> : 'İletişim bilgilerimiz yakında paylaşılacak.'}</p>
@@ -42,10 +48,7 @@ export default function ContactPage() {
                 <h3 className="text-xs uppercase tracking-widest font-medium">Adres</h3>
                 <p className="text-sm font-sans text-nrs-ink/70">{contactAddress}</p>
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xs uppercase tracking-widest font-medium">Çalışma Saatleri</h3>
-                <p className="text-sm font-sans text-nrs-ink/70">Pazartesi - Cumartesi: 10:00 - 19:00</p>
-              </div>
+
             </div>
 
             <div className="bg-nrs-panel p-8 border border-nrs-ink/5 shadow-sm space-y-6">

@@ -3,6 +3,7 @@
 import Script from 'next/script'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { COOKIE_CONSENT_EVENT, readAdvertisingConsent } from '@/lib/cookie-consent'
 
 const PIXEL_ID = '1141376638847457'
 
@@ -25,9 +26,20 @@ declare global {
 export default function MetaPixel() {
   const pathname = usePathname()
   const [ready, setReady] = useState(false)
+  const [allowed, setAllowed] = useState(false)
+  useEffect(() => {
+    setAllowed(readAdvertisingConsent() === true)
+    const change = (event: Event) => {
+      const accepted = (event as CustomEvent).detail === true
+      setAllowed(accepted)
+      if (!accepted) { window.fbq?.('consent', 'revoke'); setReady(false) }
+    }
+    window.addEventListener(COOKIE_CONSENT_EVENT, change)
+    return () => window.removeEventListener(COOKIE_CONSENT_EVENT, change)
+  }, [])
 
   useEffect(() => {
-    if (!pathname) return
+    if (!allowed || !pathname || /^\/(admin|checkout|profile)(\/|$)/.test(pathname)) return
     if (!window.fbq) {
       // Queue commands before the asynchronous Meta library is downloaded.
       const fbq = ((...args: unknown[]) => {
@@ -42,6 +54,7 @@ export default function MetaPixel() {
       if (!window._fbq) window._fbq = fbq
     }
 
+    window.fbq('consent', 'grant')
     const state = window.__nrsMetaPixel ??= { initialized: false, lastPath: null }
     if (!state.initialized) {
       // Only explicit PageView events; no automatic commerce event detection.
@@ -54,8 +67,8 @@ export default function MetaPixel() {
       state.lastPath = pathname
     }
     setReady(true)
-  }, [pathname])
+  }, [pathname, allowed])
 
-  if (!ready) return null
+  if (!ready || !allowed) return null
   return <Script id="nrs-meta-pixel" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive" />
 }

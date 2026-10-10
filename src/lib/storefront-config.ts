@@ -1,4 +1,4 @@
-const configuredEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || 'nursineerkus4@gmail.com';
+const configuredEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || 'rojhat1maman@gmail.com';
 const configuredPhone = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() || '905454227919';
 
 export function normalizeWhatsappNumber(value: string) {

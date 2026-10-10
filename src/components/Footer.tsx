@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { contactEmail, contactPhone, contactPhoneLabel, contactAddress, whatsappUrl } from '@/lib/storefront-config';
+import { getLegalDocument, LEGAL_ROUTES } from '@/lib/legal/documents';
 
 export default function Footer() {
   return (
@@ -93,8 +94,10 @@ export default function Footer() {
             </h4>
             <nav className="flex flex-col gap-3">
               {[
-                { name: 'Kargo & Teslimat', href: '/shipping' },
-                { name: 'İade & Değişim', href: '/returns' },
+                { name: 'İletişim', href: '/contact' },
+                { name: 'Kargo ve Teslimat', href: '/kargo-ve-teslimat' },
+                { name: 'İade ve Değişim', href: '/iade-ve-degisim' },
+                { name: 'İptal Koşulları', href: '/iptal-kosullari' },
                 { name: 'Beden Rehberi', href: '/size-guide' },
                 { name: 'Bakım Rehberi', href: '/care-guide' },
                 { name: 'Sıkça Sorulan Sorular', href: '/faq' },
@@ -110,6 +113,17 @@ export default function Footer() {
             </nav>
           </div>
         </div>
+
+        <nav aria-label="Yasal" className="mb-12 border-t border-nrs-ink/10 pt-8">
+          <h4 className="mb-5 text-[11px] uppercase tracking-[0.2em] font-sans font-medium text-nrs-ink">Yasal</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2">
+            {LEGAL_ROUTES.filter(route => !['/iade-ve-degisim', '/iptal-kosullari', '/kargo-ve-teslimat'].includes(route)).map(route => (
+              <Link key={route} href={route} className="flex min-h-11 items-center text-sm text-nrs-ink/65 hover:text-nrs-ink transition-colors font-light">
+                {getLegalDocument(route.slice(1))!.title}
+              </Link>
+            ))}
+          </div>
+        </nav>
 
         <div className="pt-10 border-t border-nrs-ink/5 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-[10px] uppercase tracking-widest text-nrs-ink/30 font-sans">

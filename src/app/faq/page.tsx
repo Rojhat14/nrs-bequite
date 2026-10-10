@@ -6,23 +6,24 @@ import { ENABLE_CARD_PAYMENT } from '@/lib/feature-flags';
 
 export default function FAQPage() {
   const faqs = [
+    { q: 'Kargo ücreti ve teslimat süresi nedir?', a: 'Türkiye genelinde ücretsiz kargo. Sipariş onayından itibaren özel dikim üretimi ve kargo taşımacılığı dahil toplam 7–10 iş günü içerisinde teslimat. Ek kargo süresi eklenmez.' },
     {
       q: 'Siparişimi nasıl takip edebilirim?',
-      a: 'Siparişiniz kargoya verildiğinde, kayıtlı e-posta adresinize bir takip numarası ve kargo firması bilgisi iletilir.'
+      a: 'Kargo firması henüz belirlenmedi; anlaşmalı taşıyıcı veya takip hizmeti taahhüt edilmez. Teslimat durumunu şirket iletişim e-postasından sorabilirsiniz.'
     },
     {
       q: 'İade süreci nasıl işliyor?',
-      a: 'Teslimat tarihinden itibaren 14 gün içinde iade talebinizi info@nrs.com adresine ileterek süreci başlatabilirsiniz.'
+      a: 'Kıyafetler müşterinin ölçülerine göre özel dikilir. Cayma hakkı istisnası yalnızca mevzuattaki koşullar oluştuğunda uygulanır; ayıplı ürün hakları korunur. Cayma hakkının geçerli olduğu ürünlerde teslimden itibaren 14 gün içinde bildirim yapılabilir. İletişim ve ayrıntılar İade ve Değişim Koşulları sayfasındadır.'
     },
     {
       q: 'Ödeme yöntemleriniz nelerdir?',
       a: ENABLE_CARD_PAYMENT
-        ? 'Kredi kartı ve banka kartları ile güvenli ödeme yapabilirsiniz. Tüm işlemler PayTR altyapısı ile şifrelenmiş olarak gerçekleştirilir.'
+        ? 'Online ödeme hizmetinin kullanılabilirliği ödeme ekranında bildirilir. Havale / EFT bilgileri sipariş teyidinde paylaşılır.'
         : 'WhatsApp üzerinden sipariş verebilirsiniz. Havale / EFT ve IBAN bilgileri sipariş onayı sırasında paylaşılır.'
     },
     {
       q: 'Kişiye özel ölçü ile üretim yapıyor musunuz?',
-      a: 'Belirli parçalarımızda özel ölçü hizmeti sunmaktayız. Detaylar için bizimle iletişime geçebilirsiniz.'
+      a: 'Bütün kıyafetler ürün bazında ilettiğiniz zorunlu beden ölçülerine göre özel dikilir.'
     },
   ];
 
