@@ -9,7 +9,7 @@ export default function FAQPage() {
     { q: 'Kargo ücreti ve teslimat süresi nedir?', a: 'Türkiye genelinde ücretsiz kargo. Sipariş onayından itibaren özel dikim üretimi ve kargo taşımacılığı dahil toplam 7–10 iş günü içerisinde teslimat. Ek kargo süresi eklenmez.' },
     {
       q: 'Siparişimi nasıl takip edebilirim?',
-      a: 'Siparişiniz kargoya verildiğinde taşıyıcı ve takip bilgilerini mevcut iletişim kanalınızdan talep edebilirsiniz.'
+      a: 'Kargo firması henüz belirlenmedi; anlaşmalı taşıyıcı veya takip hizmeti taahhüt edilmez. Teslimat durumunu şirket iletişim e-postasından sorabilirsiniz.'
     },
     {
       q: 'İade süreci nasıl işliyor?',
