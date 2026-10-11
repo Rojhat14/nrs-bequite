@@ -9,6 +9,7 @@ export const MEASUREMENT_HELP = {
 export const MEASUREMENT_RANGES = { chest: [50,180], waist: [40,180], hips: [50,200], height: [120,220], shoulder: [20,70], sleeve: [10,100], length: [20,200], inseam: [30,120] } as const
 export function measurementKind(category: string): MeasurementKind {
   const type = category.toLocaleLowerCase('tr-TR')
+  if (/\bhome\b|bedding|nevresim/.test(type)) return 'accessory'
   if (/şal|eşarp|aksesuar/.test(type)) return 'accessory'
   if (/takım|takim/.test(type)) return 'suit'
   if (/elbise/.test(type)) return 'dress'

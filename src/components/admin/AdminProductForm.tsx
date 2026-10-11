@@ -7,11 +7,13 @@ import type { CategoryRow, CollectionRow, ProductRow, ProductVariantRow, Product
 import { DEFAULT_ADMIN_SETTINGS } from '@/lib/admin/config'
 import ProductImageManager from '@/components/admin/ProductImageManager'
 import ProductVariantManager from '@/components/admin/ProductVariantManager'
+import Link from 'next/link'
+import { isHomeCategory } from '@/lib/home-category'
 
 const EMPTY_COLLECTIONS: CollectionRow[] = []
 const EMPTY_COLLECTION_IDS: string[] = []
 
-export default function AdminProductForm({ product, categories, collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [], images }: { product?: ProductRow; categories: CategoryRow[]; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[]; images?: ProductImageRow[] }) {
+export default function AdminProductForm({ product, categories, initialCategoryId = '', collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [], images }: { product?: ProductRow; categories: CategoryRow[]; initialCategoryId?: string; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[]; images?: ProductImageRow[] }) {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -67,10 +69,12 @@ export default function AdminProductForm({ product, categories, collections = EM
           {product && <div className="space-y-2"><span className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">Ürün ID (sabit)</span><p className="border border-[#E4DED2] bg-[#FAF9F6] px-3 py-3 text-sm">{product.id}</p></div>}
           <div className="space-y-2">
             <label htmlFor="category_id" className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">Kategori</label>
-            <select id="category_id" name="category_id" defaultValue={product?.category_id ?? ''} className="admin-field" onChange={() => setDirty(true)}>
+            <select id="category_id" name="category_id" defaultValue={product?.category_id ?? initialCategoryId} className="admin-field" onChange={() => setDirty(true)}>
               <option value="">Kategori seçin</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name} · {category.slug}</option>)}
+              {!categories.some(isHomeCategory) && <option value="" disabled>Home / Nevresim — önce kategori oluşturun</option>}
+              {categories.map((category) => <option key={category.id} value={category.id}>{isHomeCategory(category) ? 'Home / Nevresim' : category.name} · {category.slug}</option>)}
             </select>
+            {!categories.some(isHomeCategory) && <Link href="/admin/home" className="block text-xs text-[#6B5734] underline">Home / Nevresim kategorisini oluştur ve ürün ekle</Link>}
           </div>
           <fieldset className="space-y-3 border border-[#E4DED2] bg-[#FAF9F6] p-4 sm:col-span-2 sm:p-5">
             <legend className="px-1 font-serif text-lg">Koleksiyonlar</legend>

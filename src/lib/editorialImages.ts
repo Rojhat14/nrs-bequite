@@ -13,6 +13,9 @@ const categoryImages: Record<string, string> = {
   bottoms: '/images/editorial/categories/bottoms.jpg',
   takimlar: '/images/editorial/categories/suits.jpg',
   suits: '/images/editorial/categories/suits.jpg',
+  bedding: '/images/editorial/categories/home-bedding.webp',
+  home: '/images/editorial/categories/home-bedding.webp',
+  nevresim: '/images/editorial/categories/home-bedding.webp',
   indirim: '/images/editorial/collections/sale.jpg',
   sale: '/images/editorial/collections/sale.jpg',
 }

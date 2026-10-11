@@ -4,6 +4,8 @@ import ProductListing from '@/components/ProductListing'
 import CategoryHero from '@/components/CategoryHero'
 import { getCategoryCatalog, getStorefrontProducts } from '@/lib/products'
 import { getCategoryEditorialImage } from '@/lib/editorialImages'
+import { isHomeCategory } from '@/lib/home-category'
+import { getHomeCategoryCover } from '@/lib/storage/category-covers'
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>
@@ -21,7 +23,9 @@ const categoryBanners: Record<string, { title: string; description: string }> = 
   bottoms: { title: 'KADIN ALT GİYİM', description: 'Dengeli siluetler ve özenli kesimler. Modern terziliği rahatlık ve zarafetle birleştiren tasarımlar.' },
   takimlar: { title: 'KADIN TAKIM KOLEKSİYONU', description: 'Bir bütün olarak tasarlanan siluetler. Dengeli bir görünüm sunan rafine takım seçkileri.' },
   suits: { title: 'KADIN TAKIM KOLEKSİYONU', description: 'Bir bütün olarak tasarlanan siluetler. Dengeli bir görünüm sunan rafine takım seçkileri.' },
-  bedding: { title: 'BEDDING', description: 'NRS seçkisinden rafine tasarımlar.' },
+  bedding: { title: 'NRS HOME', description: 'Nevresim ve ev tekstili koleksiyonumuzu keşfedin.' },
+  home: { title: 'NRS HOME', description: 'Nevresim ve ev tekstili koleksiyonumuzu keşfedin.' },
+  nevresim: { title: 'NRS HOME', description: 'Nevresim ve ev tekstili koleksiyonumuzu keşfedin.' },
   accessories: { title: 'AKSESUAR', description: 'NRS seçkisinden rafine tasarımlar.' },
   indirim: { title: 'İNDİRİM', description: 'NRS seçkisinden özel parçalar.' },
   sale: { title: 'İNDİRİM', description: 'NRS seçkisinden özel parçalar.' },
@@ -59,7 +63,8 @@ export default async function CategoryPage({ params: paramsPromise }: CategoryPa
     title: category.name.toLocaleUpperCase('tr-TR'),
     description: category.description || 'Seçkin gözler için küratörlüğünü yaptığımız özel parçalar.',
   }
-  const image = getCategoryEditorialImage(params.slug) ?? getCategoryEditorialImage(category.slug)
+  const image = isHomeCategory(category) ? await getHomeCategoryCover(category.id)
+    : getCategoryEditorialImage(params.slug) ?? getCategoryEditorialImage(category.slug)
 
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink">

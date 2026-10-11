@@ -63,5 +63,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!categories.some(category => category.slug === 'sale' || category.slug === 'indirim')) {
     entries.push({ url: `${SITE_URL}/category/sale` })
   }
+  if (!categories.some(category => category.slug === 'bedding')) {
+    entries.push({ url: `${SITE_URL}/category/bedding` })
+  }
   return entries
 }

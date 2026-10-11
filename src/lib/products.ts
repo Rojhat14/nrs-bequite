@@ -6,8 +6,10 @@ import { PRODUCTS, type Product } from '@/data/products'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getProductImageUrl } from '@/lib/storage/products'
 import type { CategoryRow, CollectionRow, ProductImageRow, ProductRow, ProductVariantRow } from '@/lib/admin/types'
+import { isHomeCategory } from '@/lib/home-category'
+import { getHomeCategoryCover } from '@/lib/storage/category-covers'
 
-export type StorefrontCategory = Pick<CategoryRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'>
+export type StorefrontCategory = Pick<CategoryRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'> & { imageUrl?: string }
 export type StorefrontCollection = Pick<CollectionRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'>
 
 type CatalogProductRow = Pick<ProductRow, 'id' | 'slug' | 'name' | 'category_id' | 'description' | 'price_amount' | 'currency' | 'compare_at_price' | 'in_stock' | 'fabric' | 'care'>
@@ -15,6 +17,9 @@ type CatalogVariantRow = Pick<ProductVariantRow, 'id' | 'product_id' | 'size' | 
 const PRODUCT_COLUMNS = 'id,slug,name,category_id,description,price_amount,currency,compare_at_price,in_stock,fabric,care'
 const CATEGORY_COLUMNS = 'id,name,slug,description,sort_order'
 const COLLECTION_COLUMNS = 'id,name,slug,description,sort_order'
+const HOME_CATEGORY: StorefrontCategory = {
+  id: '', name: 'Home', slug: 'bedding', description: 'NRS Home nevresim ve ev tekstili koleksiyonu.', sort_order: 100,
+}
 const IMAGE_COLUMNS = 'id,product_id,provider,storage_key,url,alt_text,sort_order,is_primary,created_at'
 const VARIANT_COLUMNS = 'id,product_id,size,stock_quantity,is_active'
 
@@ -223,7 +228,13 @@ function fallbackById(id: string) {
 export const getStorefrontCategories = cache(async function getStorefrontCategories(): Promise<StorefrontCategory[]> {
   try {
     const { data, error } = await getActiveCategoryRows()
-    if (!error) return (data ?? []) as unknown as StorefrontCategory[]
+    if (!error) {
+      const categories = (data ?? []) as unknown as StorefrontCategory[]
+      return categories.some(isHomeCategory)
+        ? await Promise.all(categories.map(async category => isHomeCategory(category)
+          ? { ...category, name: 'Home', imageUrl: await getHomeCategoryCover(category.id) } : category))
+        : [...categories, HOME_CATEGORY]
+    }
   } catch {
     // Fall back to the existing category names when Supabase is unavailable.
   }
@@ -264,8 +275,15 @@ export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: 
       categoryError = result.error
     }
     if (categoryError) return fallbackCategoryCatalog(slug)
-    if (!categoryData) return { category: null, products: [] as Product[] }
-    const category = categoryData as unknown as StorefrontCategory
+    const requestedHome = isHomeCategory({ name: '', slug: requestedSlug })
+    if (!categoryData && requestedHome) {
+      const { data, error } = await getActiveCategoryRows()
+      if (error) return { category: HOME_CATEGORY, products: [] as Product[] }
+      categoryData = data?.find(isHomeCategory) ?? null
+    }
+    if (!categoryData) return { category: requestedHome ? HOME_CATEGORY : null, products: [] as Product[] }
+    const rawCategory = categoryData as unknown as StorefrontCategory
+    const category = isHomeCategory(rawCategory) ? { ...rawCategory, name: 'Home' } : rawCategory
     const { data, error } = await supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
@@ -281,6 +299,7 @@ export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: 
 })
 
 function fallbackCategoryCatalog(slug: string) {
+  if (isHomeCategory({ name: '', slug })) return { category: HOME_CATEGORY, products: [] as Product[] }
   const categorySlug = categoryRouteAliases[slug.toLowerCase()] ?? slug.toLowerCase()
   const category = getLegacyCategories().find((item) => item.slug === categorySlug) ?? null
   const products = category
@@ -296,9 +315,9 @@ function getLegacyCategories(): StorefrontCategory[] {
     'Ceketler & Blazerlar',
     'Alt Giyim',
     'Takımlar',
-  ].map((name, index) => ({
+  ].map<StorefrontCategory>((name, index) => ({
     id: '', name, slug: legacyCategorySlug[name], description: null, sort_order: index,
-  }))
+  })).concat(HOME_CATEGORY)
 }
 
 export const getCollectionCatalog = cache(async function getCollectionCatalog(slug: string) {

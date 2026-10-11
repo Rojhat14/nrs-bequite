@@ -12,6 +12,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useStorefrontCatalog } from '@/context/StorefrontCatalogContext';
 import { getCollectionPresentation } from '@/lib/collectionPresentation';
+import { isHomeCategory, HOME_CATEGORY_IMAGE, HOME_CATEGORY_THUMBNAIL } from '@/lib/home-category';
+import { canOptimizeImage } from '@/lib/imageOptimization';
 
 // Navigation Mode Definition for Adaptive UI
 type NavigationMode = 'transparent' | 'solid' | 'dark' | 'adaptive';
@@ -113,6 +115,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM' },
     { slugs: ['takimlar', 'suits'], names: ['takımlar'], fallback: 'takimlar', label: 'TAKIMLAR' },
     { slugs: ['dis-giyim'], names: ['dış giyim'], fallback: 'dis-giyim', label: 'DIŞ GİYİM' },
+    { slugs: ['bedding', 'home', 'nevresim'], names: ['home', 'bedding', 'nevresim'], fallback: 'bedding', label: 'HOME' },
   ];
   const categoryLinks = categoryOrder.map((item) => {
     const category = categories.find((entry) => item.slugs.includes(entry.slug) || item.names.includes(entry.name.toLocaleLowerCase('tr-TR')))
@@ -431,7 +434,14 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                       onClick={() => closeMenu()}
                       className="group flex min-h-11 items-center justify-between border-b border-nrs-ink/[0.06] py-2 text-[15px] font-serif tracking-wide text-nrs-ink/75 transition-all duration-300 hover:translate-x-1 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
                     >
-                      <span>{category.name}</span><span className="text-xs opacity-0 transition-opacity group-hover:opacity-60">→</span>
+                      <span className="flex items-center gap-3">
+                        {isHomeCategory(category) && <Image
+                          src={category.imageUrl && category.imageUrl !== HOME_CATEGORY_IMAGE ? category.imageUrl : HOME_CATEGORY_THUMBNAIL}
+                          alt="" width={52} height={52} className="h-[52px] w-[52px] rounded-sm object-cover"
+                          unoptimized={Boolean(category.imageUrl && !canOptimizeImage(category.imageUrl))}
+                        />}
+                        {category.name}
+                      </span><span className="text-xs opacity-0 transition-opacity group-hover:opacity-60">→</span>
                     </Link>)}
                   </nav>
                 </section>
