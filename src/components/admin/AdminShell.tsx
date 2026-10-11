@@ -7,6 +7,7 @@ import {
   Boxes,
   X,
   Heart,
+  Home,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -21,6 +22,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 const navigation = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Ürünler', href: '/admin/products', icon: Boxes },
+  { label: 'Home / Nevresim', href: '/admin/home', icon: Home },
   { label: 'Kategoriler', href: '/admin/categories', icon: Tags },
   { label: 'Stok', href: '/admin/inventory', icon: PackageCheck },
   { label: 'Siparişler', href: '/admin/orders', icon: ShoppingBag },

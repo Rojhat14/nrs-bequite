@@ -8,6 +8,7 @@ export interface StorefrontNavCategory {
   slug: string
   description: string | null
   sort_order: number
+  imageUrl?: string
 }
 
 export interface StorefrontNavCollection {

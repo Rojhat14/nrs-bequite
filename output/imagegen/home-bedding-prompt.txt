@@ -1,0 +1,6 @@
+Tool: built-in image_gen
+Hero: public/images/editorial/categories/home-bedding.webp
+Thumbnail: public/images/editorial/categories/home-bedding-thumb.webp
+
+Final prompt:
+Photorealistic luxury bedding editorial photograph for the NRS Home website category thumbnail and wide hero. A beautifully made bed with ivory cotton satin duvet cover, layered cream pillows and a softly folded beige linen blanket in a calm elegant bedroom. Natural morning window light, warm neutral stone and cream palette, tactile realistic textile detail, quiet refined styling. Landscape composition, bed central and fully legible when cropped square, no people, no text, no logos, no watermark.

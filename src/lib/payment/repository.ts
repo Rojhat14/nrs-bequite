@@ -16,8 +16,16 @@ import { cookies } from 'next/headers'
 
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } })
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key,
+    { auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: (url, options) => {
+        const headers = new Headers(options?.headers)
+        // The SDK's REST fallback treats this non-JWT key as Bearer too.
+        // This isolated server client uses secret keys only through apikey.
+        if (key.startsWith('sb_secret_')) headers.delete('Authorization')
+        return fetch(url, { ...options, headers })
+      } } })
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 function requestHash(request: CheckoutRequest) {

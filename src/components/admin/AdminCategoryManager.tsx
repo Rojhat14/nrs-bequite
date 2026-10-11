@@ -4,13 +4,18 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CategoryRow } from '@/lib/admin/types'
 import { deleteCategory, saveCategory } from '@/app/admin/(protected)/actions'
+import Link from 'next/link'
+import Image from 'next/image'
+import { HOME_CATEGORY_IMAGE, isHomeCategory } from '@/lib/home-category'
+import HomeCategoryCover from './HomeCategoryCover'
 
 const canonicalSlugs = ['dresses', 'tops', 'blazers', 'bottoms', 'suits', 'sale', 'bedding', 'accessories']
 
-export default function AdminCategoryManager({ categories, productCounts }: { categories: CategoryRow[]; productCounts: Record<string, number> }) {
+export default function AdminCategoryManager({ categories, productCounts, homeCoverUrl = HOME_CATEGORY_IMAGE, homeOnly = false }: { categories: CategoryRow[]; productCounts: Record<string, number>; homeCoverUrl?: string; homeOnly?: boolean }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const homeCategory = categories.find(isHomeCategory)
 
   async function save(form: FormData) {
     setBusy(true)
@@ -34,7 +39,38 @@ export default function AdminCategoryManager({ categories, productCounts }: { ca
 
   return <div>
     {message && <p role={message.ok ? 'status' : 'alert'} className={`mb-5 border bg-white p-3 text-sm ${message.ok ? 'border-emerald-200 text-emerald-800' : 'border-rose-200 text-rose-800'}`}>{message.text}</p>}
-    <form action={save} className="mb-6 grid gap-3 border border-[#E4DED2] bg-white p-5 sm:grid-cols-2 xl:grid-cols-6">
+    <section className="mb-6 space-y-5 border border-[#E4DED2] bg-white p-5 sm:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 className="font-serif text-2xl">NRS Home · Nevresim</h2><p className="mt-1 text-sm text-[#777165]">Home ürünlerini ve kategori fotoğrafını buradan yönetin.</p></div>
+        {homeCategory && homeCategory.is_active && <Link href={`/admin/products/new?category_id=${encodeURIComponent(homeCategory.id)}`} className="admin-primary">Nevresim ürünü ekle</Link>}
+      </div>
+      {homeCategory ? <>
+        {!homeCategory.is_active && <form action={save} className="space-y-3">
+          <input type="hidden" name="id" value={homeCategory.id} />
+          <input type="hidden" name="name" value={homeCategory.name} />
+          <input type="hidden" name="slug" value={homeCategory.slug} />
+          <input type="hidden" name="description" value={homeCategory.description ?? ''} />
+          <input type="hidden" name="sort_order" value={homeCategory.sort_order} />
+          <input type="hidden" name="is_active" value="true" />
+          <p className="text-sm text-amber-900">Home kategorisi şu anda pasif.</p>
+          <button disabled={busy} className="admin-primary">Home kategorisini aktifleştir</button>
+        </form>}
+        <HomeCategoryCover categoryId={homeCategory.id} imageUrl={homeCoverUrl} />
+      </> : <div className="flex flex-wrap items-center gap-5">
+        <Image src={HOME_CATEGORY_IMAGE} alt="Home nevresim koleksiyonu" width={160} height={160} className="h-40 w-40 rounded-sm object-cover" />
+        <form action={save} className="space-y-3">
+          <input type="hidden" name="name" value="Home" />
+          <input type="hidden" name="slug" value="bedding" />
+          <input type="hidden" name="description" value="NRS Home nevresim ve ev tekstili koleksiyonu." />
+          <input type="hidden" name="sort_order" value="100" />
+          <input type="hidden" name="is_active" value="true" />
+          <p className="max-w-md text-sm text-[#777165]">Nevresim ürünlerini eklemek için önce Home kategorisini oluşturun.</p>
+          <button disabled={busy} className="admin-primary">Home kategorisini oluştur</button>
+        </form>
+      </div>}
+      <a href={HOME_CATEGORY_IMAGE} download className="inline-block text-xs text-[#6B5734] underline">Hazır nevresim fotoğrafını indir</a>
+    </section>
+    {!homeOnly && <><form action={save} className="mb-6 grid gap-3 border border-[#E4DED2] bg-white p-5 sm:grid-cols-2 xl:grid-cols-6">
       <h2 className="font-serif text-xl sm:col-span-2 xl:col-span-6">Yeni kategori</h2>
       <Field label="Kategori adı" name="name" required />
       <Field label="Slug" name="slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" required />
@@ -62,7 +98,7 @@ export default function AdminCategoryManager({ categories, productCounts }: { ca
           {categories.length === 0 && <tr><td colSpan={7} className="p-10 text-center text-sm text-[#9A9385]">Henüz kategori yok.</td></tr>}
         </tbody>
       </table>
-    </div>
+    </div></>}
   </div>
 }
 
