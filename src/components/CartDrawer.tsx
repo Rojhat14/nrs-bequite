@@ -1,5 +1,4 @@
 'use client'
-import { DELIVERY_TERMS } from '@/lib/delivery-policy'
 
 import React from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
@@ -9,10 +8,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useDialog } from '@/hooks/useDialog';
 import CartWhatsappOrder from '@/components/CartWhatsappOrder';
-import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
 
 const CartDrawer = () => {
-  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
+  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, shippingAmount, totalAmount } = useCart();
   const router = useRouter();
   const dialogRef = useDialog(isDrawerOpen, closeDrawer);
 
@@ -36,10 +34,10 @@ const CartDrawer = () => {
             aria-modal="true"
             aria-labelledby="cart-drawer-title"
             tabIndex={-1}
-            className="w-full max-w-[450px] bg-nrs-canvas h-[100dvh] overflow-y-auto shadow-2xl p-4 sm:p-8 flex flex-col"
+            className="w-full max-w-[450px] bg-nrs-canvas h-[100dvh] overflow-hidden shadow-2xl px-4 pt-4 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex shrink-0 justify-between items-center mb-6 sm:mb-12">
+            <div className="flex shrink-0 justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <ShoppingBag size={20} strokeWidth={1.5} className="text-nrs-ink" />
                 <h2 id="cart-drawer-title" className="font-serif text-2xl text-nrs-ink">Your Bag</h2>
@@ -47,7 +45,7 @@ const CartDrawer = () => {
               <button
                 onClick={closeDrawer}
                 aria-label="Sepeti kapat"
-                className="p-2 text-nrs-ink hover:text-nrs-rosegold transition-colors rounded-full hover:bg-nrs-black/5"
+                className="flex min-h-11 min-w-11 items-center justify-center text-nrs-ink hover:text-nrs-rosegold transition-colors rounded-full hover:bg-nrs-black/5"
               >
                 <X size={24} strokeWidth={1.5} />
               </button>
@@ -71,38 +69,37 @@ const CartDrawer = () => {
               </div>
             ) : (
               <>
-                <div className="min-h-24 flex-1 overflow-y-auto pr-1 sm:pr-4 space-y-8">
+                <div role="list" aria-label="Sepetteki ürünler" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
                   {items.map((item) => {
                     const cartItemId = getCartItemId(item)
-                    return <div key={cartItemId} className="flex gap-3 sm:gap-6 pb-8 border-b border-nrs-ink/10">
-                      <div className="w-16 h-24 sm:w-24 sm:h-32 bg-nrs-black/5 flex-shrink-0 overflow-hidden relative">
+                    return <div key={cartItemId} role="listitem" className="flex gap-3 py-3 first:pt-0 border-b border-nrs-ink/10 last:border-b-0">
+                      <div className="w-16 h-20 sm:h-24 bg-nrs-black/5 flex-shrink-0 overflow-hidden relative">
                         <Image
                           src={item.image || 'https://images.unsplash.com/photo-1515378791000-01714bb6013c?q=80&w=200&auto=format&fit=crop'}
                           alt={item.title}
                           fill
                           className="object-cover opacity-80"
-                          sizes="96px"
+                          sizes="64px"
                         />
                       </div>
-                      <div className="min-w-0 flex flex-col justify-between flex-1 py-1">
-                        <div className="flex flex-wrap justify-between gap-2 items-start">
-                          <h3 className="text-sm font-serif text-nrs-ink">{item.title}</h3>
-                          <p className="text-sm font-sans text-nrs-ink">{item.price}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="space-y-1">
+                          <h3 title={item.title} className="line-clamp-2 text-sm leading-5 font-serif text-nrs-ink [overflow-wrap:anywhere]">{item.title}</h3>
+                          {item.size && <p className="text-xs leading-4 text-nrs-ink/65">Beden: {item.size}</p>}
+                          <p className="text-sm leading-5 font-sans tabular-nums text-nrs-ink">{item.price}</p>
                         </div>
-                        <div className="flex flex-wrap gap-3 justify-between items-center mt-4">
-                          <div className="space-y-2">
-                            {item.size && <p className="text-xs text-nrs-ink/65">Beden: {item.size}</p>}
-                            <div className="flex items-center gap-3 text-xs text-nrs-ink/65 uppercase tracking-widest">
-                              <button type="button" aria-label={`${item.title} miktarını azalt`} onClick={() => updateQuantity(cartItemId, item.quantity - 1)} className="h-7 w-7 border border-nrs-ink/15 hover:border-nrs-ink">−</button>
-                              <span>Qty: {item.quantity}</span>
-                              <button type="button" aria-label={`${item.title} miktarını artır`} onClick={() => updateQuantity(cartItemId, item.quantity + 1)} className="h-7 w-7 border border-nrs-ink/15 hover:border-nrs-ink">+</button>
-                            </div>
+                        <div className="flex flex-wrap gap-x-2 justify-between items-center mt-1">
+                          <div className="flex items-center text-xs text-nrs-ink/75">
+                            <button type="button" aria-label={`${item.title} miktarını azalt`} onClick={() => updateQuantity(cartItemId, item.quantity - 1)} className="flex h-11 w-11 items-center justify-center hover:bg-nrs-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">−</button>
+                            <span className="min-w-6 text-center tabular-nums" aria-label={`Adet: ${item.quantity}`}>{item.quantity}</span>
+                            <button type="button" aria-label={`${item.title} miktarını artır`} onClick={() => updateQuantity(cartItemId, item.quantity + 1)} className="flex h-11 w-11 items-center justify-center hover:bg-nrs-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">+</button>
                           </div>
                           <button
+                            type="button" aria-label={`${item.title} ürününü sepetten kaldır`}
                             onClick={() => removeItem(cartItemId)}
-                            className="text-[10px] uppercase tracking-widest text-nrs-ink/60 hover:text-red-400 transition-colors"
+                            className="min-h-11 px-2 text-[10px] uppercase tracking-widest text-nrs-ink/60 hover:text-red-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                           >
-                            Remove
+                            Kaldır
                           </button>
                         </div>
                       </div>
@@ -110,43 +107,18 @@ const CartDrawer = () => {
                   })}
                 </div>
 
-                  <div className="shrink-0 pt-4 sm:pt-8 border-t border-nrs-ink/20 space-y-4 sm:space-y-6">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span className="text-nrs-ink/60 uppercase tracking-widest">Ara Toplam</span>
-                        <span className="font-serif text-nrs-ink">₺{subtotalAmount.toLocaleString('tr-TR')}</span>
-                      </div>
-                      {discountAmount > 0 && <div className="flex justify-between items-center text-nrs-ink/55">
-                        <span className="uppercase tracking-widest">İndirim</span>
-                        <span>−₺{discountAmount.toLocaleString('tr-TR')}</span>
-                      </div>}
-                      <div className="flex justify-between items-center text-nrs-ink/55">
-                        <span className="uppercase tracking-widest">Kargo</span>
-                        <span>{shippingAmount === 0 ? 'Ücretsiz' : `₺${shippingAmount.toLocaleString('tr-TR')}`}</span>
-                      </div>
-                      <div className="flex justify-between items-center border-t border-nrs-ink/10 pt-3">
-                        <span className="text-nrs-ink/60 uppercase tracking-widest">Genel Toplam</span>
-                        <span className="text-lg font-serif text-nrs-ink">₺{totalAmount.toLocaleString('tr-TR')}</span>
-                      </div>
+                  <div role="group" aria-label="Sepet işlemleri" className="shrink-0 mt-2 pt-3 border-t border-nrs-ink/20">
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-xs uppercase tracking-widest text-nrs-ink/65">Toplam</span>
+                      <span className="text-xl font-serif tabular-nums text-nrs-ink">₺{totalAmount.toLocaleString('tr-TR')}</span>
                     </div>
-                  <p className="text-xs leading-6">{DELIVERY_TERMS}</p>
-                  <CartWhatsappOrder items={items} total={totalAmount} />
+                  <p className="mt-1 mb-3 text-xs text-nrs-ink/60">{shippingAmount === 0 ? 'Kargo ücretsiz' : `Kargo: ₺${shippingAmount.toLocaleString('tr-TR')}`}</p>
                   <button type="button"
                     onClick={() => { closeDrawer(); router.push('/checkout'); }}
-                    className="flex min-h-12 w-full items-center justify-center border border-nrs-ink/25 px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ink hover:bg-nrs-ink hover:text-nrs-canvas transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
-                    Ödeme / Siparişe Geç
+                    className="flex min-h-12 w-full items-center justify-center bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 px-4 py-3 text-center text-xs uppercase tracking-widest text-nrs-ivory hover:bg-nrs-rosegold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    Ödemeye Geç
                   </button>
-                  <CardPaymentNotice id="cart-card-payment-status" />
-                  {<button
-                    onClick={() => {
-                      closeDrawer();
-                      router.push('/checkout');
-                    }}
-                    className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 text-xs uppercase tracking-widest hover:bg-nrs-rosegold transition-all duration-500 flex items-center justify-center gap-3"
-                  >
-                    Ölçülerle Sipariş Oluştur
-                    <ShoppingBag size={16} />
-                  </button>}
+                  <CartWhatsappOrder items={items} total={totalAmount} compact />
                 </div>
               </>
             )}

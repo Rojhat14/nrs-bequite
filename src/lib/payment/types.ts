@@ -8,6 +8,7 @@ export interface CheckoutRequest extends LegalAcceptance { items: CheckoutItem[]
 export interface Quote { summary: LegalOrderSummary; hash: string }
 export interface PaymentOrder { id: string; merchantReference: string; amountMinor: number; currency: string; state: 'initiating' | 'pending' | 'paid' | 'failed'; legal: OrderLegalRecord }
 export interface PaymentRedirect { redirectUrl: string }
+export type PaymentMode = 'sandbox' | 'live'
 // The adapter must authenticate raw callback bytes, then independently query the
 // provider when its protocol requires it. Browser return parameters are NOT proof.
 export interface VerifiedPayment {
@@ -17,6 +18,7 @@ export interface VerifiedPayment {
 }
 export interface PaymentProvider {
   readonly name: string
+  readonly mode: PaymentMode
   readonly merchantId: string
   readonly allowedRedirectOrigins: readonly string[]
   initiate(order: PaymentOrder, idempotencyKey: string): Promise<PaymentRedirect>
