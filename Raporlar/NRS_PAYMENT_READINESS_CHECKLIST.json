@@ -1,0 +1,137 @@
+{
+  "checkedAt": "2026-10-09T13:09:52.078Z",
+  "finalStatus": "PARTIALLY_READY",
+  "scope": "Source checks, NOT production certification",
+  "checks": [
+    {
+      "name": "Legal pages",
+      "status": "SOURCE_PASS",
+      "evidence": "8 explicit routes"
+    },
+    {
+      "name": "Footer and sitemap",
+      "status": "SOURCE_PASS",
+      "evidence": "Shared route list"
+    },
+    {
+      "name": "Checkout legal consent",
+      "status": "SOURCE_PASS",
+      "evidence": "Initial consent is null/unselected"
+    },
+    {
+      "name": "Consent before payment request",
+      "status": "SOURCE_PASS",
+      "evidence": "UI + server tests"
+    },
+    {
+      "name": "Payment obligation button",
+      "status": "SOURCE_PASS",
+      "evidence": "Hidden while payment unavailable"
+    },
+    {
+      "name": "Server preflight",
+      "status": "SOURCE_PASS",
+      "evidence": "Strict legal versions and request parser"
+    },
+    {
+      "name": "Trusted prices and stock",
+      "status": "SOURCE_PASS",
+      "evidence": "Catalog quote + locked SQL recheck"
+    },
+    {
+      "name": "Atomic order and legal",
+      "status": "SOURCE_PASS",
+      "evidence": "Single SQL function, transaction rollback tests"
+    },
+    {
+      "name": "Stock locking and idempotency",
+      "status": "SOURCE_PASS",
+      "evidence": "Keys + locks + unique constraints"
+    },
+    {
+      "name": "Provider and secret boundaries",
+      "status": "SOURCE_PASS",
+      "evidence": "No real provider registered"
+    },
+    {
+      "name": "Callback and 3DS verification interfaces only",
+      "status": "SOURCE_PASS",
+      "evidence": "No real adapter: interfaces require verification; local DB checks amount/currency/transaction"
+    },
+    {
+      "name": "Contract versions match RPC",
+      "status": "SOURCE_PASS",
+      "evidence": "Current v1.1; v1.0 archive preserved"
+    },
+    {
+      "name": "Hashes and snapshot",
+      "status": "SOURCE_PASS",
+      "evidence": "Deterministic SHA-256 + server acceptance time"
+    },
+    {
+      "name": "Legal FK and immutability",
+      "status": "SOURCE_PASS",
+      "evidence": "Local PostgreSQL FK/RLS tests; live pending"
+    },
+    {
+      "name": "Guest access",
+      "status": "SOURCE_PASS",
+      "evidence": "New guest checkout disabled; legacy hashed capability has expiry and no ID-only access"
+    },
+    {
+      "name": "Success/failure server status",
+      "status": "SOURCE_PASS",
+      "evidence": "No browser success flag accepted"
+    },
+    {
+      "name": "Profile and admin documents",
+      "status": "SOURCE_PASS",
+      "evidence": "Existing authentication preserved"
+    },
+    {
+      "name": "Payment is unavailable",
+      "status": "SOURCE_PASS",
+      "evidence": "Disabled/default gate + empty real adapter registry"
+    },
+    {
+      "name": "WhatsApp flow preserved",
+      "status": "SOURCE_PASS",
+      "evidence": "No tracked source diff in protected paths"
+    },
+    {
+      "name": "Bank transfer flow preserved",
+      "status": "SOURCE_PASS",
+      "evidence": "No tracked source diff in protected paths"
+    },
+    {
+      "name": "Products, prices, categories, stock and cart preserved",
+      "status": "SOURCE_PASS",
+      "evidence": "No tracked source diff in protected paths"
+    },
+    {
+      "name": "Authentication and existing RLS preserved",
+      "status": "SOURCE_PASS",
+      "evidence": "No tracked source diff in protected paths"
+    },
+    {
+      "name": "Order ACL and RLS hardening prepared",
+      "status": "SOURCE_PASS",
+      "evidence": "Local table and column privilege tests; NOT APPLIED"
+    },
+    {
+      "name": "Production Supabase schema, migration, ownership and RLS",
+      "status": "NOT_VERIFIED",
+      "evidence": "Live access explicitly forbidden; only local representative PostgreSQL schema tested"
+    },
+    {
+      "name": "Business shipping/delivery policy",
+      "status": "NOT_CONFIGURED",
+      "evidence": "PAYMENT_SHIPPING_MINOR and PAYMENT_DELIVERY_TERMS require confirmed business policy"
+    },
+    {
+      "name": "Real provider sandbox and production deployment",
+      "status": "NOT_PERFORMED",
+      "evidence": "Bank protocol/credentials absent; no deployment performed"
+    }
+  ]
+}

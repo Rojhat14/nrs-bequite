@@ -13,6 +13,9 @@ import { canonicalCheckoutItems } from './items'
 import { GUEST_COOKIE, hashGuestToken } from './access'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
+import { garantiObservationOnly } from './garanti/config'
+import { PaymentStartError } from './start-error'
+import { GarantiProvider } from './garanti/adapter'
 
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
@@ -50,10 +53,34 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       const { data, error } = await db.from('payment_orders')
         .select('order_id,user_id,guest_hash,request_hash,provider,merchant_reference,amount_minor,currency,state')
         .eq('idempotency_key', request.idempotencyKey).maybeSingle()
-      if (error) throw new Error('Ödeme durumu doğrulanamadı.')
+      if (error) throw new PaymentStartError('START_FAILED', 'lookup', 'Ödeme durumu doğrulanamadı.', error.code)
+      // Separate TEST attempts use separate keys/orders. Never fold a new key
+      // into another pending order; exact-key ownership/content checks remain.
       if (!data) return null
       if (data.user_id !== userId || data.guest_hash !== guestHash || data.request_hash !== requestHash(request) || data.provider !== process.env.PAYMENT_PROVIDER) throw new Error('Sipariş isteği doğrulanamadı.')
       return { id: data.order_id, merchantReference: data.merchant_reference, amountMinor: Number(data.amount_minor), currency: data.currency, state: data.state } as PaymentOrder
+    },
+    async resumeUnsubmittedTest(orderId, userId, provider, context) {
+      if (manual || !garantiObservationOnly() || !(provider instanceof GarantiProvider) || !provider.config.observationOnly) throw new Error('Test-only resume unavailable.')
+      const { loadGarantiOrder } = await import('./garanti/order')
+      const stored = await loadGarantiOrder(orderId)
+      if (stored.userId !== userId || stored.state !== 'pending' || !stored.redirectUrl) throw new Error('Test order cannot resume.')
+      const current = new URL(stored.redirectUrl)
+      if (current.searchParams.has('used')) throw new PaymentStartError('TEST_HANDOFF_SUBMITTED', 'handoff', 'Bu test siparişi bankaya gönderilmiş. Sonuç doğrulanmadan tekrar ödeme başlatılmadı.', undefined, orderId)
+      const tokens = current.searchParams.getAll('token')
+      if (current.origin !== provider.config.siteOrigin || current.pathname !== '/api/payment/garanti/handoff' || tokens.length !== 1) {
+        throw new Error('Stored TEST handoff unavailable.')
+      }
+      try {
+        if (provider.handoff(tokens[0]).id !== orderId) throw new Error('TEST handoff order mismatch.')
+      } catch {
+        // An expired/invalid unsubmitted link can be renewed from the owned
+        // order-result page. A duplicate create request must never rotate it:
+        // another browser may already be using the currently stored token.
+        throw new PaymentStartError('UNRESOLVED_PAYMENT', 'handoff', 'Continue the existing TEST order.', undefined, orderId)
+      }
+      void context
+      return { redirectUrl: stored.redirectUrl }
     },
     async quote(items: CheckoutItem[], customer: Buyer): Promise<Quote> {
       const sorted = canonicalCheckoutItems(items)
@@ -61,7 +88,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         db.from('products').select('id,name,description,price_amount,compare_at_price,currency,status,in_stock,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
         db.from('product_variants').select('id,product_id,size,stock_quantity,is_active').in('id', sorted.map(i => i.variantId)),
       ])
-      if (products.error || variants.error) throw new Error('Ürün bilgileri doğrulanamadı.')
+      if (products.error || variants.error) throw new PaymentStartError('START_FAILED', 'quote', 'Ürün bilgileri doğrulanamadı.', (products.error || variants.error)?.code)
       let subtotalMinor = 0, saleMinor = 0
       const lines = sorted.map(item => {
         const product = products.data.find(p => p.id === item.productId)
@@ -96,18 +123,44 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       if (!userId || guestHash !== null) throw new Error('Authenticated checkout required.')
       const id = randomUUID()
       const record = prepareOrderLegalRecord(id, request, quote.summary)
-      const { data, error } = await db.rpc('nrs_create_payment_order', {
+      const { data, error } = await db.rpc(!manual && garantiObservationOnly() ? 'nrs_create_garanti_test_observation_order' : 'nrs_create_payment_order', {
         p_order_id: id, p_user_id: userId, p_guest_hash: guestHash, p_key: request.idempotencyKey,
         p_request_hash: requestHash(request),
         p_items: canonicalCheckoutItems(request.items), p_customer: request.customer, p_legal: record,
         p_provider: process.env.PAYMENT_PROVIDER,
       })
-      if (error || !data?.order) throw new Error('Sipariş oluşturulamadı. Sepetinizi kontrol edin.')
+      if (error || !data?.order) {
+        // A distinct key cannot create a second TEST order after the single
+        // finalize slot has been claimed. Link the same owner back to that
+        // order so they can resume its unsubmitted handoff instead of seeing
+        // a generic startup error or attempting another checkout.
+        if (!manual && userId && garantiObservationOnly() && error?.code === 'P0001'
+          && error.message === 'Single TEST finalization order already claimed') {
+          let resumeOrderId: string | undefined
+          try {
+            const { data: allowance, error: allowanceError } = await db.from('garanti_test_single_finalize_allowances')
+              .select('order_id').eq('project_ref', 'dzuxhwtbuojnhibzfxqy')
+              .eq('site_origin', 'https://nrs-bequite-garanti-test.vercel.app').eq('user_id', userId).maybeSingle()
+            const id = !allowanceError && allowance?.order_id
+            if (typeof id === 'string' && UUID.test(id)) {
+              const { data: existing, error: orderError } = await db.from('payment_orders')
+                .select('order_id').eq('order_id', id).eq('user_id', userId)
+                .eq('provider', 'garanti-oos').eq('state', 'pending').maybeSingle()
+              if (!orderError && existing?.order_id === id) resumeOrderId = id
+            }
+          } catch { /* No resume link unless ownership and pending state are verified. */ }
+          throw new PaymentStartError('UNRESOLVED_PAYMENT', 'create_rpc',
+            'An existing single TEST order must be continued.', 'P0001', resumeOrderId)
+        }
+        throw new PaymentStartError(
+          error?.code === 'P0001' && error.message === 'Unresolved payment exists; reconcile before a new attempt' ? 'UNRESOLVED_PAYMENT' : 'START_FAILED',
+          'create_rpc', 'Sipariş oluşturulamadı. Sepetinizi kontrol edin.', error?.code)
+      }
       return data as { order: PaymentOrder; created: boolean }
     },
     async storeRedirect(orderId: string, redirect: PaymentRedirect) {
       const { error } = await db.rpc('nrs_store_payment_redirect', { p_order_id: orderId, p_redirect: redirect.redirectUrl })
-      if (error) throw new Error('Ödeme durumu kaydedilemedi. Yeniden ödeme başlatmayın; bizimle iletişime geçin.')
+      if (error) throw new PaymentStartError('START_FAILED', 'store_redirect', 'Ödeme durumu kaydedilemedi. Yeniden ödeme başlatmayın; bizimle iletişime geçin.', error.code)
     },
     async getRedirect(orderId: string) {
       const { data, error } = await db.from('payment_orders').select('redirect_url').eq('order_id', orderId).maybeSingle()

@@ -53,6 +53,7 @@ export default function Checkout() {
     postalCode: '',
     orderNote: '',
   })
+  const [pendingOrderUrl, setPendingOrderUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -120,10 +121,13 @@ export default function Checkout() {
       const payload = withLegalAcceptance({ ...checkoutInput(), quoteHash: confirmedQuote?.hash, idempotencyKey }, contractAccepted)
       if (!user) throw new Error('Kartla ödeme için hesabınıza giriş yapın.')
       if (!confirmedQuote) throw new Error('Ödeme öncesinde sipariş özetini yeniden doğrulayın.')
-      setLegalError(''); setBusy(true)
+      setLegalError(''); setPendingOrderUrl(null); setBusy(true)
       const response = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Ödeme başlatılamadı.')
+      if (!response.ok) {
+        if (typeof data.resumeUrl === 'string' && /^\/checkout\/verify\?orderId=[0-9a-f-]{36}$/i.test(data.resumeUrl)) setPendingOrderUrl(data.resumeUrl)
+        throw new Error(data.error || 'Ödeme başlatılamadı.')
+      }
       if (typeof data.redirectUrl !== 'string' || !data.redirectUrl.startsWith('https://')) throw new Error('Ödeme yönlendirmesi doğrulanamadı.')
       window.location.assign(data.redirectUrl)
     } catch (error) {
@@ -368,6 +372,7 @@ export default function Checkout() {
                     Siparişi Ver ve Ödeme Yap
                   </button>
                   {paymentMessage && <p role="status" className="text-sm text-nrs-ink/65">{paymentMessage}</p>}
+                  {pendingOrderUrl && <Link href={pendingOrderUrl} className="inline-flex min-h-11 items-center text-sm underline">Bekleyen test siparişine devam et</Link>}
                 </div>}
                 {!ENABLE_CARD_PAYMENT && <div className="space-y-3 border border-nrs-ink/15 p-4 sm:p-6">
                   <button type="button" disabled aria-describedby="checkout-card-payment-status"

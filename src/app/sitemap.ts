@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import { LEGAL_ROUTES } from '@/lib/legal/documents'
+import { isGarantiTestSetup } from '@/lib/payment/garanti/test-setup'
 
 const SITE_URL = 'https://nrsbequiteluminous.com'
 const PAGE_SIZE = 500
@@ -10,6 +11,9 @@ export const revalidate = 3600
 type SitemapRow = { slug: string; updated_at: string }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // An unconfigured isolated Preview has no catalog to index. Production and
+  // configured environments retain the existing catalog validation.
+  if (isGarantiTestSetup()) return []
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {

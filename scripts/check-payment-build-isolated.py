@@ -40,10 +40,14 @@ if result.returncode == 0 and '--http' in sys.argv:
   for route in routes:
    with urlopen(base+'/'+route,timeout=10) as response:
     assert response.status==200,route
-  for path in ['/api/payment/create','/api/payment/callback','/api/payment/quote','/api/payment/return']:
+  for path in ['/api/payment/create','/api/payment/callback','/api/payment/quote','/api/payment/return',
+   '/api/payment/garanti/success','/api/payment/garanti/failure','/api/payment/garanti/handoff']:
    try: urlopen(Request(base+path,data=b'{}',headers={'Content-Type':'application/json'}),timeout=10)
    except HTTPError as error: assert error.code==503,(path,error.code)
    else: raise AssertionError('Disabled payment endpoint did not return 503: '+path)
+  try: urlopen(base+'/api/payment/garanti/handoff',timeout=10)
+  except HTTPError as error: assert error.code==503,error.code
+  else: raise AssertionError('Disabled Garanti handoff did not return 503')
   with urlopen(base+'/sitemap.xml',timeout=10) as response:
    xml=response.read().decode(); assert all('/'+route in xml for route in routes)
   class NoRedirect(HTTPRedirectHandler):
@@ -56,7 +60,7 @@ if result.returncode == 0 and '--http' in sys.argv:
   for path in ['/checkout/success','/checkout/verify','/checkout/failure']:
    with urlopen(base+path+'?orderId=11111111-1111-4111-8111-111111111111&status=paid&success=true',timeout=10) as response:
     html=response.read().decode(); assert response.status==200 and 'Ödeme doğrulandı' not in html,path
-  print('PASS 18 local production HTTP checks: legal routes, redirects, sitemap, disabled APIs, forged success claims')
+  print('PASS 22 local production HTTP checks: legal routes, redirects, sitemap, disabled APIs including Garanti, forged success claims')
   if '--browser' in sys.argv:
    browser_env={**env,'PAYMENT_TEST_URL':base}
    subprocess.run(['node','scripts/check-payment-ui.cjs'],cwd=dst,env=browser_env,check=True,timeout=45)

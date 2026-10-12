@@ -1,22 +1,32 @@
 import 'server-only'
+import { isIP } from 'node:net'
+import { isoBytes } from './garanti/protocol'
 import { UUID, parsePaymentRequest } from './request'
 import type { PaymentProvider, PaymentRepository, VerifiedPayment } from './types'
+import { PaymentStartError, startStage } from './start-error'
 
 export async function initiatePayment(body: unknown, userId: string | null, guestHash: string | null,
-  repository: PaymentRepository, provider: PaymentProvider) {
-  const request = parsePaymentRequest(body)
+  repository: PaymentRepository, provider: PaymentProvider, context?: { customerIp: string }) {
+  const request = await startStage('request', async () => parsePaymentRequest(body))
   if (!userId || guestHash !== null) throw new Error('Kartla ödeme için hesabınıza giriş yapın.')
-  const existing = await repository.findExisting(request, userId, guestHash)
+  if (provider.name === 'garanti-oos' && (!context || isIP(context.customerIp) !== 4)) throw new Error('Müşteri IP adresi doğrulanamadı.')
+  if (provider.name === 'garanti-oos' && isoBytes(request.customer.email).length > 64) throw new Error('Banka ödeme adresi doğrulanamadı.')
+  const existing = await startStage('lookup', () => repository.findExisting(request, userId, guestHash))
   if (existing) {
+    if (provider.settlementDisabled && repository.resumeUnsubmittedTest) {
+      const redirect = await startStage('handoff', () => repository.resumeUnsubmittedTest!(existing.id, userId, provider, context))
+      validateRedirect(redirect.redirectUrl, provider)
+      return { orderId: existing.id, ...redirect }
+    }
     const redirect = await repository.getRedirect(existing.id)
     if (!redirect || existing.state === 'paid' || existing.state === 'failed') throw new Error('Siparişin ödeme durumunu kontrol edin; tekrar ödeme başlatılmadı.')
     validateRedirect(redirect.redirectUrl, provider)
     return { orderId: existing.id, ...redirect }
   }
   // All prices and stock come from DB; request prices/totals are discarded.
-  const quote = await repository.quote(request.items, request.customer)
-  if (quote.hash !== request.quoteHash) throw new Error('Sipariş bilgileri değişti. Özeti yeniden inceleyip onaylayın.')
-  const { order, created } = await repository.createAtomic(request, userId, guestHash, quote)
+  const quote = await startStage('quote', () => repository.quote(request.items, request.customer))
+  if (quote.hash !== request.quoteHash) throw new PaymentStartError('START_FAILED', 'quote', 'Sipariş bilgileri değişti. Özeti yeniden inceleyip onaylayın.')
+  const { order, created } = await startStage('create_rpc', () => repository.createAtomic(request, userId, guestHash, quote))
   if (!created) {
     const redirect = await repository.getRedirect(order.id)
     // Never initiate a second ambiguous payment after a timeout. Adapter must
@@ -25,9 +35,9 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
     validateRedirect(redirect.redirectUrl, provider)
     return { orderId: order.id, ...redirect }
   }
-  const redirect = await provider.initiate(order, request.idempotencyKey)
+  const redirect = await startStage('handoff', () => provider.initiate(order, request.idempotencyKey, context))
   validateRedirect(redirect.redirectUrl, provider)
-  await repository.storeRedirect(order.id, redirect)
+  await startStage('store_redirect', () => repository.storeRedirect(order.id, redirect))
   return { orderId: order.id, ...redirect }
 }
 function validateRedirect(redirectUrl: string, provider: PaymentProvider) {
@@ -35,6 +45,7 @@ function validateRedirect(redirectUrl: string, provider: PaymentProvider) {
   if (url.protocol !== 'https:' || url.username || url.password || !provider.allowedRedirectOrigins.includes(url.origin)) throw new Error('Geçersiz ödeme yönlendirmesi.')
 }
 export function validateVerifiedPayment(payment: VerifiedPayment, provider: PaymentProvider) {
+  if (provider.settlementDisabled) throw new Error('Observation-only test results cannot settle an order.')
   if (!payment || payment.merchantId !== provider.merchantId || !payment.eventId || !payment.transactionId
     || typeof payment.eventId !== 'string' || typeof payment.transactionId !== 'string'
     || !UUID.test(payment.merchantReference) || !Number.isSafeInteger(payment.amountMinor) || payment.amountMinor <= 0

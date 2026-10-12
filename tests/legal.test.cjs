@@ -286,3 +286,20 @@ test('Real checkout sends only IDs/quantities and versioned consent after confir
     assert.equal(calls[0].body.totalAmount, undefined); assert.equal(calls[0].body.items[0].price, undefined);
   } finally { global.fetch = oldFetch; }
 });
+
+test('Pending-order recovery link is visible in the payment step without creating another order', async () => {
+  const harness = checkoutHarness(true, true), oldFetch = global.fetch;
+  const resumeUrl = '/checkout/verify?orderId=11111111-1111-4111-8111-111111111111';
+  let calls = 0;
+  global.fetch = async () => { calls++; return { ok: false, json: async () => ({ error: 'Bekleyen sipariş', code: 'UNRESOLVED_PAYMENT', resumeUrl }) }; };
+  try {
+    let tree = harness.render();
+    findElement(tree, node => node.type?.name === 'CheckoutLegalConsent').props.onChange(true);
+    tree = harness.render();
+    findElement(tree, node => node.type === 'button' && node.props.children === 'Siparişi Ver ve Ödeme Yap').props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    tree = harness.render();
+    const link = findElement(tree, node => node.props?.href === resumeUrl);
+    assert.ok(link); assert.equal(link.props.children, 'Bekleyen test siparişine devam et'); assert.equal(calls, 1);
+  } finally { global.fetch = oldFetch; }
+});

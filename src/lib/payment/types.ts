@@ -16,10 +16,11 @@ export interface VerifiedPayment {
   threeDS: 'authenticated' | 'not_required' | 'failed'
 }
 export interface PaymentProvider {
+  readonly settlementDisabled?: boolean
   readonly name: string
   readonly merchantId: string
   readonly allowedRedirectOrigins: readonly string[]
-  initiate(order: PaymentOrder, idempotencyKey: string): Promise<PaymentRedirect>
+  initiate(order: PaymentOrder, idempotencyKey: string, context?: { customerIp: string }): Promise<PaymentRedirect>
   verifyCallback(rawBody: string, headers: Headers): Promise<VerifiedPayment>
   verifyReturn(rawBody: string, headers: Headers): Promise<VerifiedPayment>
   reconcile(merchantReference: string): Promise<VerifiedPayment>
@@ -28,6 +29,7 @@ export interface PaymentProvider {
 // The database implementations MUST use transactions and row locks. A single
 // RPC creates order + items + immutable legal record + stock reservation.
 export interface PaymentRepository {
+  resumeUnsubmittedTest?(orderId: string, userId: string, provider: PaymentProvider, context?: { customerIp: string }): Promise<PaymentRedirect>
   findExisting(request: CheckoutRequest, userId: string | null, guestHash: string | null): Promise<PaymentOrder | null>
   quote(items: CheckoutItem[], customer: Buyer): Promise<Quote>
   createAtomic(request: CheckoutRequest, userId: string | null, guestHash: string | null, quote: Quote): Promise<{ order: PaymentOrder; created: boolean }>

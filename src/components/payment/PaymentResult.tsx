@@ -3,17 +3,69 @@ import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
 import LegalDocumentContent from '@/components/legal/LegalDocumentContent'
 import { getLegalDocument, legalDocumentHref } from '@/lib/legal/documents'
 import { readAccessiblePaymentOrder } from '@/lib/payment/repository'
+import { garantiObservationOnly } from '@/lib/payment/garanti/config'
+import { readTestDiagnostic } from '@/lib/payment/garanti/diagnostics'
+import { testHandoffUnsubmitted } from '@/lib/payment/garanti/order'
 
 export default async function PaymentResult({ orderId, failure = false }: { orderId?: string; failure?: boolean }) {
   // URL flags (success=true, status=paid, etc.) are deliberately ignored.
   let order: Awaited<ReturnType<typeof readAccessiblePaymentOrder>> = null
   try { if (orderId) order = await readAccessiblePaymentOrder(orderId) } catch { /* unavailable DB grants no access */ }
+  const observation = garantiObservationOnly()
+  const diagnostic = observation && order ? await readTestDiagnostic(order.id) : null
+  const canRenew = observation && order ? await testHandoffUnsubmitted(order.id) : false
+  const testTitle = diagnostic?.outcome === 'verified_failure' ? 'TEST — Banka işlemi başarısız'
+    : diagnostic?.outcome === 'unverified_failure' ? 'TEST — Başarısızlık dönüşü, sonuç doğrulanamadı'
+    : diagnostic?.outcome === 'verification_pending'
+      ? diagnostic.query_stage === 'matched' ? 'TEST — Banka dönüşü ve sorgu eşleşti'
+        : diagnostic.query_stage === 'mismatch' ? 'TEST — Banka sorgusu eşleşmedi'
+        : 'TEST — Banka dönüşü doğrulandı'
+      : diagnostic ? 'TEST — Sonuç doğrulanamadı'
+        : orderId && !order ? 'TEST — Sipariş erişimi doğrulanamadı'
+          : failure && !orderId ? 'TEST — Banka dönüşü ilişkilendirilemedi' : 'TEST — Gözlem modu'
+  const testMessage = diagnostic?.outcome === 'verified_failure'
+    ? 'İmzalı banka dönüşü bu test denemesinin başarısız olduğunu bildirdi.'
+    : diagnostic?.outcome === 'unverified_failure'
+      ? 'Başarısızlık bildiriminin imza veya işlem eşleşmeleri doğrulanamadı. Kesin banka sonucu bilinmiyor.'
+      : diagnostic?.outcome === 'verification_pending'
+        ? diagnostic.query_stage === 'matched'
+          ? 'İmzalı banka dönüşü ile sipariş, tutar, para birimi ve terminal kontrolleri geçti. Banka sorgusunun işlem, tutar ve onay bilgileri de eşleşti; sorgu alanları aşağıda gösteriliyor.'
+          : diagnostic.query_stage === 'mismatch'
+            ? 'İmzalı banka dönüşü doğrulandı, ancak banka sorgusu aynı işlemin bilgileriyle eşleşmedi. Bu ayrı bir doğrulama sorunudur.'
+            : diagnostic.query_stage === 'unavailable'
+              ? 'İmzalı banka dönüşü doğrulandı. Banka sorgusu tamamlanamadı; sorgu doğrulaması bekliyor.'
+              : 'İmzalı banka dönüşü doğrulandı. Banka sorgusu için henüz tanı kaydı yok.'
+        : diagnostic ? 'Banka bildiriminin imzası veya işlem eşleşmeleri doğrulanamadı. Bu ayrı bir doğrulama sorunudur.'
+          : orderId && !order
+            ? 'Bu siparişe erişim doğrulanamadı. Siparişi oluşturan TEST hesabıyla giriş yapın. Erişim sağlanamaması banka dönüş kaydının olmadığı anlamına gelmez.'
+            : failure && !orderId
+              ? 'Banka dönüşü ayrıştırılamadı, işlemle ilişkilendirilemedi veya tanı kaydı işlenemedi. Bu teknik dönüş sorunu, gözlem modunun siparişi pending bırakmasından ayrıdır. Yeniden ödeme başlatmayın.'
+              : order ? 'Bu sipariş için banka dönüş tanısı henüz bulunmuyor. Gözlem modu politikası ile dönüş kaydının eksikliği ayrı durumlardır.'
+                : 'Bu ekranda bir sipariş seçilmedi. Siparişi oluşturan TEST hesabıyla hesabınızdaki sipariş sonucunu açın; burada banka kaydının varlığına ilişkin bir sonuç çıkarılmıyor.'
+  const query = diagnostic?.query_evidence
+  const checked = (value: boolean | null | undefined) => value === true ? 'doğrulandı' : value === false ? 'eşleşmedi' : 'kontrol edilmedi'
   const paid = order?.status === 'paid'
   return <main className="min-h-screen bg-nrs-canvas px-6 pb-16 pt-[calc(var(--nrs-header-height)+3rem)]">
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-serif text-3xl">{paid ? 'Ödeme doğrulandı' : order?.status === 'failed' || failure ? 'Ödeme tamamlanamadı' : 'Ödeme durumu doğrulanıyor'}</h1>
-      <p className="text-sm leading-7 text-nrs-ink/65">{paid ? 'Siparişinizin ödeme sonucu sunucu tarafından doğrulandı.' : 'Bu ekran tek başına ödeme veya kesin sipariş onayı değildir. Kartınızdan çekim gerçekleşip gerçekleşmediğini bankanızdan kontrol edin. Durum netleşmeden yeniden ödeme yapmayın; bizimle iletişime geçebilirsiniz.'}</p>
+      <h1 className="font-serif text-3xl">{paid ? (observation ? 'TEST — Sipariş paid' : 'Ödeme doğrulandı') : observation ? testTitle : order?.status === 'failed' || failure ? 'Ödeme tamamlanamadı' : 'Ödeme durumu doğrulanıyor'}</h1>
+      <p className="text-sm leading-7 text-nrs-ink/65">{paid ? (observation ? 'Test veritabanında sipariş paid olarak kayıtlı. Bu durum, tek başına tarayıcı uçtan uca testinin tamamlandığını göstermez.' : 'Siparişinizin ödeme sonucu sunucu tarafından doğrulandı.') : observation ? testMessage : 'Bu ekran tek başına ödeme veya kesin sipariş onayı değildir. Kartınızdan çekim gerçekleşip gerçekleşmediğini bankanızdan kontrol edin. Durum netleşmeden yeniden ödeme yapmayın; bizimle iletişime geçebilirsiniz.'}</p>
+      {observation && !paid && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Test gözlem modu: otomatik sipariş onayı kapalı. Banka kontrolleri geçse bile sipariş pending kalır; bu test politikası bir doğrulama hatası değildir. Bu mod siparişi ödenmiş olarak işaretlemez.</p>}
+      {observation && paid && !diagnostic && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Bu sipariş için dönüş tanı kaydı bulunmuyor; imza ve banka sorgusu kanıtları bu ekranda gösterilemiyor.</p>}
+      {diagnostic && <div className="space-y-2 border border-nrs-ink/15 p-4 text-sm">
+        <p>Tanılama verisi: {diagnostic.association === 'verified' ? 'İmza ve işlem eşleşmeleri doğrulandı' : 'Güvenilmeyen / doğrulanmamış banka bildirimi'}</p>
+        <p>mdstatus: {diagnostic.mdstatus ?? 'yok'} · response: {diagnostic.response ?? 'yok'} · procreturncode: {diagnostic.procreturncode ?? 'yok'}</p>
+        <p>Dönüş imzası: {checked(diagnostic.signature_verified)} · Sipariş: {checked(diagnostic.order_match)} · Tutar: {checked(diagnostic.amount_match)} · Para birimi: {checked(diagnostic.currency_match)} · Terminal: {checked(diagnostic.terminal_match)} · İlk istek: {checked(diagnostic.request_match)}</p>
+        {query && <div className="space-y-2"><p>Banka sorgusu: HTTP {query.http} · Status: {query.status ?? 'bilinmiyor'} · ChargeType: {query.charge_type ?? 'bilinmiyor'} · Code: {query.result_code ?? 'yok'}</p>
+          <p>Sorgu kimliği: {checked(query.identity_match)} · Tutar: {checked(query.amount_match)} · Onay eşleşmesi: {checked(query.auth_match)}</p>
+        </div>}
+        {diagnostic.mderrormessage && <p>{diagnostic.mderrormessage}</p>}{diagnostic.errmsg && <p>{diagnostic.errmsg}</p>}
+        {!diagnostic.error_text_signed && <p>Hata açıklamaları imzayla doğrulanmış kabul edilmez.</p>}
+      </div>}
       {order && <>
+        {canRenew && <form method="post" action="/api/payment/garanti/renew">
+          <input type="hidden" name="orderId" value={order.id} />
+          <button type="submit" className="min-h-11 border border-nrs-ink px-5 py-3 text-sm">Bankaya gönderilmemiş test bağlantısını yenile</button>
+        </form>}
         <p className="break-all text-sm">Sipariş numarası: {order.id} · Ödeme durumu: {order.status}</p>
         <LegalOrderSummary summary={order.legal.order_summary} />
         <p className="text-sm">Sözleşme kabul zamanı: {new Date(order.legal.accepted_at).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}</p>

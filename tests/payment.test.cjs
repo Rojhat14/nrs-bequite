@@ -82,7 +82,7 @@ test('Verified callback is handed to the atomic DB operation', async () => {
   await processPaymentCallback('signed', new Headers(), f.repository, f.provider);
   assert.equal(f.calls[0].status, 'paid');
 });
-test('No registered real provider means activation fails closed, even with enabled flag', () => {
+test('An unconfigured payment provider fails closed, even with enabled flag', () => {
   const previous = process.env.PAYMENT_ENABLED;
   process.env.PAYMENT_ENABLED = 'true';
   try { assert.equal(paymentAvailable(), false); assert.throws(getPaymentProvider); }
