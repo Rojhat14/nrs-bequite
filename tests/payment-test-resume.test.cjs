@@ -69,19 +69,15 @@ test('Only exact observation mode routes creation to the test-only RPC',async()=
  assert.equal(rpcName,observation?'nrs_create_garanti_test_observation_order':'nrs_create_payment_order');assert.equal(result.created,true);
  }
 });
-test('Claimed one-order TEST slot returns only its owned pending order for safe continuation',async()=>{
- const calls=[];const db={
-  async rpc(name){calls.push(['rpc',name]);return{data:null,error:{code:'P0001',message:'Single TEST finalization order already claimed'}}},
-  from(table){let filters=[];return{select(){return this},eq(key,value){filters.push([key,value]);return this},async maybeSingle(){
-   calls.push(['read',table,filters]);
-   if(table==='garanti_test_single_finalize_allowances')return{data:{order_id:id},error:null};
-   return{data:{order_id:id},error:null};
-  }}}
+test('Claimed single-finalize TEST account can create a distinct observation-only order',async()=>{
+ const calls=[],nextId='33333333-3333-4333-8333-333333333333';const db={
+  async rpc(name,args){calls.push(['rpc',name,args]);return{data:{created:true,order:{id:nextId,state:'initiating'}},error:null}}
  };
  const load=loader({'@supabase/supabase-js':{createClient:()=>db},'./config':{requirePaymentDeployment(){}},
   './garanti/config':{garantiObservationOnly:()=>true},'@/lib/legal/payment-preflight':{prepareOrderLegalRecord:()=>({})}});
  Object.assign(process.env,{PAYMENT_DATABASE_VERIFIED:'true',SUPABASE_SERVICE_ROLE_KEY:'synthetic',NEXT_PUBLIC_SUPABASE_URL:'https://dzuxhwtbuojnhibzfxqy.supabase.co',PAYMENT_PROVIDER:'garanti-oos'});
  const repo=load('src/lib/payment/repository.ts').createPaymentRepository();
- await assert.rejects(repo.createAtomic(input,'owner',null,{summary:{},hash:input.quoteHash}),e=>e.code==='UNRESOLVED_PAYMENT'&&e.stage==='create_rpc'&&e.databaseCode==='P0001'&&e.resumeOrderId===id);
- assert.equal(calls.filter(x=>x[0]==='rpc').length,1);assert.deepEqual(calls.filter(x=>x[0]==='read').map(x=>x[1]),['garanti_test_single_finalize_allowances','payment_orders']);
+ const result=await repo.createAtomic(input,'owner',null,{summary:{},hash:input.quoteHash});
+ assert.equal(result.order.id,nextId);assert.equal(calls.length,1);assert.equal(calls[0][1],'nrs_create_garanti_test_observation_order');
+ assert.equal(calls[0][2].p_user_id,'owner');assert.notEqual(calls[0][2].p_order_id,id);assert.equal(calls[0][2].p_key,input.idempotencyKey);
 });
