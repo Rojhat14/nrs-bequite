@@ -14,12 +14,15 @@ import { whatsappNumber, whatsappUrl } from '@/lib/storefront-config';
 import { buildWhatsappOrderMessage, whatsappSelectionError } from '@/lib/whatsapp-order';
 import BankTransferInfo from '@/components/BankTransferInfo';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
+import { useRouter } from 'next/navigation';
+import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
 
 interface ProductDetailProps {
   product: Product;
 }
 
 export default function ProductDetail({ product }: ProductDetailProps) {
+  const router = useRouter();
   const addItem = useCart(state => state.addItem);
   const openDrawer = useCart(state => state.openDrawer);
   const { user } = useAuth();
@@ -90,6 +93,27 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       ? ['XS', 'S', 'M', 'L', 'XL'].map((size) => ({ id: `legacy-${size}`, label: size, size, stock: product.inStock ? 1 : 0 }))
       : []
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
+  function addSelection(checkout = false) {
+    if (!product.inStock) return;
+    if (variants.length > 0 && !selectedVariant) {
+      setOrderError('Lütfen bir beden seçin.'); return;
+    }
+    if (!Number.isSafeInteger(quantity) || quantity < 1) {
+      setOrderError('Lütfen geçerli bir adet seçin.'); return;
+    }
+    if (selectedVariant && quantity > selectedVariant.stock) {
+      setOrderError('Seçilen adet için yeterli stok bulunmuyor.'); return;
+    }
+    addItem({
+      id: product.id, slug: product.slug, title: product.name,
+      category: product.category, price: product.price, image: product.image,
+      size: selectedVariant?.size ?? undefined, variantId: selectedVariant?.id,
+      compareAtPrice: product.compareAtPrice,
+    }, quantity);
+    setOrderError('');
+    if (checkout) router.push('/checkout');
+    else openDrawer();
+  }
   const galleryImages = product.galleryImages?.length
     ? product.galleryImages
     : product.image ? [{ url: product.image, altText: product.name, sortOrder: 0, isPrimary: true }] : []
@@ -262,33 +286,19 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       className="min-h-12 w-20 border border-nrs-ink/20 bg-transparent px-3 text-nrs-ink" />
                   </label>
                   <button
-                    onClick={() => {
-                      if (variants.length > 0 && !selectedVariant) {
-                        alert('Lütfen bir beden seçin');
-                        return;
-                      }
-                      if (selectedVariant && quantity > selectedVariant.stock) {
-                        setOrderError('Seçilen adet için yeterli stok bulunmuyor.'); return;
-                      }
-                      addItem({
-                        id: product.id,
-                        slug: product.slug,
-                        title: product.name,
-                        category: product.category,
-                        price: product.price,
-                        image: product.image,
-                        size: selectedVariant?.size ?? undefined,
-                        variantId: selectedVariant?.id,
-                        compareAtPrice: product.compareAtPrice,
-                      }, quantity);
-                      openDrawer();
-                    }}
+                    onClick={() => addSelection()}
                     disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
                     className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans enabled:hover:bg-white enabled:hover:text-nrs-ink transition-all duration-700 flex items-center justify-center gap-3"
                   >
                     <ShoppingBag size={18} />
                     Sepete Ekle
                   </button>
+                  <button type="button" onClick={() => addSelection(true)}
+                    disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
+                    className="flex min-h-12 w-full items-center justify-center border border-nrs-ink/25 px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ink enabled:hover:bg-nrs-ink enabled:hover:text-nrs-canvas disabled:cursor-not-allowed disabled:opacity-40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    Ödeme / Siparişe Geç
+                  </button>
+                  <CardPaymentNotice id="product-card-payment-status" />
                   <p className="mt-3 text-sm leading-6">Bütün kıyafetler özel dikilir; gerekli beden ölçüleri sipariş kesinleştirilmeden önce alınır. {DELIVERY_TERMS}</p>
                   <button type="button" disabled={!product.inStock || !whatsappNumber}
                     aria-label={`${product.name} için WhatsApp'tan sipariş ver`}

@@ -186,7 +186,22 @@ test('Payment flag remains false and WhatsApp does not require card consent', ()
   const tree = checkoutHarness(false).render();
   assert.equal(findElement(tree, node => node.type?.name === 'CheckoutLegalConsent'), null);
   assert.equal(findElement(tree, node => node.type === 'button' && node.props.children === 'Siparişi Ver ve Ödeme Yap'), null);
+  const cardButton = findElement(tree, node => node.type === 'button' && node.props.children === 'Kartla Ödeme Yap');
+  assert.ok(cardButton);
+  assert.equal(cardButton.props.disabled, true);
+  assert.equal(cardButton.props.onClick, undefined);
+  assert.match(renderToStaticMarkup(tree), /Kartla ödeme, banka onayının ardından kullanıma açılacaktır\. Siparişinizi WhatsApp üzerinden tamamlayabilirsiniz\./);
   assert.ok(findElement(tree, node => node.type?.name === 'CartWhatsappOrder'));
+});
+
+test('Unavailable card payment keeps customer fields and verified manual-order consent available', () => {
+  const tree = checkoutHarness(false, true).render();
+  assert.ok(findElement(tree, node => node.type === 'input' && node.props.id === 'checkout-firstName'));
+  assert.ok(findElement(tree, node => node.type === 'textarea' && node.props.id === 'checkout-address'));
+  const consent = findElement(tree, node => node.type?.name === 'CheckoutLegalConsent');
+  assert.ok(consent);
+  assert.equal(consent.props.accepted, false);
+  assert.ok(findElement(tree, node => node.type === 'button' && node.props.children === 'Havale / WhatsApp sipariş talebini kaydet'));
 });
 
 for (const route of ['create', 'callback']) {

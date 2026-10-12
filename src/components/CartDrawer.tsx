@@ -9,10 +9,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useDialog } from '@/hooks/useDialog';
 import CartWhatsappOrder from '@/components/CartWhatsappOrder';
-import { useCardPaymentEnabled } from '@/lib/feature-flags';
+import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
 
 const CartDrawer = () => {
-  const ENABLE_CARD_PAYMENT = useCardPaymentEnabled();
   const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount } = useCart();
   const router = useRouter();
   const dialogRef = useDialog(isDrawerOpen, closeDrawer);
@@ -132,6 +131,12 @@ const CartDrawer = () => {
                     </div>
                   <p className="text-xs leading-6">{DELIVERY_TERMS}</p>
                   <CartWhatsappOrder items={items} total={totalAmount} />
+                  <button type="button"
+                    onClick={() => { closeDrawer(); router.push('/checkout'); }}
+                    className="flex min-h-12 w-full items-center justify-center border border-nrs-ink/25 px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ink hover:bg-nrs-ink hover:text-nrs-canvas transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    Ödeme / Siparişe Geç
+                  </button>
+                  <CardPaymentNotice id="cart-card-payment-status" />
                   {<button
                     onClick={() => {
                       closeDrawer();
