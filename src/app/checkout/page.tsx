@@ -15,6 +15,7 @@ import { useCardPaymentEnabled } from '@/lib/feature-flags'
 import CheckoutLegalConsent from '@/components/legal/CheckoutLegalConsent'
 import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
 import LegalDocumentContent from '@/components/legal/LegalDocumentContent'
+import CardPaymentNotice, { CARD_PAYMENT_COMING_SOON } from '@/components/payment/CardPaymentNotice'
 import { getLegalDocument, LEGAL_DOCUMENT_VERSIONS } from '@/lib/legal/documents'
 import { withLegalAcceptance } from '@/lib/legal/acceptance'
 import type { Quote } from '@/lib/payment/types'
@@ -112,6 +113,7 @@ export default function Checkout() {
 
   async function prepareCardPayment() {
     if (busy) return
+    if (!ENABLE_CARD_PAYMENT) { setPaymentMessage(CARD_PAYMENT_COMING_SOON); return }
     try {
       // Consent is checked BEFORE any payment request. Client commercial values
       // never reach payment/create; only IDs, quantity and approved quote hash.
@@ -340,8 +342,8 @@ export default function Checkout() {
 
             {(!ENABLE_CARD_PAYMENT || step === 3) && (
               <div className="space-y-6">
+                <h2 className="font-serif text-2xl">Ödeme</h2>
                 {ENABLE_CARD_PAYMENT && <>
-                  <h2 className="font-serif text-2xl">Ödeme</h2>
                   <p role="status" className="text-nrs-ink/60">Lütfen sunucuda doğrulanan sipariş özetini ve sözleşmeleri inceleyin. Ödeme yükümlülüğü, aşağıdaki ödeme butonuna basıldığında doğar.</p>
                 </>}
                 <p>Toplam: ₺{orderSummary.total.toLocaleString('tr-TR')}</p>
@@ -366,6 +368,13 @@ export default function Checkout() {
                     Siparişi Ver ve Ödeme Yap
                   </button>
                   {paymentMessage && <p role="status" className="text-sm text-nrs-ink/65">{paymentMessage}</p>}
+                </div>}
+                {!ENABLE_CARD_PAYMENT && <div className="space-y-3 border border-nrs-ink/15 p-4 sm:p-6">
+                  <button type="button" disabled aria-describedby="checkout-card-payment-status"
+                    className="flex min-h-12 w-full items-center justify-center bg-nrs-charcoal px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ivory opacity-50 cursor-not-allowed">
+                    Kartla Ödeme Yap
+                  </button>
+                  <CardPaymentNotice id="checkout-card-payment-status" />
                 </div>}
                 {!ENABLE_CARD_PAYMENT && confirmedQuote && <div className="space-y-3">
                   <CheckoutLegalConsent accepted={contractAccepted} onChange={value => setAcceptedSnapshot(value ? snapshotKey : null)} error={legalError} />
