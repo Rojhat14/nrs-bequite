@@ -4,14 +4,16 @@ import { m as motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { canOptimizeImage } from '@/lib/imageOptimization'
+import type { ReactNode } from 'react'
 
 interface CategoryHeroProps {
   title: string
   description: string
   image: string | null
+  children?: ReactNode
 }
 
-export default function CategoryHero({ title, description, image }: CategoryHeroProps) {
+export default function CategoryHero({ title, description, image, children }: CategoryHeroProps) {
   const [imageUnavailable, setImageUnavailable] = useState(!image)
 
   useEffect(() => {
@@ -19,7 +21,7 @@ export default function CategoryHero({ title, description, image }: CategoryHero
   }, [image])
 
   return (
-    <section className="relative h-[60svh] min-h-[calc(var(--nrs-header-height)+22rem)] w-full overflow-hidden">
+    <section className={`relative ${children ? 'min-h-[max(60svh,calc(var(--nrs-header-height)+22rem))]' : 'h-[60svh] min-h-[calc(var(--nrs-header-height)+22rem)]'} w-full overflow-hidden`}>
       {image && !imageUnavailable ? <motion.div
           initial={{ scale: 1.1 }}
           animate={{ scale: 1 }}
@@ -30,7 +32,7 @@ export default function CategoryHero({ title, description, image }: CategoryHero
             unoptimized={!canOptimizeImage(image)}
             onError={() => setImageUnavailable(true)} className="object-cover" />
         </motion.div> : <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${title} — görsel henüz eklenmedi`} />}
-      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4 pb-8 pt-[calc(var(--nrs-header-height)+2rem)]">
+      <div className={`${children ? 'relative min-h-[max(60svh,calc(var(--nrs-header-height)+22rem))]' : 'absolute inset-0'} bg-black/40 flex flex-col items-center justify-center text-center text-white px-4 pb-8 pt-[calc(var(--nrs-header-height)+2rem)]`}>
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -47,6 +49,7 @@ export default function CategoryHero({ title, description, image }: CategoryHero
         >
           {description}
         </motion.p>
+        {children && <div className="mt-6 flex flex-wrap justify-center gap-3">{children}</div>}
       </div>
     </section>
   )

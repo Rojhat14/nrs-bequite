@@ -6,6 +6,9 @@ import { getCategoryCatalog, getStorefrontProducts } from '@/lib/products'
 import { getCategoryEditorialImage } from '@/lib/editorialImages'
 import { isHomeCategory } from '@/lib/home-category'
 import { getHomeCategoryCover } from '@/lib/storage/category-covers'
+import HomeEmbroideryRequest from '@/components/HomeEmbroideryRequest'
+import { whatsappUrl } from '@/lib/storefront-config'
+import WhatsAppIcon from '@/components/WhatsAppIcon'
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>
@@ -68,7 +71,18 @@ export default async function CategoryPage({ params: paramsPromise }: CategoryPa
 
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
-      <CategoryHero title={banner.title} description={banner.description} image={image} />
+      <CategoryHero title={banner.title} description={isHomeCategory(category)
+        ? 'İsminiz, baş harfleriniz veya hayalinizdeki desenle kişiye özel nakışlı nevresimler. Sizin için tasarlayalım.'
+        : banner.description} image={image}>
+        {isHomeCategory(category) && <>
+          {whatsappUrl() && <a href={whatsappUrl('Merhaba, NRS HOME kişiye özel nakışlı nevresim için bilgi almak istiyorum.')!}
+            target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-3 bg-white px-6 py-3 text-sm text-nrs-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+            <WhatsAppIcon />Kişiye Özel Nakış İçin İletişime Geç
+          </a>}
+          <a href="#nakis-talebi" className="inline-flex min-h-12 items-center border border-white/70 px-6 py-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">Nakış İsteğini Not Et</a>
+        </>}
+      </CategoryHero>
+      {isHomeCategory(category) && <HomeEmbroideryRequest />}
 
       <section className="max-w-7xl mx-auto px-6 py-24">
         <ProductListing products={products} title={category.name} />
