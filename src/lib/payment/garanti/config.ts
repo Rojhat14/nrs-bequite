@@ -101,7 +101,10 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
     if (value.protocol !== 'https:' || value.hostname !== host || value.port || value.pathname !== path || value.search || value.hash || value.username || value.password) throw new Error('Garanti endpoint invalid.')
     return value.href
   }
-  const installment = env.GARANTI_SINGLE_INSTALLMENT
+  // Garanti's no-installment form value and initiation hash component are the
+  // same empty string. Vercel cannot store an empty env var, so treat undefined
+  // as the documented no-installment value while rejecting explicit variants.
+  const installment = env.GARANTI_SINGLE_INSTALLMENT ?? ''
   if (installment !== '' && installment !== '0') throw new Error('Confirm bank single installment convention.')
   const capturedStatus = env.GARANTI_CAPTURED_STATUS || '', saleChargeType = env.GARANTI_SALE_CHARGE_TYPE || ''
   const capturedResultCode = env.GARANTI_CAPTURED_RESULT_CODE || ''

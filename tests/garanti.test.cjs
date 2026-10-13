@@ -34,6 +34,15 @@ test('Garanti configuration separates endpoints, credentials and explicit mode; 
  {GARANTI_TEST_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet'},{GARANTI_TEST_TERMINAL_ID:'00012345'},
  {GARANTI_MODE:'PROD',GARANTI_LIVE_APPROVED:'true'}]) assert.throws(()=>garantiConfig({...env,...changes}));
 });
+test('Missing installment env uses the documented empty one-shot value in both form and request hash',()=>{
+ const withoutInstallment={...env};delete withoutInstallment.GARANTI_SINGLE_INSTALLMENT;
+ const config=garantiConfig(withoutInstallment);
+ assert.equal(config.installment,'');
+ const fields=protocol.bankFields(config,order,'127.0.0.1');
+ assert.equal(fields.txninstallmentcount,'');
+ assert.equal(fields.secure3dhash,protocol.initiationHash(config,order));
+ for(const value of ['1','2','  ','00']) assert.throws(()=>garantiConfig({...withoutInstallment,GARANTI_SINGLE_INSTALLMENT:value}));
+});
 test('Controlled live eligibility is tied to one Production auth UUID and a positive small kuruş ceiling',()=>{
  const allowed='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
  const live={GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000'};
