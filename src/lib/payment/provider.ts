@@ -2,9 +2,11 @@ import 'server-only'
 import type { PaymentProvider } from './types'
 import { readPaymentConfig, requirePaymentDeployment } from './config'
 import { GarantiProvider } from './garanti/adapter'
+import { controlledLiveAccountAllowed } from './garanti/config'
 
 // Real adapters fail closed without target DB, explicit mode and bank-approved
-// configuration. Garanti live mode additionally requires sandbox acceptance.
+// configuration. Garanti live mode additionally requires an explicit bank
+// confirmation of successful Production orderinq field behavior.
 // No mock, legacy credential or generic API URL fallback is allowed.
 const providers: Readonly<Record<string, () => PaymentProvider>> = Object.freeze({ 'garanti-oos': () => new GarantiProvider() })
 export function getPaymentProvider(): PaymentProvider {
@@ -21,4 +23,12 @@ export function getPaymentProvider(): PaymentProvider {
 }
 export function paymentAvailable() {
   try { getPaymentProvider(); return true } catch { return false }
+}
+export function paymentAvailableForUser(userId: string | null | undefined) {
+  try {
+    const provider = getPaymentProvider()
+    if (provider.name !== 'garanti-oos') return false
+    const garanti = provider as GarantiProvider
+    return garanti.config.mode === 'TEST' || controlledLiveAccountAllowed(userId)
+  } catch { return false }
 }

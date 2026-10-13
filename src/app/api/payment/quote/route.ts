@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { paymentAvailable } from '@/lib/payment/provider'
+import { paymentAvailable, paymentAvailableForUser, getPaymentProvider } from '@/lib/payment/provider'
 import { createPaymentRepository } from '@/lib/payment/repository'
 import { parseCheckoutInput } from '@/lib/payment/request'
 import { boundedJson, sameOrigin, unavailable } from '@/lib/payment/http'
@@ -11,7 +11,11 @@ export async function POST(request: Request) {
     const auth = await createSupabaseServerClient()
     const { data: { user } } = await auth.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Kartla ödeme için hesabınıza giriş yapın.' }, { status: 401 })
+    if (!paymentAvailableForUser(user.id)) return NextResponse.json({ error: 'Kartla ödeme bu hesap için açık değil.' }, { status: 403 })
     const input = parseCheckoutInput(await boundedJson(request))
-    return NextResponse.json(await createPaymentRepository().quote(input.items, input.customer), { headers: { 'Cache-Control': 'no-store' } })
+    const quote = await createPaymentRepository().quote(input.items, input.customer)
+    const cap = getPaymentProvider().initiationMaxAmountMinor
+    if (cap != null && Math.round(quote.summary.total * 100) > cap) return NextResponse.json({ error: 'Sipariş tutarı kontrollü canlı deneme üst sınırını aşıyor.' }, { status: 409, headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json(quote, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return NextResponse.json({ error: 'Ürün, stok veya teslimat bilgileri doğrulanamadı.' }, { status: 409 }) }
 }

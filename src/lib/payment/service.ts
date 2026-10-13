@@ -13,6 +13,9 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
   if (provider.name === 'garanti-oos' && isoBytes(request.customer.email).length > 64) throw new Error('Banka ödeme adresi doğrulanamadı.')
   const existing = await startStage('lookup', () => repository.findExisting(request, userId, guestHash))
   if (existing) {
+    if (provider.initiationMaxAmountMinor != null && existing.amountMinor > provider.initiationMaxAmountMinor) {
+      throw new PaymentStartError('START_FAILED', 'lookup', 'Mevcut sipariş kontrollü canlı deneme üst sınırını aşıyor; yeniden ödeme başlatılmadı.')
+    }
     if (provider.settlementDisabled && repository.resumeUnsubmittedTest) {
       const redirect = await startStage('handoff', () => repository.resumeUnsubmittedTest!(existing.id, userId, provider, context))
       validateRedirect(redirect.redirectUrl, provider)
@@ -26,6 +29,12 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
   // All prices and stock come from DB; request prices/totals are discarded.
   const quote = await startStage('quote', () => repository.quote(request.items, request.customer))
   if (quote.hash !== request.quoteHash) throw new PaymentStartError('START_FAILED', 'quote', 'Sipariş bilgileri değişti. Özeti yeniden inceleyip onaylayın.')
+  if (provider.initiationMaxAmountMinor != null) {
+    const totalMinor = Math.round(quote.summary.total * 100)
+    if (!Number.isSafeInteger(totalMinor) || totalMinor <= 0 || totalMinor > provider.initiationMaxAmountMinor) {
+      throw new PaymentStartError('START_FAILED', 'quote', 'Canlı deneme üst sınırını aşan sipariş için ödeme başlatılamaz.')
+    }
+  }
   const { order, created } = await startStage('create_rpc', () => repository.createAtomic(request, userId, guestHash, quote))
   if (!created) {
     const redirect = await repository.getRedirect(order.id)

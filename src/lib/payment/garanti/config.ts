@@ -8,6 +8,21 @@ export interface GarantiConfig {
   storeKey: string; handoffSecret: string; siteOrigin: string; formUrl: string; queryUrl: string
   successUrl: string; errorUrl: string; installment: '' | '0'
   capturedStatus: string; capturedResultCode: string; saleChargeType: string; failedStatuses: readonly string[]
+  initiationMaxAmountMinor: number | null
+}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+export function controlledLiveAccountAllowed(userId: string | null | undefined, env: NodeJS.ProcessEnv = process.env) {
+  const allowedUserId = env.GARANTI_LIVE_ALLOWED_USER_ID || ''
+  return env.GARANTI_MODE === 'PROD' && env.VERCEL_ENV === 'production'
+    && env.GARANTI_LIVE_CONTROLLED_ONLY === 'true'
+    && !!userId && UUID.test(allowedUserId)
+    && userId.toLowerCase() === allowedUserId.toLowerCase()
+}
+export function controlledLiveAmountAllowed(amountMinor: number, env: NodeJS.ProcessEnv = process.env) {
+  const rawCap = env.GARANTI_LIVE_MAX_AMOUNT_MINOR || ''
+  const cap = /^\d{1,5}$/.test(rawCap) ? Number(rawCap) : Number.NaN
+  return env.GARANTI_MODE === 'PROD' && Number.isSafeInteger(amountMinor) && amountMinor > 0
+    && Number.isSafeInteger(cap) && cap > 0 && cap <= 50000 && amountMinor <= cap
 }
 export function garantiObservationOnly(env: NodeJS.ProcessEnv = process.env) {
   return env.GARANTI_TEST_OBSERVATION_ONLY === 'true' && env.GARANTI_MODE === 'TEST'
@@ -29,9 +44,14 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
   if (env.GARANTI_TEST_OBSERVATION_ONLY === 'true' && !observationOnly) throw new Error('Observation is restricted to the isolated TEST Preview.')
   if (!test && env.GARANTI_MODE !== 'PROD') throw new Error('Garanti mode missing.')
   if (test && env.VERCEL_ENV === 'production') throw new Error('Sandbox forbidden in Production.')
+  if (!test && (env.VERCEL_ENV !== 'production' || env.GARANTI_LIVE_CONTROLLED_ONLY !== 'true'
+    || !UUID.test(env.GARANTI_LIVE_ALLOWED_USER_ID || '')
+    || env.NEXT_PUBLIC_SUPABASE_URL !== 'https://moiynemxthkmgpgnfajd.supabase.co')) {
+    throw new Error('Live payments require the controlled Production account and Production database.')
+  }
   if (test && (env.GARANTI_TEST_DATABASE_ISOLATED !== 'true' || !env.GARANTI_TEST_SUPABASE_URL
     || env.GARANTI_TEST_SUPABASE_URL !== env.NEXT_PUBLIC_SUPABASE_URL)) throw new Error('Separate sandbox database required.')
-  if (!test && env.GARANTI_SANDBOX_PASSED !== 'true') throw new Error('Bank sandbox acceptance required.')
+  if (!test && env.GARANTI_LIVE_QUERY_FIELDS_CONFIRMED !== 'true') throw new Error('Confirm successful Production orderinq response fields with Garanti.')
   if ((!observationOnly && env.GARANTI_OOS_VERIFIED !== 'true') || (!test && env.GARANTI_LIVE_APPROVED !== 'true')) throw new Error('Garanti terminal not verified.')
   const prefix = test ? 'GARANTI_TEST_' : 'GARANTI_LIVE_'
   const field = (name: string) => {
@@ -71,11 +91,15 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
     || ![capturedStatus, capturedResultCode, saleChargeType, ...failedStatuses].every(v => /^[A-Za-z0-9_-]{1,32}$/.test(v)))) throw new Error('Confirm bank query status meanings.')
   const handoffSecret = env.GARANTI_HANDOFF_SECRET || ''
   if (!/^[0-9a-f]{64}$/.test(handoffSecret)) throw new Error('Garanti handoff secret missing.')
+  const initiationMaxAmountMinor = test ? null : Number(env.GARANTI_LIVE_MAX_AMOUNT_MINOR)
+  if (!test && !controlledLiveAmountAllowed(Number(initiationMaxAmountMinor), env)) {
+    throw new Error('A small controlled live amount ceiling is required.')
+  }
   return { observationOnly, singleFinalizeTest, mode: test ? 'TEST' : 'PROD', merchantId, terminalId, userId, provisionUser,
     provisionPassword: field('PROVISION_PASSWORD'), queryUser, queryPassword: field('QUERY_PASSWORD'),
     storeKey: field('STORE_KEY'), handoffSecret, siteOrigin: site.origin,
     formUrl: endpoint('FORM_URL', '/servlet/gt3dengine'), queryUrl: endpoint('QUERY_URL', '/VPServlet'),
     successUrl: url('GARANTI_SUCCESS_URL', '/api/payment/garanti/success'),
     errorUrl: url('GARANTI_ERROR_URL', '/api/payment/garanti/failure'), installment,
-    capturedStatus, capturedResultCode, saleChargeType, failedStatuses }
+    capturedStatus, capturedResultCode, saleChargeType, failedStatuses, initiationMaxAmountMinor }
 }

@@ -17,6 +17,7 @@ export interface VerifiedPayment {
 }
 export interface PaymentProvider {
   readonly settlementDisabled?: boolean
+  readonly initiationMaxAmountMinor?: number | null
   readonly name: string
   readonly merchantId: string
   readonly allowedRedirectOrigins: readonly string[]

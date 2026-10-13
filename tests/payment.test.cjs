@@ -49,6 +49,12 @@ test('Stale commercial quote cannot create an order', async () => {
   await assert.rejects(initiatePayment({ ...request, quoteHash: 'b'.repeat(64) }, 'server-user', null, f.repository, f.provider), /yeniden inceleyip/);
   assert.deepEqual(f.calls, ['quote']);
 });
+test('Controlled live amount ceiling rejects the server quote before reserving stock or starting the provider', async () => {
+ const f=fixture(); f.repository.quote=async()=>{f.calls.push('quote');return {hash:request.quoteHash,summary:{total:50.01}}};
+ f.provider.initiationMaxAmountMinor=5000;
+ await assert.rejects(initiatePayment(request,'server-user',null,f.repository,f.provider),/üst sınırını aşan/);
+ assert.deepEqual(f.calls,['quote']);
+});
 test('Repeated initiation uses cached redirect and never calls provider again; ambiguous result is blocked', async () => {
   const f = fixture();
   f.repository.createAtomic = async () => ({ created: false, order: { id: key, state: 'pending' } });

@@ -19,6 +19,7 @@ export type SuccessfulTestReturnEvidence = {
 }
 export class GarantiProvider implements PaymentProvider {
   get settlementDisabled() { return this.config.observationOnly === true }
+  get initiationMaxAmountMinor() { return this.config.initiationMaxAmountMinor }
   readonly name = 'garanti-oos'
   readonly merchantId: string
   readonly allowedRedirectOrigins: readonly string[]

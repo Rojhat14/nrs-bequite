@@ -8,7 +8,8 @@ import Footer from '@/components/Footer'
 import MetaPixel from '@/components/MetaPixel'
 import CookieConsent from '@/components/CookieConsent'
 import { CardPaymentProvider } from '@/lib/feature-flags'
-import { paymentAvailable } from '@/lib/payment/provider'
+import { paymentAvailable, paymentAvailableForUser } from '@/lib/payment/provider'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getStorefrontNavigationData } from '@/lib/products'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -42,11 +43,21 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
   const navigationData = await getStorefrontNavigationData()
+  let cardPaymentEnabled = false
+  if (process.env.VERCEL_ENV === 'production') {
+    try {
+      const auth = await createSupabaseServerClient()
+      const { data: { user } } = await auth.auth.getUser()
+      cardPaymentEnabled = paymentAvailableForUser(user?.id)
+    } catch { cardPaymentEnabled = false }
+  } else {
+    cardPaymentEnabled = paymentAvailable()
+  }
   return (
     <html lang="tr" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans bg-nrs-canvas text-nrs-ink`}>
         <MetaPixel /><CookieConsent />
-        <CardPaymentProvider value={paymentAvailable()}><AuthProvider>
+        <CardPaymentProvider value={cardPaymentEnabled}><AuthProvider>
           <MotionProvider>
             <StorefrontShell categories={navigationData.categories} collections={navigationData.collections} footer={<Footer />}>{children}</StorefrontShell>
           </MotionProvider>

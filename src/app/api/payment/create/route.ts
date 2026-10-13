@@ -4,7 +4,7 @@ import { UUID } from '@/lib/payment/request'
 export async function POST(request: Request) {
   if (process.env.PAYMENT_ENABLED !== 'true') return NextResponse.json(
     { error: 'Online ödeme şu anda kullanılamıyor. Lütfen bizimle iletişime geçin.' }, { status: 503 })
-  const { paymentAvailable, getPaymentProvider } = await import('@/lib/payment/provider')
+  const { paymentAvailable, paymentAvailableForUser, getPaymentProvider } = await import('@/lib/payment/provider')
   const { boundedJson, sameOrigin, unavailable } = await import('@/lib/payment/http')
   if (!paymentAvailable()) return unavailable()
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 403 })
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const { data: { user } } = await auth.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Kartla ödeme için hesabınıza giriş yapın.' }, { status: 401 })
     const provider = getPaymentProvider()
+    if (!paymentAvailableForUser(user.id)) return NextResponse.json({ error: 'Kartla ödeme bu hesap için açık değil.' }, { status: 403 })
     const rawIp = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
     const { isIP } = await import('node:net')
     // The bank's published TEST example IP lets IPv6 users exercise this

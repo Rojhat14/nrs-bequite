@@ -2,7 +2,7 @@ const test=require('node:test'), assert=require('node:assert/strict'),crypto=req
 const {loader}=require('./source-loader.cjs');
 const load=loader();
 const {GarantiProvider,GarantiPending}=load('src/lib/payment/garanti/adapter.ts');
-const {garantiConfig}=load('src/lib/payment/garanti/config.ts');
+const {garantiConfig,controlledLiveAccountAllowed,controlledLiveAmountAllowed}=load('src/lib/payment/garanti/config.ts');
 const protocol=load('src/lib/payment/garanti/protocol.ts');
 const id='11111111-1111-4111-8111-111111111111';
 // Synthetic credentials and bank responses only; no customer/bank access data.
@@ -33,6 +33,35 @@ test('Garanti configuration separates endpoints, credentials and explicit mode; 
  {GARANTI_CAPTURED_STATUS:''},{GARANTI_TEST_FORM_URL:'https://evil.example/servlet/gt3dengine'},
  {GARANTI_TEST_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet'},{GARANTI_TEST_TERMINAL_ID:'00012345'},
  {GARANTI_MODE:'PROD',GARANTI_LIVE_APPROVED:'true'}]) assert.throws(()=>garantiConfig({...env,...changes}));
+});
+test('Controlled live eligibility is tied to one Production auth UUID and a positive small kuruş ceiling',()=>{
+ const allowed='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const live={GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000'};
+ assert.equal(controlledLiveAccountAllowed(allowed,live),true);
+ assert.equal(controlledLiveAccountAllowed(allowed.toUpperCase(),live),true);
+ for(const changes of [{GARANTI_LIVE_CONTROLLED_ONLY:'false'},{VERCEL_ENV:'preview'},{GARANTI_MODE:'TEST'},
+  {GARANTI_LIVE_ALLOWED_USER_ID:'not-a-uuid'}]) assert.equal(controlledLiveAccountAllowed(allowed,{...live,...changes}),false);
+ assert.equal(controlledLiveAccountAllowed('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',live),false);
+ assert.equal(controlledLiveAccountAllowed(null,live),false);
+ assert.equal(controlledLiveAmountAllowed(5000,live),true);
+ assert.equal(controlledLiveAmountAllowed(5001,live),false);
+ for(const changes of [{GARANTI_LIVE_MAX_AMOUNT_MINOR:''},{GARANTI_LIVE_MAX_AMOUNT_MINOR:'0'},
+  {GARANTI_LIVE_MAX_AMOUNT_MINOR:'50001'},{GARANTI_LIVE_MAX_AMOUNT_MINOR:'1.5'},
+  {GARANTI_LIVE_MAX_AMOUNT_MINOR:'5e3'}])
+  assert.equal(controlledLiveAmountAllowed(1,{...live,...changes}),false);
+});
+test('A controlled live trial does not claim sandbox decline/cancel completion and still requires bank query-field confirmation',()=>{
+ const live={...env,GARANTI_MODE:'PROD',VERCEL_ENV:'production',NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',
+  GARANTI_SITE_ORIGIN:'https://nrsbequiteluminous.com',GARANTI_SUCCESS_URL:'https://nrsbequiteluminous.com/api/payment/garanti/success',
+  GARANTI_ERROR_URL:'https://nrsbequiteluminous.com/api/payment/garanti/failure',GARANTI_OOS_VERIFIED:'true',GARANTI_LIVE_APPROVED:'true',
+  GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:'true',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000',GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',
+  GARANTI_LIVE_PROVISION_USER:'PROVOOS',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-live-password',GARANTI_LIVE_QUERY_USER:'PROVOOS',
+  GARANTI_LIVE_QUERY_PASSWORD:'synthetic-live-query-password',GARANTI_LIVE_STORE_KEY:'synthetic-live-store-key',
+  GARANTI_LIVE_FORM_URL:'https://sanalposprov.garanti.com.tr/servlet/gt3dengine',GARANTI_LIVE_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet'};
+ delete live.GARANTI_SANDBOX_PASSED;
+ const config=garantiConfig(live);assert.equal(config.mode,'PROD');assert.equal(config.initiationMaxAmountMinor,5000);
+ assert.throws(()=>garantiConfig({...live,GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:''}));
 });
 test('ISO-8859-9 hash encoding uses Turkish bytes and rejects replacement characters',()=>{
  assert.deepEqual([...protocol.isoBytes('ĞİŞğış')],[208,221,222,240,253,254]);

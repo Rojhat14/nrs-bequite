@@ -45,7 +45,7 @@ test('Safe errors retain RPC SQLSTATE without exposing arbitrary error fields',a
  await assert.rejects(startStage('create_rpc',async()=>{throw e}),x=>x===e);
 });
 test('Checkout reports/logs only allowlisted stage and code, and links an owned unresolved test order',async()=>{
- const load=loader({'@/lib/payment/provider':{paymentAvailable:()=>true,getPaymentProvider:()=>({})},
+ const load=loader({'@/lib/payment/provider':{paymentAvailable:()=>true,paymentAvailableForUser:()=>true,getPaymentProvider:()=>({})},
  '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user:{id:'owner'}}})}})},
  '@/lib/payment/repository':{createPaymentRepository:()=>({})},
  '@/lib/payment/service':{initiatePayment:async()=>{throw new (load('src/lib/payment/start-error.ts').PaymentStartError)('UNRESOLVED_PAYMENT','create_rpc','NEVER_EXPOSE_RAW_CREDENTIAL', 'P0001',id)}}});

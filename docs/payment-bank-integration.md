@@ -1,6 +1,6 @@
 # Garanti BBVA Güvenli Ortak Ödeme Sayfası
 
-12 Ekim 2026. Adaptör uygulanmıştır; **canlı etkinleştirme BLOCKED**.
+13 Ekim 2026. Adaptör uygulanmıştır; **canlı etkinleştirme BLOCKED**.
 Model: tek çekim TRY, `sales`, `3D_OOS_PAY`. Ön otorizasyon veya yerel kart girişi yok.
 
 ## Resmî kaynaklar
@@ -101,6 +101,7 @@ Aşağıdaki `GARANTI_{TEST|LIVE}_...` adları iki ayrı gerçek değişkeni ifa
 | GARANTI_OOS_VERIFIED | Terminalin tek çekim TRY ve 3D ortak ödeme yetkisi banka tarafından doğrulanınca `true` |
 | GARANTI_LIVE_APPROVED | Canlı kullanım bankaca onaylanınca `true` |
 | GARANTI_SANDBOX_PASSED | Gerçek banka sandbox senaryoları tamamlanınca `true` |
+| GARANTI_LIVE_QUERY_FIELDS_CONFIRMED | Garanti başarılı Production orderinq yanıtındaki Mode/AuthDate/Transaction.Response.ReasonCode ve Status/ChargeType/OrderInqResult.Code eşleştirmelerini yazılı doğrulayınca `true` |
 | GARANTI_TEST_DATABASE_ISOLATED | Ayrı test Supabase projesi doğrulanınca `true` |
 | GARANTI_TEST_SUPABASE_URL | Ayrı test projesi; TEST'te NEXT_PUBLIC_SUPABASE_URL ile eşleşmeli |
 | GARANTI_SINGLE_INSTALLMENT | Banka testinde onaylanan boş veya `0` |
@@ -118,6 +119,9 @@ Aşağıdaki `GARANTI_{TEST|LIVE}_...` adları iki ayrı gerçek değişkeni ifa
 | GARANTI_{TEST\|LIVE}_STORE_KEY | Banka panelindeki 3D Secure Key/StoreKey'in tam değeri/temsili |
 | GARANTI_{TEST\|LIVE}_FORM_URL | İlgili ortamın bankaca onaylı gt3dengine hedefi |
 | GARANTI_{TEST\|LIVE}_QUERY_URL | İlgili ortamın VPServlet hedefi |
+| GARANTI_LIVE_CONTROLLED_ONLY | Yalnızca kontrollü Production denemesi hazırlanırken `true`; başka hesapları açmaz |
+| GARANTI_LIVE_ALLOWED_USER_ID | İzin verilecek tek Supabase Auth kullanıcı UUID'si; yalnızca Vercel Production'da girilir |
+| GARANTI_LIVE_MAX_AMOUNT_MINOR | Kuruş cinsinden üst sınır; en fazla `50000` (500 TL), küçük deneme için daha düşük seçilir |
 
 Genel PAYMENT_API_KEY/API_SECRET alanları bu adaptörde kullanılmaz; Garanti
 şifreleri bu alanlara tahminî olarak eşleştirilmez. TEST modu Production'da
@@ -159,9 +163,35 @@ kopyalanmaz. Rastgele, mevcut olmayan sipariş için yalnızca orderinq gönderi
 12 Ekim 2026 sonucu: HTTP 200, güvenli kod 0110 (işlem bulunamadı). Sipariş/tahsilat yok.
 Bu sonuç bağlantı ve sorgu kontrolüdür; başarılı 3DS satış testi değildir.
 
-Tam banka başarı/ret/iptal testleri çalıştırılamadı: izole test DB/HTTPS dönüş
-kurulumu, terminal yetkisi ve banka status eşleştirmeleri hazır değil. Canlı
-credentials/izinler doğrulanmadan deploy veya ödeme etkinleştirme yapılmaz.
+Gerçek TEST ret ve kullanıcı iptali senaryoları tamamlanmadı. Garanti'nin resmî
+TEST kartı sayfası bir simülatör kartı ve 3DS OTP yayımlar; kesin ret üreten
+belgelenmiş bir seçenek/girdi tanımlamaz. Rastgele kart/OTP ile ret simüle edilmez.
+Bu iki test tamamlanmış gibi raporlanamaz.
+
+## Kontrollü Production hazırlığı — 13 Ekim 2026
+
+Canlı ödeme yolu, Production `moiynemxthkmgpgnfajd` Supabase URL'si, tek izinli
+Auth UUID'si ve kuruş cinsinden tutar tavanı olmadan fail-closed kalır. Checkout
+yalnızca oturumdaki izinli kullanıcıya kart seçeneğini gösterir; `/api/payment/quote`
+ve `/api/payment/create` aynı yetkiyi sunucuda tekrar kontrol eder. Sipariş özeti,
+kullanıcı banka ekranına gönderilmeden önce toplamı gösterir. TEST gözlem izinleri
+ve SQL kurulumları `supabase/test-setup/` altında kalır; Production migrasyonlarına
+eklenmez. TEST'te doğrulanan bir sipariş Production'a taşınmaz.
+
+Canlı orderinq doğrulaması bilinçli olarak sıkıdır. Sorgu isteğinde `Mode=PROD`
+gönderilir. Başarılı kabul şu anda yanıt `Mode=PROD`,
+`OrderInqResult.Status=GARANTI_CAPTURED_STATUS`, `ChargeType=...`,
+`OrderInqResult.Code=...`, eşleşen `AuthAmount`, `AuthDate` için YYYYMMDD ve
+`Transaction.Response.ReasonCode=00` koşullarını gerektirir. Resmî sorgu şeması
+bu alanları listeliyor ancak başarılı her yanıtta hepsinin dolu olacağını veya
+ReasonCode değerinin mutlaka `00` olacağını açıkça söylemiyor. Bu nedenle canlı
+başarıda boş Mode/AuthDate/ReasonCode mevcut bir engeldir; bu koşullar kaldırılmaz.
+Status, ChargeType, OrderInqResult.Code ve nihai ret Status eşleştirmeleri de TEST
+değerlerinden varsayılmaz. Bankadan Production başarılı/ret/iptal yanıtlarının
+örnekleri veya bu alanlar için kesin kural alınana dek `GARANTI_LIVE_QUERY_FIELDS_CONFIRMED`,
+`GARANTI_LIVE_APPROVED` ve `PAYMENT_DATABASE_VERIFIED` etkinleştirilmemelidir.
+Kontrollü tek-hesap canlı denemesi `GARANTI_SANDBOX_PASSED` değerini doldurmaz;
+ret/iptal testleri eksiktir, bu yüzden geniş müşteri açılımı yapılmaz.
 
 ## Son doğrulama sonucu
 
