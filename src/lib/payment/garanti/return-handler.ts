@@ -6,7 +6,7 @@ import { createPaymentRepository } from '@/lib/payment/repository'
 import { validateVerifiedPayment } from '@/lib/payment/service'
 import { GarantiProvider, GarantiPending } from './adapter'
 import { diagnoseTestReturn, saveTestDiagnostic } from './diagnostics'
-import { parseReturn } from './protocol'
+import { GarantiReturnParseError, parseReturn, ReturnSignatureError } from './protocol'
 import { loadGarantiOrder, isGarantiSingleFinalizeOrder } from './order'
 
 export async function garantiReturn(request: Request) {
@@ -14,8 +14,17 @@ export async function garantiReturn(request: Request) {
   const provider = getPaymentProvider()
   if (!(provider instanceof GarantiProvider)) return unavailable()
   const destination = (path: string) => NextResponse.redirect(new URL(path, provider.config.siteOrigin), 303)
+  const source = new URL(request.url).pathname.endsWith('/failure') ? 'failure' : 'success'
+  const liveFailureCode = (error: unknown) => {
+    const prefix = source === 'failure' ? 'GARANTI_FAILURE_RETURN' : 'GARANTI_SUCCESS_RETURN'
+    if (error instanceof ReturnSignatureError) return `${prefix}_SIGNATURE_${error.result.toUpperCase()}`
+    if (error instanceof GarantiReturnParseError) return `${prefix}_FIELD_${error.code.toUpperCase()}`
+    if (error instanceof Error && error.message === 'Bank return order mismatch.') return `${prefix}_ASSOCIATION_MISMATCH`
+    if (error instanceof Error && error.message === 'Bank query identity mismatch.') return `${prefix}_ORDERINQ_IDENTITY_MISMATCH`
+    if (error instanceof Error && error.message === 'Bank capture mismatch.') return `${prefix}_ORDERINQ_CAPTURE_MISMATCH`
+    return 'GARANTI_RETURN_VERIFICATION_FAILED'
+  }
   if (provider.config.observationOnly) {
-    const source = new URL(request.url).pathname.endsWith('/failure') ? 'failure' : 'success'
     let raw: string
     try { raw = await boundedText(request) } catch { return destination('/checkout/failure') }
     // A single TEST order is explicitly claimed in the isolated DB during order
@@ -76,6 +85,11 @@ export async function garantiReturn(request: Request) {
   } catch (error) {
     if (error instanceof GarantiPending) return destination(`/checkout/verify?orderId=${encodeURIComponent(error.reference)}`)
     // Neither bad signatures nor unsigned cancellations can change DB state.
+    if (provider.config.liveObservationOnly) {
+      const code = liveFailureCode(error)
+      console.warn(JSON.stringify({ event: 'garanti_live_return_rejected', code }))
+      return destination(`/checkout/failure?code=${encodeURIComponent(code)}`)
+    }
     return destination('/checkout/failure')
   }
 }

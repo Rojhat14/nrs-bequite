@@ -32,6 +32,20 @@ test('Native form handoff preserves POST Origin without leaking token in referre
  for(const secret of [config.storeKey,config.provisionPassword,config.queryPassword])assert.equal(body.includes(secret),false);
  assert.doesNotMatch(body,/name="(?:cardnumber|cardcvv2)"/);
 });
+test('Live observation renders the validated Production bank form action without sending a bank request',async()=>{
+ const f=await fixture();
+ f.provider.config.mode='PROD';f.provider.config.liveObservationOnly=true;
+ f.provider.config.formUrl='https://sanalposprov.garanti.com.tr/servlet/gt3dengine';
+ const get=await f.route.GET(new Request(f.order.redirectUrl));assert.equal(get.status,200);
+ assert.match(await get.text(),/gerçek tahsilat yapılabilir/);
+ const post=await f.route.POST(new Request(f.order.redirectUrl,{method:'POST',headers:{Origin:origin}}));
+ assert.equal(post.status,200);const html=await post.text();
+ assert.match(html,/action="https:\/\/sanalposprov\.garanti\.com\.tr\/servlet\/gt3dengine"/);
+ assert.match(html,/name="mode" value="PROD"/);assert.match(html,/name="txntype" value="sales"/);
+ assert.match(html,/name="secure3dsecuritylevel" value="3D_OOS_PAY"/);
+ assert.match(html,/document\.getElementById\('bank'\)\.submit\(\)/);
+ assert.equal(f.claims(),1);
+});
 test('Missing/null/foreign Origin still fail before token consumption',async()=>{
  for(const value of [null,'null','https://attacker.example']){
   const f=await fixture(),headers=value?{Origin:value}:{};

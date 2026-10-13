@@ -129,3 +129,43 @@ for(const first of ['admin','callback']) test(`Native PostgreSQL: concurrent can
   await adminClient.query('RESET ROLE');await callbackClient.query('RESET ROLE');
  }
 });
+
+for(const first of ['cancel','callback']) test(`Native PostgreSQL: customer cancel/paid callback race (${first} locks first)`,{skip:!enabled,timeout:20000},async()=>{
+ await prepare();
+ await newOrder(observer,f.orderId,f.userId);
+ const cancelClient=adminClient, callback=callbackClient;
+ const leading=first==='cancel'?cancelClient:callback;
+ const waiting=first==='cancel'?callback:cancelClient;
+ const pid=(await waiting.query('select pg_backend_pid() pid')).rows[0].pid;
+ await leading.query('BEGIN');
+ try {
+  await leading.query('RESET ROLE');
+  await leading.query('select order_id from public.payment_orders where order_id=$1::uuid for update',[f.orderId]);
+  await leading.query('SET ROLE service_role');
+  await waiting.query('SET ROLE service_role');
+  const competing=(first==='cancel'
+    ? callback.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(f.callback()),'test-bank'])
+    : cancelClient.query('select public.nrs_customer_cancel_order($1::uuid,$2::uuid)',[f.orderId,f.userId]))
+    .then(()=>({ok:true}),error=>({ok:false,error}));
+  await waitBlocked(pid);
+  if(first==='cancel') {
+   await leading.query('select public.nrs_customer_cancel_order($1::uuid,$2::uuid)',[f.orderId,f.userId]);
+  } else {
+   await leading.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(f.callback()),'test-bank']);
+  }
+  await leading.query('COMMIT');
+  const result=await competing;
+  if(first==='cancel') {
+   assert.equal(result.ok,false);assert.match(result.error.message,/terminal state conflict/);
+   assert.deepEqual(await f.state(wrap(observer)),{status:'cancelled',state:'failed',stock_quantity:1,events:0,released:1});
+  } else {
+   assert.equal(result.ok,true);
+   const actual=(await observer.query('select public.nrs_customer_cancel_order($1::uuid,$2::uuid) result',[f.orderId,f.userId])).rows[0].result;
+   assert.equal(actual,'paid');
+   assert.deepEqual(await f.state(wrap(observer)),{status:'paid',state:'paid',stock_quantity:0,events:1,released:0});
+  }
+ } finally {
+  await leading.query('ROLLBACK');
+  await adminClient.query('RESET ROLE');await callbackClient.query('RESET ROLE');
+ }
+});

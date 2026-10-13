@@ -56,7 +56,7 @@ $$;
  ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
  CREATE TABLE public.profiles(id uuid PRIMARY KEY,first_name text,last_name text,phone text,email text);
  CREATE TABLE public.wishlist(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL,product_id text NOT NULL);
- CREATE TABLE public.orders(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,total_amount numeric NOT NULL,status text NOT NULL CHECK(status IN('pending','payment_pending','paid','processing','shipped','delivered','cancelled','refunded')),customer_name text,customer_email text,customer_phone text,shipping_address text,shipping_city text,shipping_district text,shipping_postal_code text,created_at timestamptz NOT NULL DEFAULT now());
+ CREATE TABLE public.orders(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,total_amount numeric NOT NULL,status text NOT NULL CHECK(status IN('pending','payment_pending','paid','processing','shipped','delivered','cancelled','refunded')),customer_name text,customer_email text,customer_phone text,shipping_address text,shipping_city text,shipping_district text,shipping_postal_code text,manual_request_key uuid,manual_paid_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
  CREATE TABLE public.order_items(id uuid primary key default gen_random_uuid(),order_id uuid NOT NULL references public.orders(id),product_id text NOT NULL,quantity integer NOT NULL,price_at_purchase numeric NOT NULL);
  CREATE TABLE public.products(id text primary key,name text NOT NULL,description text,price_amount numeric NOT NULL,compare_at_price numeric,currency text NOT NULL,status text NOT NULL,in_stock boolean NOT NULL);
  CREATE TABLE public.product_variants(id uuid PRIMARY KEY,product_id text REFERENCES public.products(id),size text,stock_quantity integer NOT NULL CHECK(stock_quantity>=0),is_active boolean NOT NULL);
@@ -80,6 +80,7 @@ $$;
 
  await db.exec(fs.readFileSync('supabase/migrations/20261009130000_payment_transaction_hardening.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261009140000_final_security_review_fixes.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261013120000_customer_payment_cancellation.sql','utf8'));
 });
 test.after(async()=>{ await db.close() });
 test('Local PostgreSQL: atomic creation saves one order, items, legal snapshot and stock reservation',async()=>{
@@ -226,11 +227,17 @@ test('Local PostgreSQL: service role retains atomic RPC access; transaction IDs 
  await assert.rejects(db.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(callback()),'other-provider']),/mismatch/);
 });
 
-test('Local PostgreSQL: losing the browser key cannot create a second unresolved payment for the same owner',async()=>{
+test('Local PostgreSQL: distinct same-owner order is created when its own stock is available',async()=>{
  const id='66666666-6666-4666-8666-666666666666';
- await assert.rejects(create(id,id,userId),/Unresolved payment exists/);
- assert.equal((await db.query('select count(*)::integer as n from public.orders where id=$1::uuid',[id])).rows[0].n,0);
- assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,4);
+ const stock=(await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity;
+ if(stock>0) {
+  assert.equal((await create(id,id,userId)).rows[0].result.created,true);
+  assert.equal((await db.query('select count(*)::integer as n from public.orders where id=$1::uuid',[id])).rows[0].n,1);
+  assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,stock-1);
+ } else {
+  await assert.rejects(create(id,id,userId),/stock unavailable/);
+  assert.equal((await db.query('select count(*)::integer as n from public.orders where id=$1::uuid',[id])).rows[0].n,0);
+ }
 });
 
 test('Local PostgreSQL: browser roles cannot bypass service-only payment RPCs or read payment tokens/events',async()=>{

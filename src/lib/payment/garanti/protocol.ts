@@ -98,6 +98,9 @@ export type ReturnSignatureEvidence = {
   hashparamsval_matches_rebuilt: boolean | null
   hash_shape: ReturnType<typeof inspectHashRepresentation>
 }
+export class ReturnSignatureError extends Error {
+  constructor(readonly result: ReturnSignatureEvidence['result']) { super('Bank return signature could not be verified.') }
+}
 export function inspectHashRepresentation(value = '') {
   const strictHex = value.length > 0 && value.length % 2 === 0 && /^[A-Fa-f0-9]+$/.test(value)
   // RFC 4648 standard alphabet, required padding and canonical unused bits.
@@ -141,7 +144,8 @@ export function inspectReturnSignature(c: GarantiConfig, f: Record<string, strin
   return d
 }
 export function verifyReturnHash(c: GarantiConfig, f: Record<string, string>) {
-  if (inspectReturnSignature(c, f).result !== 'verified') throw new Error('Bank signature invalid.')
+  const result = inspectReturnSignature(c, f).result
+  if (result !== 'verified') throw new ReturnSignatureError(result)
   // Never verify from hashparamsval or the initiation secure3dhash.
 }
 export function queryXml(c: GarantiConfig, order: PaymentOrder, ip: string) {

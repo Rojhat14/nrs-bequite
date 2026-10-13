@@ -6,7 +6,7 @@ import { UUID } from '@/lib/payment/request'
 import { garantiConfig, type GarantiConfig } from './config'
 import { loadGarantiOrder } from './order'
 import { testQueryEvidence, type TestQueryEvidence } from './query-evidence'
-import { bankFields, initiationHash, equalHex, isoBytes, parseReturn, verifyReturnHash, queryXml, parseQuery, scalar } from './protocol'
+import { bankFields, initiationHash, equalHex, isoBytes, ReturnSignatureError, parseReturn, verifyReturnHash, queryXml, parseQuery, scalar } from './protocol'
 
 export class GarantiPending extends Error {
   constructor(readonly reference: string) { super('Payment awaits bank reconciliation.') }
@@ -73,8 +73,9 @@ export class GarantiProvider implements PaymentProvider {
     // The bank documents hash checking for successful (00) returns only. Failed
     // unsigned returns may not cancel a DB order or release reserved stock.
     try { verifyReturnHash(c, f) } catch (error) {
-      if (c.liveObservationOnly) console.info(JSON.stringify({ event: 'garanti_live_return_verified',
-        order_id: UUID.test(f.oid || '') ? f.oid : null, signature_verified: false }))
+      if (c.liveObservationOnly) console.info(JSON.stringify({ event: 'garanti_live_return_rejected',
+        order_id: UUID.test(f.oid || '') ? f.oid : null, signature_verified: false,
+        signature_result: error instanceof ReturnSignatureError ? error.result : 'verification_error' }))
       throw error
     }
     const order = await this.loadOrder(f.oid)

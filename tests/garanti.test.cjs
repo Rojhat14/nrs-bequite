@@ -278,6 +278,25 @@ test('POST return handler finalizes only verified capture without any session co
  p.verifyReturn=async()=>{throw Error('bad signature')};
  assert.match((await garantiReturn(request())).headers.get('location'),/checkout\/failure/);assert.equal(finalized,1);
 });
+test('Live failure callback exposes a safe signature code instead of the generic observation result',async()=>{
+ const provider=new GarantiProvider({...c,mode:'PROD',liveObservationOnly:true,observationOnly:false});
+ provider.verifyReturn=async()=>{throw new protocol.ReturnSignatureError('hash_mismatch')};let finalized=0;const warnings=[];
+ const mocks={
+  'next/server':{NextResponse:{redirect:(url,status)=>Response.redirect(url,status)}},
+  '@/lib/payment/provider':{paymentAvailable:()=>true,getPaymentProvider:()=>provider},
+  '@/lib/payment/repository':{createPaymentRepository:()=>({finalizeAtomic:async()=>{finalized++}})},
+  './adapter':{GarantiProvider,GarantiPending},'./protocol':protocol,
+ };
+ const {garantiReturn}=loader(mocks)('src/lib/payment/garanti/return-handler.ts');
+ const oldWarn=console.warn;console.warn=value=>warnings.push(String(value));let response;
+ try { response=await garantiReturn(new Request('https://shop.example/api/payment/garanti/failure',{
+  method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'response=Declined&hash=redacted'})) }
+ finally { console.warn=oldWarn }
+ const location=new URL(response.headers.get('location'));assert.equal(location.pathname,'/checkout/failure');
+ assert.equal(location.searchParams.get('code'),'GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH');
+ assert.equal(finalized,0);assert.deepEqual(warnings.map(v=>JSON.parse(v)),[{event:'garanti_live_return_rejected',code:'GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH'}]);
+ assert.equal(warnings.join('').includes('Declined'),false);assert.equal(warnings.join('').includes('redacted'),false);
+});
 test('Unconfigured HTTPS test setup can never activate in Production or with a live DB/service key/write flags',()=>{
  const {isGarantiTestSetup}=load('src/lib/payment/garanti/test-setup.ts');
  const setup={GARANTI_TEST_SETUP_ONLY:'true',GARANTI_MODE:'TEST',NEXT_PUBLIC_SUPABASE_URL:'https://nrs-garanti-test-unconfigured.invalid',

@@ -7,7 +7,7 @@ import { garantiObservationOnly, garantiLiveObservationOnly } from '@/lib/paymen
 import { readTestDiagnostic } from '@/lib/payment/garanti/diagnostics'
 import { testHandoffUnsubmitted } from '@/lib/payment/garanti/order'
 
-export default async function PaymentResult({ orderId, failure = false }: { orderId?: string; failure?: boolean }) {
+export default async function PaymentResult({ orderId, failure = false, failureCode }: { orderId?: string; failure?: boolean; failureCode?: string }) {
   // URL flags (success=true, status=paid, etc.) are deliberately ignored.
   let order: Awaited<ReturnType<typeof readAccessiblePaymentOrder>> = null
   try { if (orderId) order = await readAccessiblePaymentOrder(orderId) } catch { /* unavailable DB grants no access */ }
@@ -45,11 +45,16 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
                 : 'Bu ekranda bir sipariş seçilmedi. Siparişi oluşturan TEST hesabıyla hesabınızdaki sipariş sonucunu açın; burada banka kaydının varlığına ilişkin bir sonuç çıkarılmıyor.'
   const query = diagnostic?.query_evidence
   const checked = (value: boolean | null | undefined) => value === true ? 'doğrulandı' : value === false ? 'eşleşmedi' : 'kontrol edilmedi'
+  const safeFailureCode = failureCode && /^GARANTI_[A-Z0-9_]{1,96}$/.test(failureCode) ? failureCode : null
+  const failureCopy = safeFailureCode?.startsWith('GARANTI_FAILURE_RETURN_')
+    ? 'Garanti’nin başarısızlık dönüşü alındı, ancak imzası doğrulanmadı. Banka sonucu ve tahsilat durumu bu bildirime dayanarak kesinleştirilemez.'
+    : 'Garanti dönüşü doğrulanamadı. Sipariş pending kalır; tahsilat ihtimali netleşmeden tekrar ödeme başlatmayın.'
   const paid = order?.status === 'paid'
   return <main className="min-h-screen bg-nrs-canvas px-6 pb-16 pt-[calc(var(--nrs-header-height)+3rem)]">
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-serif text-3xl">{paid ? (observation ? 'TEST — Sipariş paid' : 'Ödeme doğrulandı') : observation ? testTitle : liveObservation ? 'Canlı deneme — incelemede' : order?.status === 'failed' || failure ? 'Ödeme tamamlanamadı' : 'Ödeme durumu doğrulanıyor'}</h1>
-      <p className="text-sm leading-7 text-nrs-ink/65">{paid ? (observation ? 'Test veritabanında sipariş paid olarak kayıtlı. Bu durum, tek başına tarayıcı uçtan uca testinin tamamlandığını göstermez.' : 'Siparişinizin ödeme sonucu sunucu tarafından doğrulandı.') : observation ? testMessage : liveObservation ? 'Bu kontrollü canlı gözlem siparişi otomatik olarak paid yapmaz. Garanti dönüş imzası ve bağımsız orderinq sonucu sunucu kayıtlarında incelenir. Kartınızdan çekim olmuş olabilir; durumu netleştirmeden yeni ödeme başlatmayın.' : 'Bu ekran tek başına ödeme veya kesin sipariş onayı değildir. Kartınızdan çekim gerçekleşip gerçekleşmediğini bankanızdan kontrol edin. Durum netleşmeden yeniden ödeme yapmayın; bizimle iletişime geçebilirsiniz.'}</p>
+      <h1 className="font-serif text-3xl">{paid ? (observation ? 'TEST — Sipariş paid' : 'Ödeme doğrulandı') : observation ? testTitle : liveObservation ? (failure ? 'Canlı deneme — banka dönüşü doğrulanmadı' : 'Canlı deneme — incelemede') : order?.status === 'failed' || failure ? 'Ödeme tamamlanamadı' : 'Ödeme durumu doğrulanıyor'}</h1>
+      <p className="text-sm leading-7 text-nrs-ink/65">{paid ? (observation ? 'Test veritabanında sipariş paid olarak kayıtlı. Bu durum, tek başına tarayıcı uçtan uca testinin tamamlandığını göstermez.' : 'Siparişinizin ödeme sonucu sunucu tarafından doğrulandı.') : observation ? testMessage : liveObservation ? (failure ? failureCopy : 'Bu kontrollü canlı gözlem siparişi otomatik olarak paid yapmaz. Garanti dönüş imzası ve bağımsız orderinq sonucu sunucu kayıtlarında incelenir. Kartınızdan çekim olmuş olabilir; durumu netleştirmeden yeni ödeme başlatmayın.') : 'Bu ekran tek başına ödeme veya kesin sipariş onayı değildir. Kartınızdan çekim gerçekleşip gerçekleşmediğini bankanızdan kontrol edin. Durum netleşmeden yeniden ödeme yapmayın; bizimle iletişime geçebilirsiniz.'}</p>
+      {liveObservation && failure && safeFailureCode && <p role="status" className="border border-nrs-ink/15 p-4 text-sm">Güvenli hata kodu: <code>{safeFailureCode}</code></p>}
       {observation && !paid && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Test gözlem modu: otomatik sipariş onayı kapalı. Banka kontrolleri geçse bile sipariş pending kalır; bu test politikası bir doğrulama hatası değildir. Bu mod siparişi ödenmiş olarak işaretlemez.</p>}
       {liveObservation && !paid && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Kontrollü Production gözlem modu: banka sonucu belirsiz veya eşleştirmeleri henüz teyit edilmemiş olsa bile sipariş pending kalır. İmza ya da işlem eşleşmesi geçmezse de sipariş otomatik paid yapılmaz. Durum doğrulanmadan yeniden ödeme başlatmayın.</p>}
       {observation && paid && !diagnostic && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Bu sipariş için dönüş tanı kaydı bulunmuyor; imza ve banka sorgusu kanıtları bu ekranda gösterilemiyor.</p>}

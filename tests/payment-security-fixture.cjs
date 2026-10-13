@@ -44,7 +44,7 @@ $$;
  ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
  CREATE TABLE public.profiles(id uuid PRIMARY KEY,first_name text,last_name text,phone text,email text);
  CREATE TABLE public.wishlist(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL,product_id text NOT NULL);
- CREATE TABLE public.orders(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,total_amount numeric NOT NULL,status text DEFAULT 'pending' CHECK(status IN('pending','payment_pending','paid','processing','shipped','delivered','cancelled','refunded')),customer_name text,customer_email text,customer_phone text,shipping_address text,shipping_city text,shipping_district text,shipping_postal_code text,created_at timestamptz NOT NULL DEFAULT now());
+ CREATE TABLE public.orders(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,total_amount numeric NOT NULL,status text DEFAULT 'pending' CHECK(status IN('pending','payment_pending','paid','processing','shipped','delivered','cancelled','refunded')),customer_name text,customer_email text,customer_phone text,shipping_address text,shipping_city text,shipping_district text,shipping_postal_code text,manual_request_key uuid,manual_paid_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
  CREATE TABLE public.order_items(id uuid primary key default gen_random_uuid(),order_id uuid NOT NULL references public.orders(id),product_id text NOT NULL,quantity integer NOT NULL,price_at_purchase numeric NOT NULL);
  CREATE TABLE public.products(id text primary key,name text NOT NULL,description text,price_amount numeric NOT NULL,compare_at_price numeric,currency text NOT NULL,status text NOT NULL,in_stock boolean NOT NULL);
  CREATE TABLE public.product_variants(id uuid PRIMARY KEY,product_id text REFERENCES public.products(id),size text,stock_quantity integer NOT NULL CHECK(stock_quantity>=0),is_active boolean NOT NULL);
@@ -60,6 +60,7 @@ $$;
  if(hooks.afterOrder) await hooks.afterOrder(db);
  for(const f of ['20261008120000_order_legal_records.sql','20261008130000_payment_order_transactions.sql','20261009130000_payment_transaction_hardening.sql']) await db.exec(read('supabase/migrations/'+f));
  if(applyFix) await db.exec(read(correction));
+ if(applyFix) await db.exec(read('supabase/migrations/20261013120000_customer_payment_cancellation.sql'));
  await db.exec('update public.admin_users set is_active=true');
 }
 function historicalRecord(id,snapshot) {
