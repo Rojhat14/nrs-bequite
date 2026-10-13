@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { isIP } from 'node:net'
 import type { PaymentProvider, PaymentOrder, VerifiedPayment } from '@/lib/payment/types'
 import { UUID } from '@/lib/payment/request'
-import { garantiConfig, type GarantiConfig } from './config'
+import { controlledLiveAccountAllowed, garantiConfig, type GarantiConfig } from './config'
 import { loadGarantiOrder } from './order'
 import { testQueryEvidence, type TestQueryEvidence } from './query-evidence'
 import { bankFields, initiationHash, equalHex, isoBytes, ReturnSignatureError, parseReturn, verifyReturnHash, queryXml, parseQuery, scalar } from './protocol'
@@ -131,6 +131,56 @@ export class GarantiProvider implements PaymentProvider {
     const { http, q } = await this.inquire(order, ip)
     const evidence = testQueryEvidence(this.config, order, q, http, authCode)
     console.info(JSON.stringify({ event: 'garanti_test_orderinq', ...evidence }))
+    return evidence
+  }
+  // Authenticated, fixed-order diagnostics may inspect a Production inquiry,
+  // but never create a sale, write the order, or call the finalize RPC.
+  async readOnlyOrderInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string) {
+    const c = this.config
+    if (!c.liveObservationOnly || c.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)
+      || order.userId !== userId || order.state !== 'pending') throw new Error('Live read-only inquiry is not authorized.')
+    if (c.queryUser !== 'PROVAUT' || c.queryAgentUserId !== 'PROVAUT') throw new Error('Live query identity configuration mismatch.')
+    if (!order.redirectUrl) throw new Error('Submitted handoff is required.')
+    const redirect = new URL(order.redirectUrl)
+    const token = redirect.searchParams.get('token')
+    if (redirect.origin !== c.siteOrigin || redirect.pathname !== '/api/payment/garanti/handoff'
+      || redirect.searchParams.get('used') !== '1' || !token) throw new Error('Submitted handoff is required.')
+    const handoff = this.handoff(token, true)
+    if (handoff.id !== order.id) throw new Error('Handoff order mismatch.')
+
+    const { http, q } = await this.inquire(order, handoff.ip)
+    const safeCode = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : null
+    const response = q.Transaction?.Response
+    const result = q.Order?.OrderInqResult
+    const mode = safeCode(q.Mode)
+    const echo = q.Terminal
+    const evidence = {
+      order_id: order.id,
+      http,
+      request_mode: 'PROD',
+      request_terminal_matches_config: true,
+      request_prov_user_matches_expected: c.queryUser === 'PROVAUT',
+      request_agent_user_matches_expected: c.queryAgentUserId === 'PROVAUT',
+      response_mode_match: mode === null ? null : mode === 'PROD',
+      response_prov_user_match: typeof echo?.ProvUserID === 'string' ? echo.ProvUserID === c.queryUser : null,
+      response_agent_user_match: typeof echo?.UserID === 'string' ? echo.UserID === c.queryAgentUserId : null,
+      response_terminal_match: typeof echo?.ID === 'string' ? echo.ID === c.terminalId : null,
+      response_merchant_match: typeof echo?.MerchantID === 'string' ? echo.MerchantID === c.merchantId : null,
+      response_order_match: typeof q.Order?.OrderID === 'string' ? q.Order.OrderID === order.merchantReference : null,
+      transaction_code: safeCode(response?.Code),
+      transaction_reason_code: safeCode(response?.ReasonCode),
+      order_result_code: safeCode(result?.Code),
+      order_result_reason_code: safeCode(result?.ReasonCode),
+      status: safeCode(result?.Status),
+      charge_type: safeCode(result?.ChargeType),
+      auth_amount_match: typeof result?.AuthAmount === 'string' ? result.AuthAmount === String(order.amountMinor) : null,
+      auth_code_present: typeof result?.AuthCode === 'string' && result.AuthCode.length > 0,
+      bank_reference_present: typeof result?.RetrefNum === 'string' && result.RetrefNum.length > 0,
+      database_changed: false,
+      sale_started: false,
+      finalize_called: false,
+    }
+    console.info(JSON.stringify({ event: 'garanti_live_read_only_orderinq', ...evidence }))
     return evidence
   }
   private async observeLiveQuery(order: PaymentOrder, ip: string, authCode: string | undefined, signedReturnVerified: boolean): Promise<never> {

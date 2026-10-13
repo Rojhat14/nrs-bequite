@@ -126,6 +126,56 @@ test('Isolated live observation keeps bank-confirmation flags false, verifies th
  assert.equal(logs[1].status,'CAPTURED');assert.equal(logs[1].result_code,'00');
  const serialized=JSON.stringify(logs);for(const secret of ['synthetic-live-password','synthetic-live-query-password','synthetic-live-store-key','123456','987654','authcode'])assert.equal(serialized.includes(secret),false);
 });
+test('Private live orderinq uses the PROVAUT query password/hash and performs no settlement operation',async()=>{
+ const allowed='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const live={...env,GARANTI_MODE:'PROD',VERCEL_ENV:'production',NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',
+  GARANTI_SITE_ORIGIN:'https://nrsbequiteluminous.com',GARANTI_SUCCESS_URL:'https://nrsbequiteluminous.com/api/payment/garanti/success',
+  GARANTI_ERROR_URL:'https://nrsbequiteluminous.com/api/payment/garanti/failure',GARANTI_LIVE_CONTROLLED_ONLY:'true',
+  GARANTI_LIVE_OBSERVATION_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,GARANTI_LIVE_MAX_AMOUNT_MINOR:'1000',
+  GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',
+  GARANTI_LIVE_PROVISION_USER:'PROVAUT',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-provision',
+  GARANTI_LIVE_QUERY_USER:'PROVAUT',GARANTI_LIVE_QUERY_AGENT_USER_ID:'PROVAUT',GARANTI_LIVE_QUERY_PASSWORD:'synthetic-query',
+  GARANTI_LIVE_STORE_KEY:'synthetic-store',GARANTI_LIVE_FORM_URL:'https://sanalposprov.garanti.com.tr/servlet/gt3dengine',
+  GARANTI_LIVE_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet',GARANTI_CAPTURED_STATUS:'',
+  GARANTI_CAPTURED_RESULT_CODE:'',GARANTI_SALE_CHARGE_TYPE:'',GARANTI_FINAL_FAILED_STATUSES:''};
+ const config=garantiConfig(live), liveOrder={...order,userId:allowed,state:'pending',redirectUrl:null};let calls=0;
+ const provider=new GarantiProvider(config,async()=>liveOrder,async(url,options)=>{
+  calls++;assert.equal(url,'https://sanalposprov.garanti.com.tr/VPServlet');
+  const xml=Buffer.from(options.body).toString('latin1');
+  assert.match(xml,/<Mode>PROD<\/Mode>/);assert.match(xml,/<ProvUserID>PROVAUT<\/ProvUserID>/);
+  assert.match(xml,/<UserID>PROVAUT<\/UserID>/);assert.match(xml,/<ID>12345678<\/ID>/);
+  assert.match(xml,/<Type>orderinq<\/Type>/);assert.doesNotMatch(xml,/<Type>sales<\/Type>|CardNumber|CVV2/);
+  const pass=protocol.bankHash('sha1','synthetic-query'+'012345678');
+  const expected=protocol.bankHash('sha512',id+'12345678'+'12345'+'949'+pass);
+  assert.match(xml,new RegExp(`<HashData>${expected}<\\/HashData>`));
+  return new Response(`<GVPSResponse><Mode>PROD</Mode><Terminal><ProvUserID>PROVAUT</ProvUserID><UserID>PROVAUT</UserID><ID>12345678</ID><MerchantID>1000001</MerchantID></Terminal><Order><OrderID>${id}</OrderID><OrderInqResult><Code>00</Code><Status>APPROVED</Status><ChargeType>S</ChargeType><AuthAmount>12345</AuthAmount><AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum></OrderInqResult></Order><Transaction><Response><Code>00</Code><ReasonCode>00</ReasonCode></Response></Transaction></GVPSResponse>`,{headers:{'content-type':'text/xml;charset=utf-8'}});
+ });
+ const signedUrl=new URL((await provider.initiate({...liveOrder,state:'initiating'},id,{customerIp:'127.0.0.1'})).redirectUrl);
+ liveOrder.redirectUrl=signedUrl.toString()+'&used=1';
+ const previous={GARANTI_MODE:process.env.GARANTI_MODE,VERCEL_ENV:process.env.VERCEL_ENV,GARANTI_LIVE_CONTROLLED_ONLY:process.env.GARANTI_LIVE_CONTROLLED_ONLY,
+  GARANTI_LIVE_ALLOWED_USER_ID:process.env.GARANTI_LIVE_ALLOWED_USER_ID,NEXT_PUBLIC_SUPABASE_URL:process.env.NEXT_PUBLIC_SUPABASE_URL};
+ Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,
+  NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co'});
+ let evidence;
+ try { evidence=await provider.readOnlyOrderInquiry(liveOrder,allowed); }
+ finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
+ assert.equal(calls,1);assert.equal(evidence.response_prov_user_match,true);assert.equal(evidence.response_agent_user_match,true);
+ assert.equal(evidence.response_terminal_match,true);assert.equal(evidence.response_order_match,true);
+ assert.equal(evidence.transaction_code,'00');assert.equal(evidence.transaction_reason_code,'00');assert.equal(evidence.auth_amount_match,true);
+ assert.equal(evidence.database_changed,false);assert.equal(evidence.sale_started,false);assert.equal(evidence.finalize_called,false);
+ Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,
+  NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co'});
+ try { await assert.rejects(provider.readOnlyOrderInquiry({...liveOrder,userId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'},allowed)); }
+ finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
+ assert.equal(calls,1);
+ const otherQuery=garantiConfig({...live,GARANTI_LIVE_QUERY_AGENT_USER_ID:'PROVOOS'});
+ const mismatch=new GarantiProvider(otherQuery,async()=>liveOrder,async()=>{calls++;throw Error('must not query')});
+ Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,
+  NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co'});
+ try { await assert.rejects(mismatch.readOnlyOrderInquiry(liveOrder,allowed),/identity configuration mismatch/); }
+ finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
+ assert.equal(calls,1);
+});
 test('ISO-8859-9 hash encoding uses Turkish bytes and rejects replacement characters',()=>{
  assert.deepEqual([...protocol.isoBytes('ĞİŞğış')],[208,221,222,240,253,254]);
  assert.throws(()=>protocol.isoBytes('😀'));assert.throws(()=>protocol.isoBytes('Ð'));
