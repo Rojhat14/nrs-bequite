@@ -193,20 +193,19 @@ değerlerinden varsayılmaz. Bankadan Production başarılı/ret/iptal yanıtlar
 Kontrollü tek-hesap canlı denemesi `GARANTI_SANDBOX_PASSED` değerini doldurmaz;
 ret/iptal testleri eksiktir, bu yüzden geniş müşteri açılımı yapılmaz.
 
-## Son doğrulama sonucu
+## Son doğrulama sonucu — 13 Ekim 2026
 
-- Yerel: 107 hedefli test başarılı (15 Garanti testi ve 92 mevcut regresyon testi);
-  lint ve production build başarılı. Garanti POST dönüş/geçişleri dahil 22 yerel
-  production HTTP kontrolü başarılı. Yeni kapalı Garanti endpoint'leri 503 döndü.
-- Resmî banka TEST: yalnızca var olmayan siparişin salt okunur sorgusu çalıştırıldı;
-  HTTP 200 / 0110. Tam 3DS tahsilat/ret/iptal senaryoları doğrulanmış sayılmaz.
-- Canlı: Vercel nrs-bequite Production değişken adları kontrolünde GARANTI_*
-  alanı ve PAYMENT_PROVIDER yok. PAYMENT_ENABLED ve PAYMENT_DATABASE_VERIFIED
-  adları mevcut; gizli değerler okunup raporlanmadı. Canlı ödeme API'leri 503,
-  ürün/checkout ve sözleşme sayfaları 200; WhatsApp ve banka onayı açıklaması mevcut.
-- Kod Production'a deploy edilmedi; yeni dönüş URL'leri henüz canlı doğrulanmadı.
-  Ödeme bayrakları veya database verileri değiştirilmedi; commit/push/deploy yok.
-  İlgisiz yerel dosyalar ve stash yedeklerine dokunulmadı.
+- 59 hedefli Garanti/ödeme testi, lint ve Production build geçti.
+- Commit `a875920` `main`'e fast-forward edilip pushlandı. Vercel `6UyrqhcSDLZpxNiAN2jfexUSTaSz`
+  deployment'ı Ready/Production; `https://nrsbequiteluminous.com/checkout` HTTP 200.
+- `POST /api/payment/quote` güvenli, oturumsuz kontrolü HTTP 503 döndürdü; canlı
+  ödeme şu anda kullanılamıyor. Sipariş, banka isteği veya ödeme başlatılmadı.
+- Bu yayında Production Supabase migration/RPC doğrulaması veya DB değişikliği
+  yapılmadı. `supabase/test-setup/` altındaki TEST SQL'leri Production'a uygulanmadı.
+- Gerçek TEST ret/3DS iptali tamamlanmadı. Canlı kullanım için banka sorgu alanı
+  teyidi, mapping'ler, Production DB doğrulaması, Garanti canlı izinleri ve Vercel
+  sunucu değişkenleri bekleniyor. Tek-hesap/tutar sınırı kodda zorunlu; müşteri
+  geneline açık bir ödeme yolu yok.
 
 ## İzole HTTPS kurulum yayını — 12 Ekim 2026
 
