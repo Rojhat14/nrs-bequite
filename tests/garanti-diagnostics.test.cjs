@@ -198,3 +198,21 @@ test('Controlled Production callback diagnostic records safe signature shape and
  for(const value of [c.storeKey,c.provisionPassword,'private@example.com','synthetic',id,attempt,'Authentication failed','Card expired','4111111111111111','999']) assert.equal(safe.includes(value),false);
  assert.throws(()=>api.diagnoseLiveReturn({...f.provider,config:{...f.provider.config,liveObservationOnly:false}},f.body(),headers,null),/not enabled/);
 });
+test('Controlled live failure diagnostic records bounded result codes as untrusted and distinguishes absent from empty signature fields',()=>{
+ const f=fixture(),api=f.load('src/lib/payment/garanti/diagnostics.ts');f.provider.config.liveObservationOnly=true;f.provider.config.mode='PROD';
+ const raw=f.body({response:'Declined',procreturncode:'05',mdstatus:'0'},false)
+  .replace(/(?:^|&)hashparams=[^&]*/,'').replace(/(?:^|&)hash=[^&]*/,'');
+ const absent=api.diagnoseLiveReturn(f.provider,raw,headers,'GARANTI_FAILURE_RETURN_SIGNATURE_HASHPARAMS_INVALID','failure');
+ assert.equal(absent.validation_stage,'parsed');assert.equal(absent.signature_verified,false);
+ assert.equal(absent.hash_field_state,'missing');assert.equal(absent.hashparams_field_state,'missing');
+ assert.equal(absent.failure_notice_classification,'failure_callback_signature_material_absent_or_empty_unverified');
+ assert.equal(absent.reported_response,'declined');assert.equal(absent.reported_procreturncode,'05');assert.equal(absent.reported_mdstatus,'0');
+ assert.equal(absent.reported_fields_trust,'untrusted_unsigned_callback');assert.deepEqual(absent.hashparams_order,[]);
+ const empty=api.diagnoseLiveReturn(f.provider,'response=Declined&procreturncode=05&mdstatus=0&hash=&hashparams=',headers,'GARANTI_FAILURE_RETURN_SIGNATURE_HASHPARAMS_INVALID','failure');
+ assert.equal(empty.hash_field_state,'empty');assert.equal(empty.hashparams_field_state,'empty');
+ assert.equal(empty.reported_fields_trust,'untrusted_unsigned_callback');
+ const changed=api.diagnoseLiveReturn(f.provider,raw+'&response=approved',headers,'GARANTI_FAILURE_RETURN_FIELD_DUPLICATE_FIELD','failure');
+ assert.equal(changed.reported_response,null);assert.equal(changed.reported_fields_trust,'untrusted_unsigned_callback');
+ const safe=JSON.stringify([absent,empty,changed]);
+ for(const value of [c.storeKey,c.provisionPassword,'synthetic','private@example.com','Authentication failed','Card expired','4111111111111111']) assert.equal(safe.includes(value),false);
+});

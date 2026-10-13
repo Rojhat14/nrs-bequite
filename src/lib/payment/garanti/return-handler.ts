@@ -89,7 +89,7 @@ export async function garantiReturn(request: Request) {
     if (provider.config.liveObservationOnly) {
       const code = liveFailureCode(error)
       try {
-        const diagnostic = diagnoseLiveReturn(provider, raw, request.headers, code)
+        const diagnostic = diagnoseLiveReturn(provider, raw, request.headers, code, source)
         console.info(JSON.stringify({ event: 'garanti_live_return_diagnostic', source, ...diagnostic }))
       } catch {
         console.warn(JSON.stringify({ event: 'garanti_live_return_diagnostic_unavailable', source, code }))

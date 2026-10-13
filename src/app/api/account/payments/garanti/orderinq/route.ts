@@ -13,14 +13,16 @@ export const dynamic = 'force-dynamic'
 const allowedOrders = new Set([
   'fcccca17-ae6b-4940-9586-8679db7ee303',
   '90dc5d66-397f-4b91-8f70-fb4634cfdc94',
+  // Added only after the authenticated account's DB-owned order was verified.
+  '0a682ace-0eaa-43d7-bc4b-7efab1f7ee5f',
 ])
 const json = (status: number, body: Record<string, unknown>) => NextResponse.json(body, {
   status,
   headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' },
 })
 
-// Private one-account read-only query. It accepts only the two existing order
-// references; it has no cancellation, sale, or payment-finalization operation.
+// Private one-account read-only query. It accepts only the explicitly listed
+// order references; it has no cancellation, sale, or payment-finalization operation.
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return json(403, { error: 'INVALID_ORIGIN' })
   const auth = await createSupabaseServerClient()

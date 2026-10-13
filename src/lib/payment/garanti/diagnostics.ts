@@ -30,7 +30,7 @@ export function cleanBankExplanation(value?: string) {
 // Production callback diagnostics are log-only and available solely in the
 // explicitly controlled, one-account observation deployment. They never query
 // the bank, read an order, persist a body, or alter signature acceptance.
-export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, headers: Headers, rejectionCode: string | null) {
+export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, headers: Headers, rejectionCode: string | null, source: 'success' | 'failure' = 'success') {
   if (!provider.config.liveObservationOnly || !garantiLiveObservationOnly()) throw new Error('Live diagnostics are not enabled.')
   let parsed: Readonly<Record<string, string>> | null = null
   let duplicates: DuplicateReturnField[] = []
@@ -57,16 +57,37 @@ export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, heade
   const hashShape = parsed && !hashAmbiguous ? inspectHashRepresentation(field('hash')) : null
   const hashFormat = !parsed ? null : hashAmbiguous ? 'ambiguous_duplicate'
     : !field('hash') ? 'missing' : hashShape?.strict_base64 && hashShape.base64_decoded_bytes === 20 ? 'base64-28' : 'other'
+  const fieldState = (name: string): 'missing' | 'empty' | 'present' | null => !parsed ? null
+    : !Object.hasOwn(parsed, name) ? 'missing' : parsed[name] === '' ? 'empty' : 'present'
+  const safeUniqueValue = (name: string, pattern: RegExp, allowed?: Set<string>) => {
+    if (!parsed || ambiguousNames.has(name)) return null
+    const value = field(name) || ''
+    return pattern.test(value) && (!allowed || allowed.has(value.toLowerCase())) ? value.toLowerCase() : null
+  }
+  const hashState = fieldState('hash')
+  const hashparamsState = fieldState('hashparams')
+  const response = safeUniqueValue('response', /^[a-z]{1,16}$/i, new Set(['approved', 'declined', 'error', 'failed']))
+  const procreturncode = safeUniqueValue('procreturncode', /^\d{2}$/)
+  const mdstatus = safeUniqueValue('mdstatus', /^\d$/)
+  const signatureVerified = !!signature && !duplicates.length && signature.result === 'verified'
+  const failureNoticeClassification = !parsed ? 'callback_parse_rejected'
+    : source !== 'failure' ? null
+    : signatureVerified ? 'failure_callback_signature_verified'
+    : hashState !== 'present' && hashparamsState !== 'present' ? 'failure_callback_signature_material_absent_or_empty_unverified'
+    : hashState !== 'present' || hashparamsState !== 'present' ? 'failure_callback_signature_material_incomplete_unverified'
+    : 'failure_callback_signature_material_present_but_unverified'
   const diagnostic = {
     rejection_code: rejectionCode,
     validation_stage: rejectionCode?.endsWith('_FIELD_DUPLICATE_FIELD') ? 'duplicate_field' : parseStage,
-    signature_verified: !!signature && !duplicates.length && signature.result === 'verified',
+    signature_verified: signatureVerified,
     signature_result: ambiguous ? 'not_evaluated_ambiguous_duplicate' : signature?.result || 'not_evaluated',
     algorithm: signature?.algorithm || 'sha1',
     encoding: signature?.encoding || 'iso-8859-9',
     form_charset: signature?.form_charset || null,
     store_key_transform: 'none',
     hash_format: hashFormat,
+    hash_field_state: hashState,
+    hashparams_field_state: hashparamsState,
     hash_character_length: hashShape?.character_length ?? null,
     hash_strict_hex: hashShape?.strict_hex ?? null,
     hash_strict_base64: hashShape?.strict_base64 ?? null,
@@ -76,6 +97,11 @@ export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, heade
     missing_fields: parsed && !fieldsAmbiguous ? rawHashparams.filter(name => !Object.hasOwn(parsed!, name)).slice(0, 64).map(safeReturnFieldName) : null,
     empty_fields: parsed && !fieldsAmbiguous ? rawHashparams.filter(name => parsed![name] === '').slice(0, 64).map(safeReturnFieldName) : null,
     duplicate_fields: duplicates,
+    failure_notice_classification: failureNoticeClassification,
+    reported_response: source === 'failure' ? response : null,
+    reported_procreturncode: source === 'failure' ? procreturncode : null,
+    reported_mdstatus: source === 'failure' ? mdstatus : null,
+    reported_fields_trust: source === 'failure' ? signatureVerified ? 'signature_verified' : 'untrusted_unsigned_callback' : null,
     observation_only: true,
     finalize_called: false,
   }
