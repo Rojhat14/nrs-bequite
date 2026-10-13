@@ -42,9 +42,13 @@ export type DuplicateReturnField = { name: string; count: number; values: 'same'
 // Only published/known bank field names are retained. Arbitrary public-input
 // names can themselves contain secrets, so unknown names are redacted.
 const diagnosticNames = new Set(('mdstatus mderrormessage errmsg clientid oid response procreturncode successurl txninstallmentcount refreshtime orderid txntype terminalmerchantid txnamount txntimestamp terminaluserid mode txncurrencycode secure3dhash apiversion companyname errorurl secure3dsecuritylevel customeremailaddress customeripaddress terminalid terminalprovuserid lang authcode cavv eci md rnd hash hashparams hashparamsval cardholdername cardnumber cardexpiredatemonth cardexpiredateyear cardcvv2').split(' '))
+export const safeReturnFieldName = (name: string) => diagnosticNames.has(name) ? name : 'unrecognized'
 export function parseReturn(raw: string, headers: Headers, options: {
   allowIdenticalDuplicates?: boolean
   onDuplicates?: (summary: DuplicateReturnField[]) => void
+  // Diagnostic-only observer: receives parsed scalars transiently before the
+  // strict duplicate rejection below; callers must never persist these values.
+  onFields?: (fields: Readonly<Record<string, string>>) => void
 } = {}) {
   if (!headers.get('content-type')?.toLowerCase().startsWith('application/x-www-form-urlencoded')) throw new GarantiReturnParseError('content_type')
   if (raw.length > 65536) throw new GarantiReturnParseError('size')
@@ -79,8 +83,9 @@ export function parseReturn(raw: string, headers: Headers, options: {
     fields[name] = value
   }
   const summary: DuplicateReturnField[] = Array.from(repeats, ([name, r]): DuplicateReturnField => ({
-    name: diagnosticNames.has(name) ? name : 'unrecognized', count: r.count, values: r.same ? 'same' : 'different',
+    name: safeReturnFieldName(name), count: r.count, values: r.same ? 'same' : 'different',
   })).slice(0, 64)
+  options.onFields?.(fields)
   options.onDuplicates?.(summary)
   // No first/last selection: accepting repetitions requires equality of EVERY
   // decoded value. Hash verification and order checks use the same scalar map.
@@ -118,12 +123,11 @@ export function inspectReturnSignature(c: GarantiConfig, f: Record<string, strin
   const required = ['clientid', 'oid', 'authcode', 'procreturncode', 'response', 'mdstatus', 'cavv', 'eci', 'md', 'rnd']
   const charset = /charset\s*=\s*["']?([^;"' ]+)/i.exec(headers?.get('content-type') || '')?.[1]?.toLowerCase()
   const formCharset = !charset ? 'unspecified' : charset === 'utf-8' || charset === 'iso-8859-9' || charset === 'windows-1254' ? charset : 'unsupported'
-  const safeName = (name: string) => diagnosticNames.has(name) ? name : 'unrecognized'
   const d: ReturnSignatureEvidence = { result: 'hashparams_invalid', algorithm: 'sha1', encoding: 'iso-8859-9', store_key_transform: 'none',
     form_charset: formCharset, hash_format: !f.hash ? 'missing' : inspectHashRepresentation(f.hash).strict_base64 && inspectHashRepresentation(f.hash).base64_decoded_bytes === 20 ? 'base64-28' : 'other',
-    hashparams_order: names.slice(0, 64).map(safeName), documented_order: names.join(':') === required.join(':'),
-    missing_fields: names.filter(n => !Object.hasOwn(f, n)).slice(0, 64).map(safeName),
-    empty_fields: names.filter(n => f[n] === '').slice(0, 64).map(safeName), hashparamsval_matches_rebuilt: null,
+    hashparams_order: names.slice(0, 64).map(safeReturnFieldName), documented_order: names.join(':') === required.join(':'),
+    missing_fields: names.filter(n => !Object.hasOwn(f, n)).slice(0, 64).map(safeReturnFieldName),
+    empty_fields: names.filter(n => f[n] === '').slice(0, 64).map(safeReturnFieldName), hashparamsval_matches_rebuilt: null,
     hash_shape: inspectHashRepresentation(f.hash) }
   if (names.length < required.length || new Set(names).size !== names.length || !required.every(n => names.includes(n))
     || !names.every(n => /^[a-zA-Z0-9_]{1,64}$/.test(n) && (f[n] === undefined || typeof f[n] === 'string'))) return d

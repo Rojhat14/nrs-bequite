@@ -5,7 +5,7 @@ const c={observationOnly:true,mode:'TEST',merchantId:'1000001',terminalId:'12345
 const order={id,merchantReference:id,amountMinor:100,currency:'TRY',state:'pending',legal:{order_summary:{buyer:{email:'private@example.com'}}}};
 const headers=new Headers({'content-type':'application/x-www-form-urlencoded;charset=utf-8'});
 function fixture(){let saved;const db={from(){return{select(){return this},eq(){return this},async single(){return{data:{idempotency_key:attempt},error:null}},async upsert(row){saved=row;return{error:null}}}}};
- const load=loader({'./config':{garantiObservationOnly:()=>true},'./order':{loadGarantiOrder:async()=>order},'@/lib/payment/repository':{paymentDatabase:()=>db,createPaymentRepository:()=>{throw Error('Settlement forbidden')}}});
+ const load=loader({'./config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>true},'./order':{loadGarantiOrder:async()=>order},'@/lib/payment/repository':{paymentDatabase:()=>db,createPaymentRepository:()=>{throw Error('Settlement forbidden')}}});
  const protocol=load('src/lib/payment/garanti/protocol.ts'),{GarantiProvider}=load('src/lib/payment/garanti/adapter.ts');
  const provider=new GarantiProvider(c,async()=>order,async()=>{throw Error('No capture')});
  function body(changes={},signed=true){const f={...protocol.bankFields(c,order,'192.168.0.1'),clientid:c.terminalId,oid:id,authcode:'synthetic',mdstatus:'0',response:'Declined',procreturncode:'05',cavv:'synthetic',eci:'synthetic',md:'synthetic',rnd:'synthetic',mderrormessage:'Authentication failed',errmsg:'Card expired',...changes};
@@ -41,7 +41,7 @@ test('TEST return handler saves safe diagnostics before redirect and never final
 test('Result screen separates signed failure, untrusted failure and pending verification; no paid or consumed-link retry',async()=>{
  const {renderToStaticMarkup}=require('react-dom/server');
  for(const [outcome,title] of [['verified_failure','TEST — Banka işlemi başarısız'],['unverified_failure','TEST — Başarısızlık dönüşü, sonuç doğrulanamadı'],['verification_pending','TEST — Banka dönüşü doğrulandı'],['unverified','TEST — Sonuç doğrulanamadı']]){
- const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-12T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
+ const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-12T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>({outcome,association:outcome==='unverified_failure'?'claimed':'verified',signature_verified:true,mdstatus:'0',response:'declined',procreturncode:'05',mderrormessage:'',errmsg:''})},
  '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes(title));assert.equal(html.includes('Ödeme doğrulandı'),false);assert.equal(html.includes('/api/payment/garanti/renew'),false);
@@ -111,7 +111,7 @@ test('Verified single-finalize callback reuses its exact orderinq evidence witho
 test('Result screen shows observation policy separately from query errors or missing evidence',async()=>{
  const {renderToStaticMarkup}=require('react-dom/server');
  for(const [stage,title] of [['matched','TEST — Banka dönüşü ve sorgu eşleşti'],['mismatch','TEST — Banka sorgusu eşleşmedi'],['unavailable','TEST — Banka dönüşü doğrulandı'],[null,'TEST — Gözlem modu']]){
-  const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
+  const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
    '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>stage?{outcome:'verification_pending',association:'verified',signature_verified:true,query_stage:stage}:null},
    '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
   const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes(title));assert.ok(html.includes('otomatik sipariş onayı kapalı'));assert.equal(html.includes('Sonuç doğrulanamadı'),false);assert.equal(html.includes('Ödeme doğrulandı'),false);
@@ -120,7 +120,7 @@ test('Result screen shows observation policy separately from query errors or mis
 
 test('Paid TEST order result takes precedence over observation copy and discloses absent return diagnostics',async()=>{
  const {renderToStaticMarkup}=require('react-dom/server');
- const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'paid',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
+ const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'paid',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
   '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const html=renderToStaticMarkup(await view({orderId:id}));
  assert.ok(html.includes('TEST — Sipariş paid'));
@@ -144,7 +144,7 @@ test('Rejected success form routes to a technical result; inaccessible order is 
  const response=await handler(new Request(c.successUrl,{method:'POST',headers,body:f.body()+'&oid='+attempt}));
  assert.equal(response.status,303);assert.equal(new URL(response.headers.get('location')).pathname,'/checkout/failure');assert.equal(f.saved().validation_stage,'duplicate_field');assert.equal(f.saved().order_id,null);
  const {renderToStaticMarkup}=require('react-dom/server');
- const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>null},'@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>{throw Error('No unauthorized read')}},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>{throw Error('No unauthorized read')}}})('src/components/payment/PaymentResult.tsx').default;
+ const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>null},'@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>{throw Error('No unauthorized read')}},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>{throw Error('No unauthorized read')}}})('src/components/payment/PaymentResult.tsx').default;
  const technical=renderToStaticMarkup(await view({failure:true}));assert.ok(technical.includes('TEST — Banka dönüşü ilişkilendirilemedi'));assert.ok(technical.includes('teknik dönüş sorunu'));
  const denied=renderToStaticMarkup(await view({orderId:id}));assert.ok(denied.includes('TEST — Sipariş erişimi doğrulanamadı'));assert.equal(denied.includes('banka dönüş kaydı henüz bulunmuyor'),false);assert.equal(denied.includes('Ödeme doğrulandı'),false);
 });
@@ -174,4 +174,27 @@ test('Safe signature evidence separates missing fields, bad hash shape and misma
  assert.equal(f.saved().return_signature_evidence.algorithm,'sha1');assert.equal(f.saved().return_signature_evidence.encoding,'iso-8859-9');
  const stored=JSON.stringify(f.saved().return_signature_evidence);for(const value of [c.storeKey,c.provisionPassword,'invalid',id,'private@example.com'])assert.equal(stored.includes('"'+value+'"'),false);
  const good=await api.diagnoseTestReturn(f.provider,f.body({mdstatus:'1',response:'Approved',procreturncode:'00'}),headers,'success');assert.equal(good.return_signature_evidence.result,'verified');
+});
+
+test('Controlled Production callback diagnostic records safe signature shape and duplicate summaries only',()=>{
+ const f=fixture(),api=f.load('src/lib/payment/garanti/diagnostics.ts');f.provider.config.liveObservationOnly=true;f.provider.config.mode='PROD';
+ const malformed=api.diagnoseLiveReturn(f.provider,f.body({},false),headers,'GARANTI_SUCCESS_RETURN_SIGNATURE_HASH_FORMAT_INVALID');
+ assert.equal(malformed.rejection_code,'GARANTI_SUCCESS_RETURN_SIGNATURE_HASH_FORMAT_INVALID');assert.equal(malformed.signature_verified,false);
+ assert.equal(malformed.signature_result,'hash_format_invalid');assert.equal(malformed.hash_format,'other');
+ assert.equal(malformed.hash_character_length,7);assert.equal(malformed.hash_strict_hex,false);assert.equal(malformed.hash_strict_base64,false);assert.equal(malformed.hash_decoded_bytes,null);
+ assert.deepEqual(malformed.hashparams_order,['clientid','oid','authcode','procreturncode','response','mdstatus','cavv','eci','md','rnd']);
+ assert.deepEqual(malformed.missing_fields,[]);assert.deepEqual(malformed.empty_fields,[]);
+ const duplicate='&terminalid=12345678';
+ const same=api.diagnoseLiveReturn(f.provider,f.body()+duplicate,headers,'GARANTI_SUCCESS_RETURN_FIELD_DUPLICATE_FIELD');
+ assert.equal(same.validation_stage,'duplicate_field');assert.equal(same.signature_verified,false);assert.equal(same.signature_result,'verified');
+ assert.deepEqual(same.duplicate_fields,[{name:'terminalid',count:2,values:'same'}]);
+ const different=api.diagnoseLiveReturn(f.provider,f.body()+ '&terminalid=87654321',headers,'GARANTI_SUCCESS_RETURN_FIELD_DUPLICATE_FIELD');
+ assert.equal(different.signature_result,'not_evaluated_ambiguous_duplicate');assert.equal(different.signature_verified,false);
+ assert.deepEqual(different.duplicate_fields,[{name:'terminalid',count:2,values:'different'}]);
+ const emptyRaw=f.body({cavv:'',eci:''});
+ const absent=api.diagnoseLiveReturn(f.provider,emptyRaw.replace(/&eci=[^&]*/,''),headers,null);
+ assert.deepEqual(absent.empty_fields,['cavv']);assert.deepEqual(absent.missing_fields,['eci']);
+ const safe=JSON.stringify([malformed,same,different]);
+ for(const value of [c.storeKey,c.provisionPassword,'private@example.com','synthetic',id,attempt,'Authentication failed','Card expired','4111111111111111','999']) assert.equal(safe.includes(value),false);
+ assert.throws(()=>api.diagnoseLiveReturn({...f.provider,config:{...f.provider.config,liveObservationOnly:false}},f.body(),headers,null),/not enabled/);
 });

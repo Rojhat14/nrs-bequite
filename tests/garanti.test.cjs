@@ -328,24 +328,27 @@ test('POST return handler finalizes only verified capture without any session co
  p.verifyReturn=async()=>{throw Error('bad signature')};
  assert.match((await garantiReturn(request())).headers.get('location'),/checkout\/failure/);assert.equal(finalized,1);
 });
-test('Live failure callback exposes a safe signature code instead of the generic observation result',async()=>{
+test('Live failure callback emits safe signature diagnostics while preserving observation-only handling',async()=>{
  const provider=new GarantiProvider({...c,mode:'PROD',liveObservationOnly:true,observationOnly:false});
- provider.verifyReturn=async()=>{throw new protocol.ReturnSignatureError('hash_mismatch')};let finalized=0;const warnings=[];
+ provider.verifyReturn=async()=>{throw new protocol.ReturnSignatureError('hash_mismatch')};let finalized=0;const warnings=[],infos=[];
  const mocks={
   'next/server':{NextResponse:{redirect:(url,status)=>Response.redirect(url,status)}},
   '@/lib/payment/provider':{paymentAvailable:()=>true,getPaymentProvider:()=>provider},
   '@/lib/payment/repository':{createPaymentRepository:()=>({finalizeAtomic:async()=>{finalized++}})},
   './adapter':{GarantiProvider,GarantiPending},'./protocol':protocol,
+  './diagnostics':{diagnoseLiveReturn:(_provider,_raw,_headers,code)=>({rejection_code:code,signature_verified:false,signature_result:'hash_mismatch',finalize_called:false})},
  };
  const {garantiReturn}=loader(mocks)('src/lib/payment/garanti/return-handler.ts');
- const oldWarn=console.warn;console.warn=value=>warnings.push(String(value));let response;
+ const oldWarn=console.warn,oldInfo=console.info;console.warn=value=>warnings.push(String(value));console.info=value=>infos.push(String(value));let response;
  try { response=await garantiReturn(new Request('https://shop.example/api/payment/garanti/failure',{
   method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'response=Declined&hash=redacted'})) }
- finally { console.warn=oldWarn }
+ finally { console.warn=oldWarn;console.info=oldInfo }
  const location=new URL(response.headers.get('location'));assert.equal(location.pathname,'/checkout/failure');
  assert.equal(location.searchParams.get('code'),'GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH');
  assert.equal(finalized,0);assert.deepEqual(warnings.map(v=>JSON.parse(v)),[{event:'garanti_live_return_rejected',code:'GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH'}]);
+ assert.deepEqual(infos.map(v=>JSON.parse(v)),[{event:'garanti_live_return_diagnostic',source:'failure',rejection_code:'GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH',signature_verified:false,signature_result:'hash_mismatch',finalize_called:false}]);
  assert.equal(warnings.join('').includes('Declined'),false);assert.equal(warnings.join('').includes('redacted'),false);
+ assert.equal(infos.join('').includes('Declined'),false);assert.equal(infos.join('').includes('redacted'),false);
 });
 test('Unconfigured HTTPS test setup can never activate in Production or with a live DB/service key/write flags',()=>{
  const {isGarantiTestSetup}=load('src/lib/payment/garanti/test-setup.ts');

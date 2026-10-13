@@ -1,8 +1,8 @@
 import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
-import { garantiObservationOnly } from './config'
+import { garantiLiveObservationOnly, garantiObservationOnly } from './config'
 import { GarantiProvider, type SuccessfulTestReturnEvidence } from './adapter'
-import { parseReturn, inspectReturnSignature, GarantiReturnParseError, type DuplicateReturnField, type ReturnSignatureEvidence } from './protocol'
+import { parseReturn, inspectReturnSignature, inspectHashRepresentation, safeReturnFieldName, GarantiReturnParseError, type DuplicateReturnField, type ReturnSignatureEvidence } from './protocol'
 import { loadGarantiOrder } from './order'
 import { paymentDatabase } from '@/lib/payment/repository'
 import type { TestQueryEvidence } from './query-evidence'
@@ -25,6 +25,61 @@ export function cleanBankExplanation(value?: string) {
   if (!value) return ''
   const normalized = value.normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR')
   return (explanations[normalized] || 'Açıklama gizlilik nedeniyle saklanmadı.').slice(0, 160)
+}
+
+// Production callback diagnostics are log-only and available solely in the
+// explicitly controlled, one-account observation deployment. They never query
+// the bank, read an order, persist a body, or alter signature acceptance.
+export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, headers: Headers, rejectionCode: string | null) {
+  if (!provider.config.liveObservationOnly || !garantiLiveObservationOnly()) throw new Error('Live diagnostics are not enabled.')
+  let parsed: Readonly<Record<string, string>> | null = null
+  let duplicates: DuplicateReturnField[] = []
+  let parseStage = 'parsed'
+  try {
+    parseReturn(raw, headers, { allowIdenticalDuplicates: true,
+      onDuplicates: summary => { duplicates = summary }, onFields: fields => { parsed = fields } })
+  } catch (error) {
+    parseStage = error instanceof GarantiReturnParseError ? error.code : 'parse_rejected'
+  }
+
+  const field = (name: string) => parsed?.[name]
+  const different = duplicates.filter(item => item.values === 'different')
+  const ambiguous = different.length > 0
+  const ambiguousNames = new Set(different.map(item => item.name))
+  const rawHashparams = (field('hashparams') || '').split(':').filter(Boolean)
+  const signatureNames = new Set(rawHashparams.map(safeReturnFieldName))
+  const hashAmbiguous = ambiguousNames.has('hash') || ambiguousNames.has('unrecognized')
+  const paramsAmbiguous = ambiguousNames.has('hashparams') || ambiguousNames.has('unrecognized')
+  const fieldsAmbiguous = paramsAmbiguous || Array.from(signatureNames).some(name => ambiguousNames.has(name))
+  // Never calculate a digest from first/last values when any repeated value
+  // conflicts. Shape/order metadata remains safe if those fields are unique.
+  const signature = parsed && !ambiguous ? inspectReturnSignature(provider.config, parsed as Record<string, string>, headers) : null
+  const hashShape = parsed && !hashAmbiguous ? inspectHashRepresentation(field('hash')) : null
+  const hashFormat = !parsed ? null : hashAmbiguous ? 'ambiguous_duplicate'
+    : !field('hash') ? 'missing' : hashShape?.strict_base64 && hashShape.base64_decoded_bytes === 20 ? 'base64-28' : 'other'
+  const diagnostic = {
+    rejection_code: rejectionCode,
+    validation_stage: rejectionCode?.endsWith('_FIELD_DUPLICATE_FIELD') ? 'duplicate_field' : parseStage,
+    signature_verified: !!signature && !duplicates.length && signature.result === 'verified',
+    signature_result: ambiguous ? 'not_evaluated_ambiguous_duplicate' : signature?.result || 'not_evaluated',
+    algorithm: signature?.algorithm || 'sha1',
+    encoding: signature?.encoding || 'iso-8859-9',
+    form_charset: signature?.form_charset || null,
+    store_key_transform: 'none',
+    hash_format: hashFormat,
+    hash_character_length: hashShape?.character_length ?? null,
+    hash_strict_hex: hashShape?.strict_hex ?? null,
+    hash_strict_base64: hashShape?.strict_base64 ?? null,
+    hash_decoded_bytes: hashShape ? (hashShape.strict_base64 ? hashShape.base64_decoded_bytes : hashShape.strict_hex ? hashShape.hex_decoded_bytes : null) : null,
+    hashparams_order: parsed && !paramsAmbiguous ? rawHashparams.slice(0, 64).map(safeReturnFieldName) : null,
+    documented_hashparams_order: parsed && !paramsAmbiguous ? rawHashparams.join(':') === 'clientid:oid:authcode:procreturncode:response:mdstatus:cavv:eci:md:rnd' : null,
+    missing_fields: parsed && !fieldsAmbiguous ? rawHashparams.filter(name => !Object.hasOwn(parsed!, name)).slice(0, 64).map(safeReturnFieldName) : null,
+    empty_fields: parsed && !fieldsAmbiguous ? rawHashparams.filter(name => parsed![name] === '').slice(0, 64).map(safeReturnFieldName) : null,
+    duplicate_fields: duplicates,
+    observation_only: true,
+    finalize_called: false,
+  }
+  return diagnostic
 }
 export type TestDiagnostic = {
   order_id: string | null; payment_attempt_id: string | null; source: 'success' | 'failure'

@@ -5,7 +5,7 @@ import { boundedText, unavailable } from '@/lib/payment/http'
 import { createPaymentRepository } from '@/lib/payment/repository'
 import { validateVerifiedPayment } from '@/lib/payment/service'
 import { GarantiProvider, GarantiPending } from './adapter'
-import { diagnoseTestReturn, saveTestDiagnostic } from './diagnostics'
+import { diagnoseLiveReturn, diagnoseTestReturn, saveTestDiagnostic } from './diagnostics'
 import { GarantiReturnParseError, parseReturn, ReturnSignatureError } from './protocol'
 import { loadGarantiOrder, isGarantiSingleFinalizeOrder } from './order'
 
@@ -17,6 +17,7 @@ export async function garantiReturn(request: Request) {
   const source = new URL(request.url).pathname.endsWith('/failure') ? 'failure' : 'success'
   const liveFailureCode = (error: unknown) => {
     const prefix = source === 'failure' ? 'GARANTI_FAILURE_RETURN' : 'GARANTI_SUCCESS_RETURN'
+    if (error instanceof GarantiPending) return 'GARANTI_ORDERINQ_PENDING'
     if (error instanceof ReturnSignatureError) return `${prefix}_SIGNATURE_${error.result.toUpperCase()}`
     if (error instanceof GarantiReturnParseError) return `${prefix}_FIELD_${error.code.toUpperCase()}`
     if (error instanceof Error && error.message === 'Bank return order mismatch.') return `${prefix}_ASSOCIATION_MISMATCH`
@@ -76,13 +77,24 @@ export async function garantiReturn(request: Request) {
     // observation policy. Never imply its missing reference is a missing DB row.
     return destination(reference ? `/checkout/verify?orderId=${encodeURIComponent(reference)}` : '/checkout/failure')
   }
+  let raw = ''
   try {
     // No auth session or same-origin check: the bank submits cross-site POST.
-    const verified = await provider.verifyReturn(await boundedText(request), request.headers)
+    raw = await boundedText(request)
+    const verified = await provider.verifyReturn(raw, request.headers)
     validateVerifiedPayment(verified, provider)
     await createPaymentRepository().finalizeAtomic(verified, provider.name)
     return destination(`/checkout/verify?orderId=${encodeURIComponent(verified.merchantReference)}`)
   } catch (error) {
+    if (provider.config.liveObservationOnly) {
+      const code = liveFailureCode(error)
+      try {
+        const diagnostic = diagnoseLiveReturn(provider, raw, request.headers, code)
+        console.info(JSON.stringify({ event: 'garanti_live_return_diagnostic', source, ...diagnostic }))
+      } catch {
+        console.warn(JSON.stringify({ event: 'garanti_live_return_diagnostic_unavailable', source, code }))
+      }
+    }
     if (error instanceof GarantiPending) return destination(`/checkout/verify?orderId=${encodeURIComponent(error.reference)}`)
     // Neither bad signatures nor unsigned cancellations can change DB state.
     if (provider.config.liveObservationOnly) {
