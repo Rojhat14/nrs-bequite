@@ -3,7 +3,7 @@ import { paymentDatabase } from '@/lib/payment/repository'
 import { UUID } from '@/lib/payment/request'
 import { assertFinalLegalOrderSummary } from '@/lib/legal/order-summary'
 import type { PaymentOrder } from '@/lib/payment/types'
-import { garantiSingleFinalizeTest } from './config'
+import { garantiLiveSingleFinalizeArmed, garantiSingleFinalizeTest } from './config'
 
 export interface StoredGarantiOrder extends PaymentOrder { userId: string; redirectUrl: string | null }
 // Bank returns use server credentials and a verified bank signature, not cookies.
@@ -55,6 +55,15 @@ export async function isGarantiSingleFinalizeOrder(order: StoredGarantiOrder) {
       .select('order_id').eq('project_ref', 'dzuxhwtbuojnhibzfxqy')
       .eq('site_origin', 'https://nrs-bequite-garanti-test.vercel.app')
       .eq('user_id', order.userId).eq('order_id', order.id).maybeSingle()
+    return !error && data?.order_id === order.id
+  } catch { return false }
+}
+export async function isGarantiLiveSingleFinalizeOrder(order: StoredGarantiOrder) {
+  if (order.state !== 'pending' || order.currency !== 'TRY'
+    || !garantiLiveSingleFinalizeArmed(order.userId, order.amountMinor)) return false
+  try {
+    const { data, error } = await paymentDatabase().from('garanti_live_single_finalize_allowances')
+      .select('order_id').eq('user_id', order.userId).eq('order_id', order.id).maybeSingle()
     return !error && data?.order_id === order.id
   } catch { return false }
 }

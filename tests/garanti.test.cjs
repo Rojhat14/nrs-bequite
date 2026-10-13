@@ -2,7 +2,7 @@ const test=require('node:test'), assert=require('node:assert/strict'),crypto=req
 const {loader}=require('./source-loader.cjs');
 const load=loader();
 const {GarantiProvider,GarantiPending}=load('src/lib/payment/garanti/adapter.ts');
-const {garantiConfig,controlledLiveAccountAllowed,controlledLiveAmountAllowed}=load('src/lib/payment/garanti/config.ts');
+const {garantiConfig,controlledLiveAccountAllowed,controlledLiveAmountAllowed,garantiLiveSingleFinalizeArmed}=load('src/lib/payment/garanti/config.ts');
 const {isLiveObservationProduct,LIVE_OBSERVATION_PRODUCT_ID}=load('src/lib/payment/garanti/live-observation-product.ts');
 const protocol=load('src/lib/payment/garanti/protocol.ts');
 const id='11111111-1111-4111-8111-111111111111';
@@ -18,9 +18,9 @@ const env={GARANTI_MODE:'TEST',GARANTI_OOS_VERIFIED:'true',GARANTI_SITE_ORIGIN:'
 const c=garantiConfig(env);
 const order={id,merchantReference:id,amountMinor:12345,currency:'TRY',state:'initiating',legal:{order_summary:{buyer:{email:'synthetic@example.com'}}}};
 function response(overrides={}) {
- const o={status:'CAPTURED',charge:'sales',amount:'12345',code:'00',responseCode:'00',merchant:'1000001',terminal:'12345678',mode:'TEST',reference:id,...overrides};
+ const o={status:'CAPTURED',charge:'sales',amount:'12345',code:'00',responseCode:'00',resultCode:'00',resultReasonCode:'00',merchant:'1000001',terminal:'12345678',mode:'TEST',reference:id,...overrides};
  const mode=o.omitMode?'':`<Mode>${o.mode}</Mode>`,date=o.omitAuthDate?'':`<AuthDate>${o.authDate??'20261012'}</AuthDate>`;
- return new Response(`<GVPSResponse>${mode}<Terminal><ID>${o.terminal}</ID><MerchantID>${o.merchant}</MerchantID></Terminal><Order><OrderID>${o.reference}</OrderID><OrderInqResult><Status>${o.status}</Status><ChargeType>${o.charge}</ChargeType><Code>00</Code><AuthAmount>${o.amount}</AuthAmount>${date}<AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum><InstallmentCnt>0</InstallmentCnt></OrderInqResult></Order><Transaction><Response><Code>${o.responseCode}</Code><ReasonCode>${o.code}</ReasonCode></Response></Transaction></GVPSResponse>`,{headers:{'content-type':'text/xml;charset=utf-8'}})
+ return new Response(`<GVPSResponse>${mode}<Terminal><ID>${o.terminal}</ID><MerchantID>${o.merchant}</MerchantID></Terminal><Order><OrderID>${o.reference}</OrderID><OrderInqResult><Status>${o.status}</Status><ChargeType>${o.charge}</ChargeType><Code>${o.resultCode}</Code><ReasonCode>${o.resultReasonCode}</ReasonCode><AuthAmount>${o.amount}</AuthAmount>${date}<AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum><InstallmentCnt>0</InstallmentCnt></OrderInqResult></Order><Transaction><Response><Code>${o.responseCode}</Code><ReasonCode>${o.code}</ReasonCode></Response></Transaction></GVPSResponse>`,{headers:{'content-type':'text/xml;charset=utf-8'}})
 }
 function signedReturn(changes={},config=c) {
  const f={...protocol.bankFields(config,order,'127.0.0.1'),clientid:config.terminalId,oid:id,authcode:'123456',procreturncode:'00',response:'Approved',mdstatus:'1',cavv:'synthetic',eci:'05',md:'synthetic',rnd:'synthetic',...changes};
@@ -59,6 +59,17 @@ test('Controlled live eligibility is tied to one Production auth UUID and a posi
   {GARANTI_LIVE_MAX_AMOUNT_MINOR:'50001'},{GARANTI_LIVE_MAX_AMOUNT_MINOR:'1.5'},
   {GARANTI_LIVE_MAX_AMOUNT_MINOR:'5e3'}])
   assert.equal(controlledLiveAmountAllowed(1,{...live,...changes}),false);
+});
+test('Production one-order finalization arm is exact-account, exact-3-TRY and observation-only scoped',()=>{
+ const allowed='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const armed={GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_OBSERVATION_ONLY:'true',
+  GARANTI_LIVE_ALLOWED_USER_ID:allowed,GARANTI_LIVE_MAX_AMOUNT_MINOR:'1000',NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',GARANTI_LIVE_SINGLE_FINALIZE_ARMED:'true'};
+ assert.equal(garantiLiveSingleFinalizeArmed(allowed,300,armed),true);
+ assert.equal(garantiLiveSingleFinalizeArmed(allowed,1000,armed),false);
+ assert.equal(garantiLiveSingleFinalizeArmed('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',300,armed),false);
+ for(const changes of [{GARANTI_LIVE_SINGLE_FINALIZE_ARMED:'false'},{GARANTI_LIVE_OBSERVATION_ONLY:'false'},
+  {GARANTI_LIVE_MAX_AMOUNT_MINOR:'200'},{VERCEL_ENV:'preview'},{NEXT_PUBLIC_SUPABASE_URL:'https://test-db.example'}])
+  assert.equal(garantiLiveSingleFinalizeArmed(allowed,300,{...armed,...changes}),false);
 });
 test('Live observation product is fixed to the hidden 3 TRY catalog row',()=>{
  const valid={id:LIVE_OBSERVATION_PRODUCT_ID,name:'controlled observation',description:null,price_amount:'3.00',currency:'TRY',status:'active',in_stock:true,payment_test_only:true};
@@ -122,8 +133,8 @@ test('Isolated live observation keeps bank-confirmation flags false, verifies th
  assert.equal(logs[0].terminal_match,true);assert.equal(logs[0].request_match,true);
  assert.equal(logs[1].event,'garanti_live_observation');assert.equal(logs[1].signed_return_verified,true);
  assert.equal(logs[1].order_match,true);assert.equal(logs[1].terminal_match,true);assert.equal(logs[1].amount_match,true);
- assert.equal(logs[1].mode_match,null);assert.equal(logs[1].auth_date_present,false);
- assert.equal(logs[1].status,'CAPTURED');assert.equal(logs[1].result_code,'00');
+ assert.equal(logs[1].mode_match,null);assert.equal(logs[1].auth_date_format,'missing');assert.equal(logs[1].order_result_success_codes_match,true);
+ assert.equal(logs[1].status,'CAPTURED');assert.equal(logs[1].order_result_code,'00');assert.equal(logs[1].order_result_reason_code,'00');
  const serialized=JSON.stringify(logs);for(const secret of ['synthetic-live-password','synthetic-live-query-password','synthetic-live-store-key','123456','987654','authcode'])assert.equal(serialized.includes(secret),false);
 });
 test('Private live orderinq uses the PROVAUT query password/hash and performs no settlement operation',async()=>{
@@ -148,7 +159,7 @@ test('Private live orderinq uses the PROVAUT query password/hash and performs no
   const pass=protocol.bankHash('sha1','synthetic-query'+'012345678');
   const expected=protocol.bankHash('sha512',id+'12345678'+'12345'+'949'+pass);
   assert.match(xml,new RegExp(`<HashData>${expected}<\\/HashData>`));
-  return new Response(`<GVPSResponse><Mode>PROD</Mode><Terminal><ProvUserID>PROVAUT</ProvUserID><UserID>PROVAUT</UserID><ID>12345678</ID><MerchantID>1000001</MerchantID></Terminal><Order><OrderID>${id}</OrderID><OrderInqResult><Code>00</Code><Status>APPROVED</Status><ChargeType>S</ChargeType><AuthAmount>12345</AuthAmount><AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum></OrderInqResult></Order><Transaction><Response><Code>00</Code><ReasonCode>00</ReasonCode></Response></Transaction></GVPSResponse>`,{headers:{'content-type':'text/xml;charset=utf-8'}});
+  return new Response(`<GVPSResponse><Mode>PROD</Mode><Terminal><ProvUserID>PROVAUT</ProvUserID><UserID>PROVAUT</UserID><ID>12345678</ID><MerchantID>1000001</MerchantID></Terminal><Order><OrderID>${id}</OrderID><OrderInqResult><Code>00</Code><ReasonCode>00</ReasonCode><Status>APPROVED</Status><ChargeType>S</ChargeType><AuthAmount>12345</AuthAmount><AuthDate>2026-10-13 12:34:56.789</AuthDate><AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum></OrderInqResult></Order><Transaction><Response><Code>00</Code></Response></Transaction></GVPSResponse>`,{headers:{'content-type':'text/xml;charset=utf-8'}});
  });
  const signedUrl=new URL((await provider.initiate({...liveOrder,state:'initiating'},id,{customerIp:'127.0.0.1'})).redirectUrl);
  liveOrder.redirectUrl=signedUrl.toString()+'&used=1';
@@ -156,24 +167,59 @@ test('Private live orderinq uses the PROVAUT query password/hash and performs no
   GARANTI_LIVE_ALLOWED_USER_ID:process.env.GARANTI_LIVE_ALLOWED_USER_ID,NEXT_PUBLIC_SUPABASE_URL:process.env.NEXT_PUBLIC_SUPABASE_URL};
  Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,
   NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co'});
- let evidence;
- try { evidence=await provider.readOnlyOrderInquiry(liveOrder,allowed); }
+ let evidence, mismatchEvidence;
+ try {
+  evidence=await provider.readOnlyOrderInquiry(liveOrder,allowed,'987654');
+  mismatchEvidence=await provider.readOnlyOrderInquiry(liveOrder,allowed,'000000');
+ }
  finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
- assert.equal(calls,1);assert.equal(evidence.response_prov_user_match,true);assert.equal(evidence.response_agent_user_match,true);
+ assert.equal(calls,2);assert.equal(evidence.response_prov_user_match,true);assert.equal(evidence.response_agent_user_match,true);
  assert.equal(evidence.response_terminal_match,true);assert.equal(evidence.response_order_match,true);
- assert.equal(evidence.transaction_code,'00');assert.equal(evidence.transaction_reason_code,'00');assert.equal(evidence.auth_amount_match,true);
+ assert.equal(evidence.transaction_code,'00');assert.equal(evidence.transaction_reason_code,null);assert.equal(evidence.order_result_code,'00');assert.equal(evidence.order_result_reason_code,'00');assert.equal(evidence.auth_date_format,'timestamp');assert.equal(evidence.auth_amount_match,true);
+ assert.equal(evidence.request_currency_code,'949');assert.equal(evidence.order_currency_match,true);assert.equal(evidence.reported_bank_reference_match,true);
+ assert.equal(mismatchEvidence.reported_bank_reference_match,false);
  assert.equal(evidence.database_changed,false);assert.equal(evidence.sale_started,false);assert.equal(evidence.finalize_called,false);
  Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,
   NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co'});
  try { await assert.rejects(provider.readOnlyOrderInquiry({...liveOrder,userId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'},allowed)); }
  finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
- assert.equal(calls,1);
+ assert.equal(calls,2);
  const otherQuery=garantiConfig({...live,GARANTI_LIVE_QUERY_AGENT_USER_ID:'PROVOOS'});
  const mismatch=new GarantiProvider(otherQuery,async()=>liveOrder,async()=>{calls++;throw Error('must not query')});
  Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,
   NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co'});
  try { await assert.rejects(mismatch.readOnlyOrderInquiry(liveOrder,allowed),/identity configuration mismatch/); }
  finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
+ assert.equal(calls,2);
+});
+test('One explicitly gated Production order can reconcile through orderinq only after signed callback evidence is order-bound',async()=>{
+ const target='f5bf8734-85e1-4a2f-8d04-c8d0145573ea',allowed='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+ const live={...env,GARANTI_MODE:'PROD',VERCEL_ENV:'production',NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',
+  GARANTI_SITE_ORIGIN:'https://nrsbequiteluminous.com',GARANTI_SUCCESS_URL:'https://nrsbequiteluminous.com/api/payment/garanti/success',
+  GARANTI_ERROR_URL:'https://nrsbequiteluminous.com/api/payment/garanti/failure',GARANTI_LIVE_CONTROLLED_ONLY:'true',
+  GARANTI_LIVE_OBSERVATION_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:allowed,GARANTI_LIVE_MAX_AMOUNT_MINOR:'1000',
+  GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',
+  GARANTI_LIVE_PROVISION_USER:'PROVAUT',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-provision',GARANTI_LIVE_QUERY_USER:'PROVAUT',
+  GARANTI_LIVE_QUERY_AGENT_USER_ID:'PROVAUT',GARANTI_LIVE_QUERY_PASSWORD:'synthetic-query',GARANTI_LIVE_STORE_KEY:'synthetic-store',
+  GARANTI_LIVE_FORM_URL:'https://sanalposprov.garanti.com.tr/servlet/gt3dengine',GARANTI_LIVE_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet',
+  GARANTI_CAPTURED_STATUS:'',GARANTI_CAPTURED_RESULT_CODE:'',GARANTI_SALE_CHARGE_TYPE:'',GARANTI_FINAL_FAILED_STATUSES:''};
+ const config=garantiConfig(live),liveOrder={...order,id:target,merchantReference:target,amountMinor:300,state:'pending',userId:allowed,redirectUrl:null};let calls=0;
+ const provider=new GarantiProvider(config,async()=>liveOrder,async(url,options)=>{
+  calls++;assert.equal(url,config.queryUrl);assert.match(Buffer.from(options.body).toString(),/<Type>orderinq<\/Type>/);
+  assert.doesNotMatch(Buffer.from(options.body).toString(),/<Type>sales<\/Type>/);
+  return response({mode:'',omitMode:true,amount:'300',status:'APPROVED',charge:'S',code:'',responseCode:'00',authDate:'2026-10-13 12:34:56.789',terminal:config.terminalId,merchant:config.merchantId,reference:target});
+ });
+ const handoffUrl=new URL((await provider.initiate({...liveOrder,state:'initiating'},target,{customerIp:'127.0.0.1'})).redirectUrl);
+ liveOrder.redirectUrl=handoffUrl.toString()+'&used=1';
+ const keys=['GARANTI_MODE','VERCEL_ENV','GARANTI_LIVE_CONTROLLED_ONLY','GARANTI_LIVE_ALLOWED_USER_ID','NEXT_PUBLIC_SUPABASE_URL','GARANTI_LIVE_SINGLE_FINALIZE_ORDER_ID','GARANTI_LIVE_VERIFIED_CALLBACK_ORDER_ID'];
+ const previous=Object.fromEntries(keys.map(k=>[k,process.env[k]]));Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',
+  GARANTI_LIVE_ALLOWED_USER_ID:allowed,NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',GARANTI_LIVE_SINGLE_FINALIZE_ORDER_ID:target,GARANTI_LIVE_VERIFIED_CALLBACK_ORDER_ID:target});
+ try {
+  const verified=await provider.verifyAuthorizedExistingLiveOrder(target,allowed);
+  assert.equal(verified.status,'paid');assert.equal(verified.threeDS,'authenticated');assert.equal(verified.amountMinor,300);assert.equal(verified.currency,'TRY');
+  await assert.rejects(provider.verifyAuthorizedExistingLiveOrder(target,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'));
+  await assert.rejects(provider.verifyAuthorizedExistingLiveOrder(id,allowed));
+ } finally { for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value} }
  assert.equal(calls,1);
 });
 test('ISO-8859-9 hash encoding uses Turkish bytes and rejects replacement characters',()=>{
@@ -200,14 +246,19 @@ test('Initiation never calls bank; server-signed handoff rejects tampering, stal
  for(const change of [{currency:'USD'},{amountMinor:1.5},{state:'paid'}])await assert.rejects(p.initiate({...order,...change},id,{customerIp:'127.0.0.1'}));
  await assert.rejects(p.initiate(order,id,{customerIp:'bad'}));
 });
-test('Signed return plus authenticated orderinq capture is required before paid; repeated events are stable',async()=>{
+test('Signed return plus authenticated orderinq capture is required before paid; identical repeats dedupe and callbacks remain stable',async()=>{
  let calls=0;const p=new GarantiProvider(c,async()=>order,async(url,options)=>{
   calls++;assert.equal(url,c.queryUrl);assert.equal(options.redirect,'error');
   const body=Buffer.from(options.body).toString();assert.match(body,/<Type>orderinq<\/Type>/);assert.doesNotMatch(body,/synthetic-query-password|CardNumber/);
   return response();
  });
  const a=await p.verifyReturn(signedReturn(),headers),b=await p.verifyReturn(signedReturn(),headers);
- assert.equal(a.status,'paid');assert.equal(a.threeDS,'authenticated');assert.deepEqual(a,b);assert.equal(calls,2);
+ const repeatedField=await p.verifyReturn(signedReturn()+'&terminalid=12345678',headers);
+ assert.equal(a.status,'paid');assert.equal(a.threeDS,'authenticated');assert.deepEqual(a,b);assert.deepEqual(a,repeatedField);assert.equal(calls,3);
+ await assert.rejects(p.verifyReturn(signedReturn()+'&terminalid=87654321',headers),error=>error instanceof protocol.GarantiReturnParseError&&error.code==='duplicate_field');
+ const tampered=new URLSearchParams(signedReturn());tampered.set('hash','invalid');
+ await assert.rejects(p.verifyReturn(tampered.toString(),headers));
+ assert.equal(calls,3,'conflicting duplicates and invalid signatures must not query or settle');
 });
 test('Bad signatures, unsigned status, changed amount/currency/order/terminal cannot reach paid',async()=>{
  for(const changes of [{hashparamsval:'attacker'},{txnamount:'1'},{txncurrencycode:'840'},{clientid:'87654321'},
@@ -236,13 +287,15 @@ test('TEST capture accepts omitted Mode/AuthDate/ReasonCode only with independen
   const provider=new GarantiProvider(config,async()=>order,async()=>response(change));
   await assert.rejects(provider.verifyReturn(signedReturn({},config),headers));
  }
- const ignoredDateMetadata=new GarantiProvider(config,async()=>order,async()=>response({authDate:'invalid'}));
- assert.equal((await ignoredDateMetadata.verifyReturn(signedReturn({},config),headers)).status,'paid');
+ const invalidDate=new GarantiProvider(config,async()=>order,async()=>response({authDate:'invalid'}));
+ await assert.rejects(invalidDate.verifyReturn(signedReturn({},config),headers));
  const production={...config,mode:'PROD',queryUrl:'https://sanalposprov.garanti.com.tr/VPServlet'};
- for(const change of [{omitMode:true},{mode:'PROD',omitAuthDate:true,code:''},{mode:'PROD',authDate:'20260230'}]){
+ for(const change of [{mode:'TEST'},{mode:'PROD',resultReasonCode:''},{mode:'PROD',authDate:'20260230'}]){
   const live=new GarantiProvider(production,async()=>order,async()=>response(change));
   await assert.rejects(live.verifyReturn(signedReturn({},production),headers));
  }
+ const fullTimestamp=new GarantiProvider(production,async()=>order,async()=>response({omitMode:true,authDate:'2026-10-13 12:34:56.789',code:''}));
+ assert.equal((await fullTimestamp.verifyReturn(signedReturn({},production),headers)).status,'paid');
 });
 test('Single-finalize TEST verification exposes only safe signature and same-query evidence once',async()=>{
  const isolated=garantiConfig({...observationEnv(),GARANTI_TEST_SINGLE_FINALIZE_ONLY:'true'});
@@ -277,9 +330,12 @@ test('Bank return endpoints are POST-only and independent of cookies; handoff ha
  for(const path of ['success','failure']){const code=fs.readFileSync(`src/app/api/payment/garanti/${path}/route.ts`,'utf8');assert.match(code,/POST = garantiReturn/);assert.doesNotMatch(code,/export.*GET/)}
  const route=fs.readFileSync('src/app/api/payment/garanti/handoff/route.ts','utf8');assert.match(route,/user\.id !== order\.userId/);assert.match(route,/sameOrigin\(request\)/);assert.match(route,/claimGarantiHandoff/);
 });
-test('Return encoding handles bank ISO-8859-9 bytes, rejects duplicate signed fields and missing signatures',()=>{
+test('Return encoding handles bank ISO-8859-9 bytes, dedupes identical repeats, rejects conflicts and missing signatures',()=>{
  const isoHeaders=new Headers({'content-type':'application/x-www-form-urlencoded;charset=iso-8859-9'});
  assert.equal(protocol.parseReturn('name=%DD%FE',isoHeaders).name,'İş');
+ const identical=protocol.parseReturn('terminalid=12345678&terminalid=12345678',headers,{allowIdenticalDuplicates:true});
+ assert.equal(identical.terminalid,'12345678');
+ assert.throws(()=>protocol.parseReturn('terminalid=12345678&terminalid=87654321',headers,{allowIdenticalDuplicates:true}),error=>error.code==='duplicate_field');
  assert.throws(()=>protocol.parseReturn('oid=x&oid=y',headers));
  assert.throws(()=>protocol.parseReturn('oid=%xx',headers));
  assert.throws(()=>protocol.verifyReturnHash(c,{hashparams:'oid:',oid:id,hash:'a'.repeat(128)}));
@@ -460,7 +516,8 @@ test('TEST query evidence uses fixed endpoint context; contradictory echoes and 
  assert.equal(testQueryEvidence(config,order,{...q,Order:{...q.Order,OrderInqResult:{...q.Order.OrderInqResult,AuthAmount:'1'}}},200).amount_match,false);
  assert.equal(testQueryEvidence(config,order,q,200,'different').auth_match,false);
  const strictConfig={...c,mode:'PROD',queryUrl:'https://sanalposprov.garanti.com.tr/VPServlet'};
- const strict=new GarantiProvider(strictConfig,async()=>order,async()=>response({mode:''}));await assert.rejects(strict.verifyReturn(signedReturn({},strictConfig),headers));
+ const strict=new GarantiProvider(strictConfig,async()=>order,async()=>response({mode:''}));assert.equal((await strict.verifyReturn(signedReturn({},strictConfig),headers)).status,'paid');
+ const contradictoryMode=new GarantiProvider(strictConfig,async()=>order,async()=>response({mode:'TEST'}));await assert.rejects(contradictoryMode.verifyReturn(signedReturn({},strictConfig),headers));
  let calls=0;const wrong=new GarantiProvider({...config,queryUrl:'https://evil.example/VPServlet'},async()=>order,async()=>{calls++;return response()});await assert.rejects(wrong.observeQuery(order,'127.0.0.1'));assert.equal(calls,0);
 });
 

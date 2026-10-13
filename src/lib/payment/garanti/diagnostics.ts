@@ -20,6 +20,8 @@ const explanations: Record<string, string> = {
   'işleminizi gerçekleştiremiyoruz. tekrar deneyiniz': 'Banka işlemi gerçekleştiremedi.',
   'user canceled': 'Kullanıcı iptali bildirildi.',
   'cancelled': 'İptal bildirildi.',
+  'sistem hatası': 'Banka sistem hatası.',
+  'system error': 'Banka sistem hatası.',
 }
 export function cleanBankExplanation(value?: string) {
   if (!value) return ''
@@ -66,10 +68,33 @@ export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, heade
   }
   const hashState = fieldState('hash')
   const hashparamsState = fieldState('hashparams')
+  const signatureVerified = !!signature && !ambiguous && signature.result === 'verified'
+  const signedErrorText = signatureVerified
+    && rawHashparams.includes('mderrormessage') && rawHashparams.includes('errmsg')
+  const safeErrorCategory = (value?: string) => {
+    // Error explanations are never retained verbatim. Their fixed category is
+    // useful even when Garanti omits a valid failure signature, but remains
+    // explicitly untrusted unless both fields are covered by a verified hash.
+    if (!value) return 'not_recorded'
+    switch (cleanBankExplanation(value)) {
+      case '3D doğrulaması başarısız.': return 'authentication_failed'
+      case 'Kartın son kullanma tarihi hatası.': return 'expired_card'
+      case 'Kart bilgisi hatası.': return 'invalid_card'
+      case 'Kullanıcı iptali bildirildi.': return 'user_cancelled'
+      case 'Banka sistem hatası.': return 'system_error'
+      default: return 'unclassified'
+    }
+  }
+  const firstErrorCategory = safeErrorCategory(field('mderrormessage'))
+  const secondErrorCategory = safeErrorCategory(field('errmsg'))
+  const errorCategory = firstErrorCategory === 'not_recorded' ? secondErrorCategory
+    : secondErrorCategory === 'not_recorded' || firstErrorCategory === secondErrorCategory ? firstErrorCategory : 'unclassified'
+  const parsedFields = parsed as Readonly<Record<string, string>> | null
   const response = safeUniqueValue('response', /^[a-z]{1,16}$/i, new Set(['approved', 'declined', 'error', 'failed']))
   const procreturncode = safeUniqueValue('procreturncode', /^\d{2}$/)
   const mdstatus = safeUniqueValue('mdstatus', /^\d$/)
-  const signatureVerified = !!signature && !duplicates.length && signature.result === 'verified'
+  // Exact duplicate values are canonicalized by parseReturn and leave one
+  // unambiguous signature input. Only conflicting repeats suppress verification.
   const failureNoticeClassification = !parsed ? 'callback_parse_rejected'
     : source !== 'failure' ? null
     : signatureVerified ? 'failure_callback_signature_verified'
@@ -80,7 +105,8 @@ export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, heade
     rejection_code: rejectionCode,
     validation_stage: rejectionCode?.endsWith('_FIELD_DUPLICATE_FIELD') ? 'duplicate_field' : parseStage,
     signature_verified: signatureVerified,
-    signature_result: ambiguous ? 'not_evaluated_ambiguous_duplicate' : signature?.result || 'not_evaluated',
+    signature_result: signatureVerified ? 'verified'
+      : ambiguous ? 'not_evaluated_ambiguous_duplicate' : signature?.result || 'not_evaluated',
     algorithm: signature?.algorithm || 'sha1',
     encoding: signature?.encoding || 'iso-8859-9',
     form_charset: signature?.form_charset || null,
@@ -98,6 +124,10 @@ export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, heade
     empty_fields: parsed && !fieldsAmbiguous ? rawHashparams.filter(name => parsed![name] === '').slice(0, 64).map(safeReturnFieldName) : null,
     duplicate_fields: duplicates,
     failure_notice_classification: failureNoticeClassification,
+    mderrormessage_present: parsedFields ? Object.hasOwn(parsedFields, 'mderrormessage') && parsedFields['mderrormessage'] !== '' : null,
+    errmsg_present: parsedFields ? Object.hasOwn(parsedFields, 'errmsg') && parsedFields['errmsg'] !== '' : null,
+    error_text_signed: signedErrorText,
+    error_category: errorCategory,
     reported_response: source === 'failure' ? response : null,
     reported_procreturncode: source === 'failure' ? procreturncode : null,
     reported_mdstatus: source === 'failure' ? mdstatus : null,

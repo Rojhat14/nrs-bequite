@@ -13,7 +13,7 @@ import { canonicalCheckoutItems } from './items'
 import { GUEST_COOKIE, hashGuestToken } from './access'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
-import { garantiObservationOnly } from './garanti/config'
+import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
 
@@ -29,6 +29,32 @@ export function paymentDatabase() {
         if (key.startsWith('sb_secret_')) headers.delete('Authorization')
         return fetch(url, { ...options, headers })
       } } })
+}
+export async function saveGarantiLiveSingleFinalizeEvidence(orderId: string, evidence: Record<string, unknown>) {
+  const { error } = await paymentDatabase().rpc('nrs_store_garanti_live_single_finalize_evidence', {
+    p_order_id: orderId, p_evidence: { ...evidence, order_id: orderId },
+  })
+  if (error) throw new Error('Verified payment evidence could not be stored.')
+}
+export async function saveGarantiLiveSingleFinalizeFailure(orderId: string, source: 'success' | 'failure',
+  stage: string, safeCode: string, diagnostic: Record<string, unknown> = {}) {
+  const { error } = await paymentDatabase().rpc('nrs_record_garanti_live_single_finalize_failure_v2', {
+    p_order_id: orderId, p_source: source, p_failure_stage: stage, p_safe_code: safeCode, p_diagnostic: diagnostic,
+  })
+  if (error) throw new Error('Controlled live failure diagnostic could not be stored.')
+}
+export async function readGarantiLiveSingleFinalizeFailure(orderId: string) {
+  if (!garantiLiveObservationOnly() || !UUID.test(orderId)) return null
+  const { data, error } = await paymentDatabase().from('garanti_live_single_finalize_failures')
+    .select('source,failure_stage,safe_code,callback_signature_verified,callback_signature_result,order_match,amount_match,currency_match,terminal_match,request_match,callback_mdstatus,callback_response,callback_procreturncode,mderrormessage_present,errmsg_present,error_text_signed,error_category,verification_basis,saved_at')
+    .eq('order_id', orderId).maybeSingle()
+  return error ? null : data
+}
+export async function finalizeGarantiLiveSinglePayment(payment: VerifiedPayment) {
+  const { error } = await paymentDatabase().rpc('nrs_finalize_garanti_live_single_finalize_payment', {
+    p_payment: payment, p_provider: 'garanti-oos',
+  })
+  if (error) throw new Error('Controlled payment result could not be committed.')
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 function requestHash(request: CheckoutRequest) {
@@ -123,12 +149,19 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       if (!userId || guestHash !== null) throw new Error('Authenticated checkout required.')
       const id = randomUUID()
       const record = prepareOrderLegalRecord(id, request, quote.summary)
-      const { data, error } = await db.rpc(!manual && garantiObservationOnly() ? 'nrs_create_garanti_test_observation_order' : 'nrs_create_payment_order', {
+      const amountMinor = Math.round(quote.summary.total * 100)
+      const liveSingleFinalize = !manual && process.env.PAYMENT_PROVIDER === 'garanti-oos'
+        && garantiLiveSingleFinalizeArmed(userId, amountMinor)
+      const rpcName = !manual && garantiObservationOnly() ? 'nrs_create_garanti_test_observation_order'
+        : liveSingleFinalize ? 'nrs_create_garanti_live_single_finalize_order' : 'nrs_create_payment_order'
+      const rpcArgs = {
         p_order_id: id, p_user_id: userId, p_guest_hash: guestHash, p_key: request.idempotencyKey,
         p_request_hash: requestHash(request),
         p_items: canonicalCheckoutItems(request.items), p_customer: request.customer, p_legal: record,
         p_provider: process.env.PAYMENT_PROVIDER,
-      })
+        ...(liveSingleFinalize ? { p_authorized_user_id: userId } : {}),
+      }
+      const { data, error } = await db.rpc(rpcName, rpcArgs)
       if (error || !data?.order) {
         // A distinct key cannot create a second TEST order after the single
         // finalize slot has been claimed. Link the same owner back to that

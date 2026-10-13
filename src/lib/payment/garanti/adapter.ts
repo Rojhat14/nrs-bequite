@@ -11,12 +11,37 @@ import { bankFields, initiationHash, equalHex, isoBytes, ReturnSignatureError, p
 export class GarantiPending extends Error {
   constructor(readonly reference: string) { super('Payment awaits bank reconciliation.') }
 }
+function authDateFormat(value: unknown): 'missing' | 'yyyymmdd' | 'timestamp' | 'invalid' {
+  if (value === undefined || value === '') return 'missing'
+  if (typeof value !== 'string') return 'invalid'
+  if (/^\d{8}$/.test(value)) {
+    const year = Number(value.slice(0, 4)), month = Number(value.slice(4, 6)), day = Number(value.slice(6, 8))
+    const date = new Date(Date.UTC(year, month - 1, day))
+    return date.toISOString().slice(0, 10) === `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` ? 'yyyymmdd' : 'invalid'
+  }
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/.test(value)) {
+    const date = new Date(`${value.replace(' ', 'T')}Z`)
+    return Number.isFinite(date.getTime()) && date.toISOString().replace('T', ' ').replace('Z', '') === value ? 'timestamp' : 'invalid'
+  }
+  return 'invalid'
+}
 export type SuccessfulTestReturnEvidence = {
   order_id: string
   signature_verified: true
   order_match: true; amount_match: true; currency_match: true; terminal_match: true; request_match: true
   query_evidence: TestQueryEvidence
 }
+export type SuccessfulLiveReturnEvidence = {
+  order_id: string; signature_verified: true; signature_algorithm: 'sha1'; signature_encoding: 'iso-8859-9'
+  order_match: true; amount_match: true; currency_match: true; terminal_match: true; request_match: true
+  callback_mdstatus: '1'; callback_response: 'approved'; callback_procreturncode: '00'
+  query_http: number; query_order_match: true; query_identity_match: true; query_amount_match: true
+  query_result_codes_match: true; query_status: 'APPROVED'; query_charge_type: 'S'
+  auth_date_format: 'missing' | 'yyyymmdd' | 'timestamp'; auth_code_match: true; bank_reference_present: true
+}
+type SuccessfulLiveQueryEvidence = Pick<SuccessfulLiveReturnEvidence,
+  'query_http' | 'query_order_match' | 'query_identity_match' | 'query_amount_match' | 'query_result_codes_match'
+  | 'query_status' | 'query_charge_type' | 'auth_date_format' | 'auth_code_match' | 'bank_reference_present'>
 export class GarantiProvider implements PaymentProvider {
   get settlementDisabled() { return this.config.observationOnly === true || this.config.liveObservationOnly === true }
   get testObservationOnly() { return this.config.observationOnly === true }
@@ -26,6 +51,18 @@ export class GarantiProvider implements PaymentProvider {
   readonly allowedRedirectOrigins: readonly string[]
   private lastTestQueryEvidence: TestQueryEvidence | null = null
   private successfulTestReturnEvidence: SuccessfulTestReturnEvidence | null = null
+  private lastSuccessfulLiveQueryEvidence: SuccessfulLiveQueryEvidence | null = null
+  private successfulLiveReturnEvidence: SuccessfulLiveReturnEvidence | null = null
+  private liveReturnVerification: Record<string, unknown> | null = null
+  private verificationStage: 'callback_parse' | 'callback_signature' | 'order_lookup' | 'callback_match'
+    | 'orderinq_request' | 'orderinq_response' | 'orderinq_identity' | 'orderinq_status' | 'orderinq_result'
+    | 'orderinq_capture' | 'orderinq_auth_code' | 'verified_payment' = 'callback_parse'
+  get lastVerificationStage() { return this.verificationStage }
+  takeLiveReturnVerification() {
+    const evidence = this.liveReturnVerification
+    this.liveReturnVerification = null
+    return evidence
+  }
   constructor(readonly config: GarantiConfig = garantiConfig(),
     private readonly loadOrder: (id: string) => Promise<PaymentOrder> = loadGarantiOrder,
     private readonly transport: typeof fetch = fetch) {
@@ -66,33 +103,65 @@ export class GarantiProvider implements PaymentProvider {
   async verifyCallback(raw: string, headers: Headers) { return this.verifyReturn(raw, headers) }
   async verifyReturn(raw: string, headers: Headers): Promise<VerifiedPayment> {
     const c = this.config
+    this.verificationStage = 'callback_parse'
     this.lastTestQueryEvidence = null
     this.successfulTestReturnEvidence = null
-    const f = parseReturn(raw, headers, { allowIdenticalDuplicates: c.mode === 'TEST'
-      && (c.observationOnly === true || c.singleFinalizeTest === true) })
+    this.lastSuccessfulLiveQueryEvidence = null
+    this.successfulLiveReturnEvidence = null
+    this.liveReturnVerification = null
+    // Garanti's Production common-payment callback may repeat terminalid.
+    // parseReturn collapses only when every decoded occurrence is identical;
+    // conflicting values still fail before signature or payment checks.
+    const f = parseReturn(raw, headers, { allowIdenticalDuplicates: true })
     // The bank documents hash checking for successful (00) returns only. Failed
     // unsigned returns may not cancel a DB order or release reserved stock.
+    this.verificationStage = 'callback_signature'
     try { verifyReturnHash(c, f) } catch (error) {
-      if (c.liveObservationOnly) console.info(JSON.stringify({ event: 'garanti_live_return_rejected',
+      if (c.liveObservationOnly || c.liveDiagnostics) console.info(JSON.stringify({ event: 'garanti_live_return_rejected',
         order_id: UUID.test(f.oid || '') ? f.oid : null, signature_verified: false,
         signature_result: error instanceof ReturnSignatureError ? error.result : 'verification_error' }))
       throw error
     }
+    this.verificationStage = 'order_lookup'
     const order = await this.loadOrder(f.oid)
+    this.verificationStage = 'callback_match'
     const matches = this.returnChecks(f, order)
-    if (c.liveObservationOnly) {
+    if (c.liveObservationOnly || c.liveDiagnostics) this.liveReturnVerification = {
+      signature_verified: true,
+      signature_result: 'verified',
+      ...matches,
+      callback_mdstatus: /^\d$/.test(f.mdstatus || '') ? f.mdstatus : null,
+      callback_response: ['approved', 'declined', 'error', 'failed'].includes((f.response || '').toLowerCase()) ? f.response.toLowerCase() : null,
+      callback_procreturncode: /^\d{2}$/.test(f.procreturncode || '') ? f.procreturncode : null,
+    }
+    if (c.liveObservationOnly || c.liveDiagnostics) {
       const safe = (value: string) => /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : (value ? 'invalid' : 'missing')
       console.info(JSON.stringify({ event: 'garanti_live_return_verified', order_id: order.id,
-        signature_verified: true, ...matches, mdstatus: safe(f.mdstatus || ''),
+        signature_verified: true, signature_result: 'verified', signature_algorithm: 'sha1',
+        signature_encoding: 'iso-8859-9', ...matches, mdstatus: safe(f.mdstatus || ''),
         response: safe(f.response || ''), procreturncode: safe(f.procreturncode || '') }))
     }
     if (!Object.values(matches).every(Boolean)) throw new Error('Bank return order mismatch.')
     const result = await this.query(order, f.customeripaddress, f.authcode, true)
+    this.verificationStage = 'verified_payment'
     if (result.status === 'paid' && (f.procreturncode !== '00' || f.response.toLowerCase() !== 'approved' || f.mdstatus !== '1')) throw new GarantiPending(order.id)
     if (result.status === 'paid' && c.mode === 'TEST' && c.singleFinalizeTest && this.lastTestQueryEvidence) {
       this.successfulTestReturnEvidence = { order_id: order.id, signature_verified: true,
         order_match: true, amount_match: true, currency_match: true, terminal_match: true, request_match: true,
         query_evidence: this.lastTestQueryEvidence }
+    }
+    const liveQueryEvidence = this.lastSuccessfulLiveQueryEvidence as SuccessfulLiveQueryEvidence | null
+    if (result.status === 'paid' && c.mode === 'PROD' && liveQueryEvidence
+      && f.mdstatus === '1' && f.response.toLowerCase() === 'approved' && f.procreturncode === '00') {
+      this.successfulLiveReturnEvidence = { order_id: order.id, signature_verified: true,
+        signature_algorithm: 'sha1', signature_encoding: 'iso-8859-9', order_match: true,
+        amount_match: true, currency_match: true, terminal_match: true, request_match: true,
+        callback_mdstatus: '1', callback_response: 'approved', callback_procreturncode: '00',
+        query_http: liveQueryEvidence.query_http, query_order_match: liveQueryEvidence.query_order_match,
+        query_identity_match: liveQueryEvidence.query_identity_match, query_amount_match: liveQueryEvidence.query_amount_match,
+        query_result_codes_match: liveQueryEvidence.query_result_codes_match, query_status: liveQueryEvidence.query_status,
+        query_charge_type: liveQueryEvidence.query_charge_type, auth_date_format: liveQueryEvidence.auth_date_format,
+        auth_code_match: liveQueryEvidence.auth_code_match, bank_reference_present: liveQueryEvidence.bank_reference_present }
     }
     // Strict fully authenticated 3DS only; half/attempted authentication is not
     // silently accepted. Query, not browser response, decides captured status.
@@ -101,6 +170,11 @@ export class GarantiProvider implements PaymentProvider {
   takeSuccessfulTestReturnEvidence() {
     const evidence = this.successfulTestReturnEvidence
     this.successfulTestReturnEvidence = null
+    return evidence
+  }
+  takeSuccessfulLiveReturnEvidence() {
+    const evidence = this.successfulLiveReturnEvidence
+    this.successfulLiveReturnEvidence = null
     return evidence
   }
   private async inquire(order: PaymentOrder, ip: string) {
@@ -135,7 +209,7 @@ export class GarantiProvider implements PaymentProvider {
   }
   // Authenticated, fixed-order diagnostics may inspect a Production inquiry,
   // but never create a sale, write the order, or call the finalize RPC.
-  async readOnlyOrderInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string) {
+  async readOnlyOrderInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string, expectedBankReference?: string) {
     const c = this.config
     if (!c.liveObservationOnly || c.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)
       || order.userId !== userId || order.state !== 'pending') throw new Error('Live read-only inquiry is not authorized.')
@@ -154,10 +228,13 @@ export class GarantiProvider implements PaymentProvider {
     const result = q.Order?.OrderInqResult
     const mode = safeCode(q.Mode)
     const echo = q.Terminal
+    const authDateShape = authDateFormat(result?.AuthDate)
     const evidence = {
       order_id: order.id,
       http,
       request_mode: 'PROD',
+      request_currency_code: '949',
+      order_currency_match: order.currency === 'TRY',
       request_terminal_matches_config: true,
       request_prov_user_matches_expected: c.queryUser === 'PROVAUT',
       request_agent_user_matches_expected: c.queryAgentUserId === 'PROVAUT',
@@ -176,12 +253,40 @@ export class GarantiProvider implements PaymentProvider {
       auth_amount_match: typeof result?.AuthAmount === 'string' ? result.AuthAmount === String(order.amountMinor) : null,
       auth_code_present: typeof result?.AuthCode === 'string' && result.AuthCode.length > 0,
       bank_reference_present: typeof result?.RetrefNum === 'string' && result.RetrefNum.length > 0,
+      auth_date_format: authDateShape,
+      mode_evidence: mode === null ? 'missing' : mode === 'PROD' ? 'response' : 'conflict',
+      order_result_success_codes_match: result?.Code === '00' && result?.ReasonCode === '00',
+      reported_bank_reference_match: expectedBankReference
+        ? result?.RetrefNum === expectedBankReference : null,
       database_changed: false,
       sale_started: false,
       finalize_called: false,
     }
     console.info(JSON.stringify({ event: 'garanti_live_read_only_orderinq', ...evidence }))
     return evidence
+  }
+  // One existing, operator-authorized Production order can be reconciled once
+  // its order-bound signed callback has been verified from protected runtime
+  // evidence. Both exact-order environment gates are set only for that order.
+  async verifyAuthorizedExistingLiveOrder(orderId: string, userId: string) {
+    const targetOrderId = 'f5bf8734-85e1-4a2f-8d04-c8d0145573ea'
+    if (!this.config.liveObservationOnly || !controlledLiveAccountAllowed(userId)
+      || orderId !== targetOrderId || process.env.GARANTI_LIVE_SINGLE_FINALIZE_ORDER_ID !== targetOrderId
+      || process.env.GARANTI_LIVE_VERIFIED_CALLBACK_ORDER_ID !== targetOrderId) throw new Error('Single-order live finalize is not authorized.')
+    const stored = await this.loadOrder(orderId) as PaymentOrder & { userId?: string; redirectUrl?: string | null }
+    if (stored.userId !== userId || stored.currency !== 'TRY' || stored.amountMinor !== 300
+      || !['pending', 'paid'].includes(stored.state) || !stored.redirectUrl) throw new Error('Single-order live finalize order mismatch.')
+    const redirect = new URL(stored.redirectUrl)
+    const token = redirect.searchParams.get('token')
+    if (redirect.origin !== this.config.siteOrigin || redirect.pathname !== '/api/payment/garanti/handoff'
+      || redirect.searchParams.get('used') !== '1' || !token) throw new Error('Submitted handoff is required.')
+    const handoff = this.handoff(token, true)
+    if (handoff.id !== orderId) throw new Error('Handoff order mismatch.')
+    const settlementProvider = new GarantiProvider({ ...this.config, liveObservationOnly: false,
+      capturedStatus: 'APPROVED', capturedResultCode: '00', saleChargeType: 'S', failedStatuses: [] }, this.loadOrder, this.transport)
+    const verified = await settlementProvider.query(stored, handoff.ip)
+    if (verified.status !== 'paid' || verified.amountMinor !== 300 || verified.currency !== 'TRY') throw new GarantiPending(orderId)
+    return { ...verified, threeDS: 'authenticated' as const }
   }
   private async observeLiveQuery(order: PaymentOrder, ip: string, authCode: string | undefined, signedReturnVerified: boolean): Promise<never> {
     try {
@@ -196,22 +301,30 @@ export class GarantiProvider implements PaymentProvider {
       const merchantId = optional(q.Terminal?.MerchantID)
       const authAmount = optional(r?.AuthAmount)
       const responseCode = optional(response?.Code)
-      const reasonCode = optional(response?.ReasonCode)
+      const responseReasonCode = optional(response?.ReasonCode)
+      const resultCode = optional(r?.Code)
+      const resultReasonCode = optional(r?.ReasonCode)
       const bankAuthCode = optional(r?.AuthCode)
-      const presentResponseCodes = [responseCode, reasonCode].filter(Boolean)
+      const presentResponseCodes = [responseCode, responseReasonCode].filter(Boolean)
       const checks = {
         order_match: orderId === order.merchantReference,
         terminal_match: terminalId === this.config.terminalId && merchantId === this.config.merchantId,
         mode_match: mode === '' ? null : mode === 'PROD',
         amount_match: authAmount === '' ? null : authAmount === String(order.amountMinor),
         explicit_response_ok: presentResponseCodes.length ? presentResponseCodes.every(code => code === '00') : null,
+        order_result_success_codes_match: resultCode === '00' && resultReasonCode === '00',
         signed_return_verified: signedReturnVerified,
         auth_code_match: authCode === undefined || !bankAuthCode ? null : bankAuthCode === authCode,
       }
+      this.verificationStage = !checks.order_match || !checks.terminal_match ? 'orderinq_identity'
+        : presentResponseCodes.some(code => code !== '00') ? 'orderinq_status'
+          : resultCode !== '00' || resultReasonCode !== '00' || optional(r?.Status) !== 'APPROVED'
+            ? 'orderinq_result' : 'verified_payment'
       console.info(JSON.stringify({ event: 'garanti_live_observation', order_id: order.id, http,
-        ...checks, mode: safe(mode), response_code: safe(responseCode), reason_code: safe(reasonCode),
+        ...checks, mode: safe(mode), response_code: safe(responseCode), response_reason_code: safe(responseReasonCode),
+        order_result_code: safe(resultCode), order_result_reason_code: safe(resultReasonCode),
         status: safe(optional(r?.Status)), charge_type: safe(optional(r?.ChargeType)),
-        result_code: safe(optional(r?.Code)), auth_date_present: !!optional(r?.AuthDate) }))
+        auth_date_format: authDateFormat(r?.AuthDate) }))
       // Live response-field semantics are not confirmed. Preserve all positive
       // evidence for review, but never create a settlement DTO in this mode.
     } catch {
@@ -227,44 +340,60 @@ export class GarantiProvider implements PaymentProvider {
       await this.observeQuery(order, ip, authCode)
       throw new GarantiPending(order.id)
     }
-    if (c.liveObservationOnly) return this.observeLiveQuery(order, ip, authCode, signedReturnVerified)
+    if (c.liveObservationOnly) {
+      this.verificationStage = 'orderinq_request'
+      return this.observeLiveQuery(order, ip, authCode, signedReturnVerified)
+    }
+    this.verificationStage = 'orderinq_request'
     const { http, q } = await this.inquire(order, ip)
+    this.verificationStage = 'orderinq_identity'
     const echoedMode = q.Mode === undefined ? '' : scalar(q.Mode)
-    const modeMatches = echoedMode === c.mode || (c.mode === 'TEST' && echoedMode === ''
-      && c.queryUrl === 'https://sanalposprovtest.garantibbva.com.tr/VPServlet')
-    if (!modeMatches || scalar(q.Terminal?.ID) !== c.terminalId
-      || scalar(q.Terminal?.MerchantID) !== c.merchantId || scalar(q.Order?.OrderID) !== order.merchantReference) throw new Error('Bank query identity mismatch.')
+    // Garanti's response schema lists Mode but doesn't mark the echo mandatory.
+    // Missing/empty is recorded as absent; a contradictory echo is rejected.
+    if ((echoedMode !== '' && echoedMode !== c.mode) || scalar(q.Terminal?.ID) !== c.terminalId
+      || scalar(q.Terminal?.MerchantID) !== c.merchantId || scalar(q.Order?.OrderID) !== order.merchantReference
+      || (q.Terminal?.ProvUserID !== undefined && scalar(q.Terminal.ProvUserID) !== c.queryUser)
+      || (q.Terminal?.UserID !== undefined && scalar(q.Terminal.UserID) !== c.queryAgentUserId)) throw new Error('Bank query identity mismatch.')
     // A display-only TEST journey never returns a settlement DTO, even if
     // mappings are later populated or the bank reports a successful capture.
     if (c.observationOnly) throw new GarantiPending(order.id)
     const r = q.Order?.OrderInqResult
     // Query response does not document a currency field. Fixed TRY is bound in
     // the original bank hash and authenticated query; do not invent a response tag.
-    // Independent order result fields establish capture. Only TEST may omit
-    // these three echoes; missing values never count as success evidence.
-    // Contradictory mode echoes and explicit non-00 bank response codes remain
-    // fail-closed, and PROD retains the original strict requirements.
+    // Transaction.Response is the outer order-query response. Sale result
+    // codes are nested under Order.OrderInqResult per Garanti's mail example.
+    // Explicit outer errors remain fatal, but their optional ReasonCode is not
+    // confused with the sale's result ReasonCode.
     const response = q.Transaction?.Response
+    this.verificationStage = 'orderinq_status'
     for (const code of [response?.Code, response?.ReasonCode]) {
       if (code !== undefined && scalar(code) !== '' && scalar(code) !== '00') throw new GarantiPending(order.id)
     }
-    if (c.mode !== 'TEST' && scalar(response?.ReasonCode) !== '00') throw new GarantiPending(order.id)
     const status = scalar(r.Status)
     const captured = status === c.capturedStatus && scalar(r.ChargeType) === c.saleChargeType
     const failed = c.failedStatuses.includes(status)
     if (!captured && !failed) throw new GarantiPending(order.id)
-    const authDate = r.AuthDate === undefined ? '' : scalar(r.AuthDate)
-    const authDateValid = c.mode === 'TEST' || (/^\d{8}$/.test(authDate)
-      && Number.isFinite(Date.UTC(Number(authDate.slice(0, 4)), Number(authDate.slice(4, 6)) - 1, Number(authDate.slice(6, 8))))
-      && new Date(Date.UTC(Number(authDate.slice(0, 4)), Number(authDate.slice(4, 6)) - 1, Number(authDate.slice(6, 8)))).toISOString().slice(0, 10)
-        === `${authDate.slice(0, 4)}-${authDate.slice(4, 6)}-${authDate.slice(6, 8)}`)
-    if (captured && (scalar(r.Code) !== c.capturedResultCode || scalar(r.AuthAmount) !== String(order.amountMinor) || !authDateValid
+    const resultCode = r.Code === undefined ? '' : scalar(r.Code)
+    const resultReasonCode = r.ReasonCode === undefined ? '' : scalar(r.ReasonCode)
+    this.verificationStage = 'orderinq_result'
+    if (captured && (resultCode !== c.capturedResultCode || resultReasonCode !== '00')) throw new GarantiPending(order.id)
+    const authDateShape = authDateFormat(r.AuthDate === undefined ? undefined : scalar(r.AuthDate))
+    const authDateValid = ['missing', 'yyyymmdd', 'timestamp'].includes(authDateShape)
+    this.verificationStage = 'orderinq_capture'
+    if (captured && (scalar(r.AuthAmount) !== String(order.amountMinor) || !authDateValid
       || !scalar(r.AuthCode) || !scalar(r.RetrefNum) || !['', '0'].includes(scalar(r.InstallmentCnt)))) throw new Error('Bank capture mismatch.')
+    this.verificationStage = 'orderinq_auth_code'
     if (captured && authCode !== undefined && scalar(r.AuthCode) !== authCode) throw new Error('Bank authorization mismatch.')
     if (failed && !['', '0'].includes(scalar(r.AuthAmount))) throw new GarantiPending(order.id)
     // Stable reference across pending/failure/paid avoids synthetic transaction
     // IDs changing between retries. Terminal + bank order uniquely identify it.
     const transactionId = `${c.terminalId}:${order.merchantReference}`
+    if (captured && c.mode === 'PROD') {
+      this.lastSuccessfulLiveQueryEvidence = { query_http: http, query_order_match: true,
+        query_identity_match: true, query_amount_match: true, query_result_codes_match: true,
+        query_status: 'APPROVED', query_charge_type: 'S', auth_date_format: authDateShape as 'missing' | 'yyyymmdd' | 'timestamp',
+        auth_code_match: true, bank_reference_present: true }
+    }
     if (c.mode === 'TEST' && c.singleFinalizeTest) this.lastTestQueryEvidence = testQueryEvidence(c, order, q, http, authCode)
     return { merchantId: c.merchantId, merchantReference: order.merchantReference, transactionId,
       eventId: `${transactionId}:${captured ? 'paid' : 'failed'}`, amountMinor: order.amountMinor,

@@ -89,7 +89,7 @@ export function parseReturn(raw: string, headers: Headers, options: {
   options.onDuplicates?.(summary)
   // No first/last selection: accepting repetitions requires equality of EVERY
   // decoded value. Hash verification and order checks use the same scalar map.
-  // Default/Production remain strict; only TEST observation opts in.
+  // Callers opt into equality-only canonicalization; conflicting repeats always fail.
   if (repeats.size && (!options.allowIdenticalDuplicates || Array.from(repeats.values()).some(r => !r.same))) throw new GarantiReturnParseError('duplicate_field')
   return fields
 }

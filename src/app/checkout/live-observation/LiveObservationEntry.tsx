@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useCart } from '@/store/useCart'
 
-export default function LiveObservationEntry() {
+export default function LiveObservationEntry({ autoFinalizeAvailable }: { autoFinalizeAvailable: boolean }) {
   const router = useRouter()
   const items = useCart(state => state.items)
   const addItem = useCart(state => state.addItem)
@@ -34,7 +34,10 @@ export default function LiveObservationEntry() {
     <section className="mx-auto max-w-xl space-y-6 border border-nrs-ink/15 bg-nrs-panel p-6 sm:p-10">
       <p className="text-xs uppercase tracking-[0.2em] text-nrs-ink/60">Yalnızca izinli hesap · canlı banka · gözlem modu</p>
       <h1 className="font-serif text-3xl">3 TL kontrollü ödeme denemesi</h1>
-      <p className="leading-7">Bu özel ürün genel katalogda yer almaz. Onay ekranı ödeme kanıtı sayılmaz; imza ve bağımsız banka sorgusu kontrol edilecek, gözlem modunda sipariş otomatik paid yapılmayıp inceleme için beklemede kalacaktır.</p>
+      <p className="leading-7">Bu özel ürün genel katalogda yer almaz. Onay ekranı ödeme kanıtı sayılmaz; imza ve bağımsız banka sorgusu doğrulanır.</p>
+      {autoFinalizeAvailable
+        ? <p className="leading-7">Bu izinli hesap için tek yeni 3 TL siparişte tüm doğrulamalar geçerse sipariş otomatik tamamlanır. Diğer siparişler gözlem modunda kalır.</p>
+        : <p className="leading-7">Bu siparişte otomatik tamamlama izni yok; sonuç doğrulanana kadar gözlem modunda kalır.</p>}
       <p className="font-medium">Toplam: 3,00 TL · tek çekim · TRY</p>
       <p className="text-sm leading-6">Bankanın ekranında kart bilgilerinizi yalnızca Garanti’nin sayfasına girin. Bu sitede kart veya CVV alanı yoktur. Ödeme isteğini siz checkout özeti ve sözleşme onayından sonra başlatırsınız.</p>
       <button type="button" onClick={prepare} disabled={busy || items.length > 0} className="min-h-12 w-full bg-nrs-charcoal px-4 text-sm text-nrs-ivory disabled:opacity-50">

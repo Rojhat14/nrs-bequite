@@ -2,7 +2,7 @@ import 'server-only'
 import { isoBytes } from './protocol'
 
 export interface GarantiConfig {
-  observationOnly?: boolean; liveObservationOnly?: boolean; singleFinalizeTest?: boolean
+  observationOnly?: boolean; liveObservationOnly?: boolean; liveDiagnostics?: boolean; singleFinalizeTest?: boolean
   mode: 'TEST' | 'PROD'; merchantId: string; terminalId: string; userId: string; queryAgentUserId: string
   provisionUser: string; provisionPassword: string; queryUser: string; queryPassword: string
   storeKey: string; handoffSecret: string; siteOrigin: string; formUrl: string; queryUrl: string
@@ -41,6 +41,12 @@ export function garantiLiveObservationOnly(env: NodeJS.ProcessEnv = process.env)
     && env.VERCEL_ENV === 'production' && env.GARANTI_LIVE_CONTROLLED_ONLY === 'true'
     && UUID.test(env.GARANTI_LIVE_ALLOWED_USER_ID || '')
     && env.NEXT_PUBLIC_SUPABASE_URL === 'https://moiynemxthkmgpgnfajd.supabase.co'
+}
+export function garantiLiveSingleFinalizeArmed(userId: string | null | undefined, amountMinor: number,
+  env: NodeJS.ProcessEnv = process.env) {
+  return env.GARANTI_LIVE_SINGLE_FINALIZE_ARMED === 'true'
+    && garantiLiveObservationOnly(env) && controlledLiveAccountAllowed(userId, env)
+    && amountMinor === 300 && controlledLiveAmountAllowed(amountMinor, env)
 }
 export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConfig {
   const test = env.GARANTI_MODE === 'TEST'
