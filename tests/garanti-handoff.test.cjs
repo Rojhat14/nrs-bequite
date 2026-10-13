@@ -7,7 +7,7 @@ const config={mode:'TEST',merchantId:'1000001',terminalId:'12345678',userId:'GAR
  formUrl:'https://sanalposprovtest.garantibbva.com.tr/servlet/gt3dengine',queryUrl:'https://sanalposprovtest.garantibbva.com.tr/VPServlet',
  successUrl:origin+'/api/payment/garanti/success',errorUrl:origin+'/api/payment/garanti/failure',installment:'',capturedStatus:'CAPTURED',saleChargeType:'sales',failedStatuses:[]};
 async function fixture(){
- const order={id,userId:'owner',merchantReference:id,amountMinor:100,currency:'TRY',state:'pending',legal:{order_summary:{buyer:{email:'test@example.com'}}}};
+ const order={id,userId:'owner',merchantReference:id,amountMinor:100,currency:'TRY',state:'pending',legal:{order_summary:{buyer:{email:'test@example.com'},items:[{name:'TEST ürün',size:'M',quantity:1,unitPrice:1}]}}};
  const provider=new GarantiProvider(config,async()=>order,async()=>{throw Error('No bank call in this test')});
  order.redirectUrl=(await provider.initiate({...order,state:'initiating'},id,{customerIp:'127.0.0.1'})).redirectUrl;
  let claims=0,user='owner';
@@ -25,7 +25,7 @@ test('Native form handoff preserves POST Origin without leaking token in referre
  assert.equal(r.status,200);assert.equal(r.headers.get('Referrer-Policy'),'strict-origin');
  assert.match(r.headers.get('Content-Security-Policy'),/form-action https:\/\/shop.example/);
  assert.match(r.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
- assert.match(await r.text(),/form method="post"/);assert.equal(f.claims(),0);
+ const handoff=await r.text();assert.match(handoff,/method="post"/);assert.match(handoff,/Güvenli ödemeye devam et/);assert.match(handoff,/Kart bilgileriniz Garanti BBVA’nın güvenli ödeme sayfasında girilir/);assert.match(handoff,/Sipariş özeti/);assert.equal(f.claims(),0);
  const post=await f.route.POST(new Request(f.order.redirectUrl,{method:'POST',headers:{Origin:origin}}));
  assert.equal(post.status,200);assert.equal(f.claims(),1);assert.equal(post.headers.get('Referrer-Policy'),'strict-origin');
  const body=await post.text();assert.match(body,/secure3dsecuritylevel/);assert.match(body,/3D_OOS_PAY/);
@@ -43,7 +43,7 @@ test('Live observation renders the validated Production bank form action without
  assert.match(html,/action="https:\/\/sanalposprov\.garanti\.com\.tr\/servlet\/gt3dengine"/);
  assert.match(html,/name="mode" value="PROD"/);assert.match(html,/name="txntype" value="sales"/);
  assert.match(html,/name="secure3dsecuritylevel" value="3D_OOS_PAY"/);
- assert.match(html,/document\.getElementById\('bank'\)\.submit\(\)/);
+ assert.match(html,/f\.submit\(\)/);assert.match(html,/Garanti BBVA’ya aktarılıyor/);
  assert.equal(f.claims(),1);
 });
 test('Missing/null/foreign Origin still fail before token consumption',async()=>{

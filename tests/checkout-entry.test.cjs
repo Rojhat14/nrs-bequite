@@ -4,7 +4,7 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { loader } = require('./source-loader.cjs');
 
-const animation = { m: { div: ({ children }) => React.createElement('div', null, children) }, AnimatePresence: ({ children }) => children };
+const animation = { m: { div: ({ children }) => React.createElement('div', null, children), aside: ({ children, ...props }) => React.createElement('aside', props, children) }, AnimatePresence: ({ children }) => children };
 function find(node, predicate) {
   if (!node || typeof node !== 'object') return null;
   if (Array.isArray(node)) return node.map(child => find(child, predicate)).find(Boolean) || null;
@@ -67,12 +67,12 @@ test('Out-of-stock products cannot enter checkout; sizeless products use the sam
   assert.deepEqual(sizeless.routes, ['/checkout']);
 });
 
-test('Cart checkout entry closes the drawer without changing cart data and retains WhatsApp and measurement entry', () => {
-  const routes = [], closes = [];
+test('Cart drawer checkout preserves the cart and keeps compact WhatsApp access', () => {
+  const routes = [], closes = [], updates = [], removals = [];
   const item = { id: 'product-1', variantId: 'variant-1', title: 'Test', price: '₺100', size: 'M', quantity: 2 };
-  const cart = { items: [item], isDrawerOpen: true, closeDrawer: () => closes.push(true), subtotalAmount: 200, discountAmount: 0, shippingAmount: 0, totalAmount: 200 };
+  const cart = { items: [item], isDrawerOpen: true, closeDrawer: () => closes.push(true), removeItem: id => removals.push(id), updateQuantity: (...args) => updates.push(args), subtotalAmount: 200, discountAmount: 0, shippingAmount: 0, totalAmount: 200 };
   const Drawer = loader({ 'framer-motion': animation,
-    '@/store/useCart': { getCartItemId: () => 'product-1::variant-1', useCart: () => cart },
+    '@/store/useCart': { getCartItemId: () => 'product-1::variant-1', parsePrice: value => Number(String(value).replace(/[^\d,.-]/g, '').replace(',', '.')), useCart: () => cart },
     '@/hooks/useDialog': { useDialog: () => ({ current: null }) },
     'next/navigation': { useRouter: () => ({ push: path => routes.push(path) }) },
     'next/image': { __esModule: true, default: () => null },
@@ -80,11 +80,17 @@ test('Cart checkout entry closes the drawer without changing cart data and retai
     '@/components/CartWhatsappOrder': { __esModule: true, default: () => null },
   })('src/components/CartDrawer.tsx').default;
   const tree = Drawer();
-  const entry = find(tree, node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe Geç');
+  find(tree, node => node.type === 'button' && node.props['aria-label'] === 'Test miktarını artır').props.onClick();
+  assert.deepEqual(updates, [['product-1::variant-1', 3]]);
+  find(tree, node => node.type === 'button' && node.props['aria-label'] === 'Test ürününü kaldır').props.onClick();
+  assert.deepEqual(removals, ['product-1::variant-1']);
+  const entry = find(tree, node => node.type === 'button' && node.props['aria-label'] === 'Ödemeye geç');
   assert.ok(entry); entry.props.onClick();
   assert.deepEqual(routes, ['/checkout']); assert.equal(closes.length, 1);
   assert.deepEqual(cart.items, [item]);
   assert.ok(find(tree, node => node.props?.items === cart.items));
-  assert.match(renderToStaticMarkup(tree), /Ölçülerle Sipariş Oluştur/);
-  assert.match(renderToStaticMarkup(tree), /Kartla ödeme, banka onayının ardından kullanıma açılacaktır/);
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /Sepetiniz/); assert.match(html, /2 ürün/); assert.match(html, /₺200/);
+  assert.doesNotMatch(html, /Ödeme yöntemi|IBAN bilgisi|kesin sipariş onayı değildir/);
+  assert.equal(find(tree, node => node.type === 'button' && node.props.children === 'Ölçülerle Sipariş Oluştur'), null);
 });

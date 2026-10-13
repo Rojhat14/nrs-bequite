@@ -123,8 +123,8 @@ function checkoutHarness(enabled, confirmed = false) {
     if (!(index in slots)) {
       const customer = { firstName: 'Test', lastName: 'Alıcı', email: 'test@example.com', phone: '905551234567', address: 'Beytepe', city: 'Ankara', district: 'Çankaya', postalCode: '06800', orderNote: '' };
       const inputKey = JSON.stringify({ items: cart.items, measurements: { ['product::'+orderId]: cart.items[0].measurements }, formData: customer, subtotalAmount: cart.subtotalAmount, discountAmount: cart.discountAmount, shippingAmount: cart.shippingAmount, totalAmount: cart.totalAmount });
-      slots[index] = index === 0 ? 3 : index === 2 ? true : confirmed && index === 6 ? { summary, hash: 'a'.repeat(64) }
-        : confirmed && index === 7 ? inputKey : confirmed && index === 8 ? orderId : confirmed && index === 12 ? customer : typeof initial === 'function' ? initial() : initial;
+      slots[index] = index === 0 ? 3 : index === 2 ? true : confirmed && index === 7 ? { summary, hash: 'a'.repeat(64) }
+        : confirmed && index === 8 ? inputKey : confirmed && index === 9 ? orderId : confirmed && index === 13 ? customer : typeof initial === 'function' ? initial() : initial;
     }
     return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
   } };
@@ -151,7 +151,7 @@ test('A/B/F: real checkout handler blocks unticked acceptance without fetch; tic
   global.fetch = () => { requests++; throw new Error('Unexpected request'); };
   try {
     let tree = harness.render();
-    const button = findElement(tree, node => node.type === 'button' && node.props.children === 'Siparişi Ver ve Ödeme Yap');
+    const button = findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç');
     assert.ok(button);
     button.props.onClick();
     tree = harness.render();
@@ -162,7 +162,7 @@ test('A/B/F: real checkout handler blocks unticked acceptance without fetch; tic
     tree = harness.render();
     consent = findElement(tree, node => node.type?.name === 'CheckoutLegalConsent');
     assert.equal(consent.props.accepted, true);
-    findElement(tree, node => node.type === 'button' && node.props.children === 'Siparişi Ver ve Ödeme Yap').props.onClick();
+    findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç').props.onClick();
     tree = harness.render();
     consent = findElement(tree, node => node.type?.name === 'CheckoutLegalConsent');
     assert.match(consent.props.error, /sipariş özetini yeniden doğrulayın/);
@@ -272,7 +272,7 @@ test('Real checkout sends only IDs/quantities and versioned consent after confir
   global.fetch = async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return { ok: false, json: async () => ({ error: 'Test: ödeme kapalı' }) }; };
   try {
     let tree = harness.render();
-    const findButton = node => findElement(node, element => element.type === 'button' && element.props.children === 'Siparişi Ver ve Ödeme Yap');
+    const findButton = node => findElement(node, element => element.type === 'button' && element.props.children === 'Garanti BBVA ödeme sayfasına geç');
     findButton(tree).props.onClick();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(calls.length, 0);
@@ -296,7 +296,7 @@ test('Pending-order recovery link is visible in the payment step without creatin
     let tree = harness.render();
     findElement(tree, node => node.type?.name === 'CheckoutLegalConsent').props.onChange(true);
     tree = harness.render();
-    findElement(tree, node => node.type === 'button' && node.props.children === 'Siparişi Ver ve Ödeme Yap').props.onClick();
+    findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç').props.onClick();
     await new Promise(resolve => setImmediate(resolve));
     tree = harness.render();
     const link = findElement(tree, node => node.props?.href === resumeUrl);
