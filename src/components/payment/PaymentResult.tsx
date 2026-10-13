@@ -3,7 +3,7 @@ import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
 import LegalDocumentContent from '@/components/legal/LegalDocumentContent'
 import { getLegalDocument, legalDocumentHref } from '@/lib/legal/documents'
 import { readAccessiblePaymentOrder } from '@/lib/payment/repository'
-import { garantiObservationOnly } from '@/lib/payment/garanti/config'
+import { garantiObservationOnly, garantiLiveObservationOnly } from '@/lib/payment/garanti/config'
 import { readTestDiagnostic } from '@/lib/payment/garanti/diagnostics'
 import { testHandoffUnsubmitted } from '@/lib/payment/garanti/order'
 
@@ -12,6 +12,7 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
   let order: Awaited<ReturnType<typeof readAccessiblePaymentOrder>> = null
   try { if (orderId) order = await readAccessiblePaymentOrder(orderId) } catch { /* unavailable DB grants no access */ }
   const observation = garantiObservationOnly()
+  const liveObservation = garantiLiveObservationOnly()
   const diagnostic = observation && order ? await readTestDiagnostic(order.id) : null
   const canRenew = observation && order ? await testHandoffUnsubmitted(order.id) : false
   const testTitle = diagnostic?.outcome === 'verified_failure' ? 'TEST — Banka işlemi başarısız'
@@ -47,9 +48,10 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
   const paid = order?.status === 'paid'
   return <main className="min-h-screen bg-nrs-canvas px-6 pb-16 pt-[calc(var(--nrs-header-height)+3rem)]">
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-serif text-3xl">{paid ? (observation ? 'TEST — Sipariş paid' : 'Ödeme doğrulandı') : observation ? testTitle : order?.status === 'failed' || failure ? 'Ödeme tamamlanamadı' : 'Ödeme durumu doğrulanıyor'}</h1>
-      <p className="text-sm leading-7 text-nrs-ink/65">{paid ? (observation ? 'Test veritabanında sipariş paid olarak kayıtlı. Bu durum, tek başına tarayıcı uçtan uca testinin tamamlandığını göstermez.' : 'Siparişinizin ödeme sonucu sunucu tarafından doğrulandı.') : observation ? testMessage : 'Bu ekran tek başına ödeme veya kesin sipariş onayı değildir. Kartınızdan çekim gerçekleşip gerçekleşmediğini bankanızdan kontrol edin. Durum netleşmeden yeniden ödeme yapmayın; bizimle iletişime geçebilirsiniz.'}</p>
+      <h1 className="font-serif text-3xl">{paid ? (observation ? 'TEST — Sipariş paid' : 'Ödeme doğrulandı') : observation ? testTitle : liveObservation ? 'Canlı deneme — incelemede' : order?.status === 'failed' || failure ? 'Ödeme tamamlanamadı' : 'Ödeme durumu doğrulanıyor'}</h1>
+      <p className="text-sm leading-7 text-nrs-ink/65">{paid ? (observation ? 'Test veritabanında sipariş paid olarak kayıtlı. Bu durum, tek başına tarayıcı uçtan uca testinin tamamlandığını göstermez.' : 'Siparişinizin ödeme sonucu sunucu tarafından doğrulandı.') : observation ? testMessage : liveObservation ? 'Bu kontrollü canlı gözlem siparişi otomatik olarak paid yapmaz. Garanti dönüş imzası ve bağımsız orderinq sonucu sunucu kayıtlarında incelenir. Kartınızdan çekim olmuş olabilir; durumu netleştirmeden yeni ödeme başlatmayın.' : 'Bu ekran tek başına ödeme veya kesin sipariş onayı değildir. Kartınızdan çekim gerçekleşip gerçekleşmediğini bankanızdan kontrol edin. Durum netleşmeden yeniden ödeme yapmayın; bizimle iletişime geçebilirsiniz.'}</p>
       {observation && !paid && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Test gözlem modu: otomatik sipariş onayı kapalı. Banka kontrolleri geçse bile sipariş pending kalır; bu test politikası bir doğrulama hatası değildir. Bu mod siparişi ödenmiş olarak işaretlemez.</p>}
+      {liveObservation && !paid && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Kontrollü Production gözlem modu: banka sonucu belirsiz veya eşleştirmeleri henüz teyit edilmemiş olsa bile sipariş pending kalır. İmza ya da işlem eşleşmesi geçmezse de sipariş otomatik paid yapılmaz. Durum doğrulanmadan yeniden ödeme başlatmayın.</p>}
       {observation && paid && !diagnostic && <p className="border border-nrs-ink/15 p-4 text-sm leading-7">Bu sipariş için dönüş tanı kaydı bulunmuyor; imza ve banka sorgusu kanıtları bu ekranda gösterilemiyor.</p>}
       {diagnostic && <div className="space-y-2 border border-nrs-ink/15 p-4 text-sm">
         <p>Tanılama verisi: {diagnostic.association === 'verified' ? 'İmza ve işlem eşleşmeleri doğrulandı' : 'Güvenilmeyen / doğrulanmamış banka bildirimi'}</p>

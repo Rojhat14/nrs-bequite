@@ -16,7 +16,7 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
     if (provider.initiationMaxAmountMinor != null && existing.amountMinor > provider.initiationMaxAmountMinor) {
       throw new PaymentStartError('START_FAILED', 'lookup', 'Mevcut sipariş kontrollü canlı deneme üst sınırını aşıyor; yeniden ödeme başlatılmadı.')
     }
-    if (provider.settlementDisabled && repository.resumeUnsubmittedTest) {
+    if (provider.testObservationOnly && repository.resumeUnsubmittedTest) {
       const redirect = await startStage('handoff', () => repository.resumeUnsubmittedTest!(existing.id, userId, provider, context))
       validateRedirect(redirect.redirectUrl, provider)
       return { orderId: existing.id, ...redirect }

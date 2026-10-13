@@ -18,7 +18,8 @@ export type SuccessfulTestReturnEvidence = {
   query_evidence: TestQueryEvidence
 }
 export class GarantiProvider implements PaymentProvider {
-  get settlementDisabled() { return this.config.observationOnly === true }
+  get settlementDisabled() { return this.config.observationOnly === true || this.config.liveObservationOnly === true }
+  get testObservationOnly() { return this.config.observationOnly === true }
   get initiationMaxAmountMinor() { return this.config.initiationMaxAmountMinor }
   readonly name = 'garanti-oos'
   readonly merchantId: string
@@ -71,10 +72,21 @@ export class GarantiProvider implements PaymentProvider {
       && (c.observationOnly === true || c.singleFinalizeTest === true) })
     // The bank documents hash checking for successful (00) returns only. Failed
     // unsigned returns may not cancel a DB order or release reserved stock.
-    verifyReturnHash(c, f)
+    try { verifyReturnHash(c, f) } catch (error) {
+      if (c.liveObservationOnly) console.info(JSON.stringify({ event: 'garanti_live_return_verified',
+        order_id: UUID.test(f.oid || '') ? f.oid : null, signature_verified: false }))
+      throw error
+    }
     const order = await this.loadOrder(f.oid)
-    if (!Object.values(this.returnChecks(f, order)).every(Boolean)) throw new Error('Bank return order mismatch.')
-    const result = await this.query(order, f.customeripaddress, f.authcode)
+    const matches = this.returnChecks(f, order)
+    if (c.liveObservationOnly) {
+      const safe = (value: string) => /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : (value ? 'invalid' : 'missing')
+      console.info(JSON.stringify({ event: 'garanti_live_return_verified', order_id: order.id,
+        signature_verified: true, ...matches, mdstatus: safe(f.mdstatus || ''),
+        response: safe(f.response || ''), procreturncode: safe(f.procreturncode || '') }))
+    }
+    if (!Object.values(matches).every(Boolean)) throw new Error('Bank return order mismatch.')
+    const result = await this.query(order, f.customeripaddress, f.authcode, true)
     if (result.status === 'paid' && (f.procreturncode !== '00' || f.response.toLowerCase() !== 'approved' || f.mdstatus !== '1')) throw new GarantiPending(order.id)
     if (result.status === 'paid' && c.mode === 'TEST' && c.singleFinalizeTest && this.lastTestQueryEvidence) {
       this.successfulTestReturnEvidence = { order_id: order.id, signature_verified: true,
@@ -120,12 +132,51 @@ export class GarantiProvider implements PaymentProvider {
     console.info(JSON.stringify({ event: 'garanti_test_orderinq', ...evidence }))
     return evidence
   }
-  async query(order: PaymentOrder, ip: string, authCode?: string): Promise<VerifiedPayment> {
+  private async observeLiveQuery(order: PaymentOrder, ip: string, authCode: string | undefined, signedReturnVerified: boolean): Promise<never> {
+    try {
+      const { http, q } = await this.inquire(order, ip)
+      const optional = (value: unknown) => value === undefined ? '' : scalar(value)
+      const safe = (value: string) => /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : (value ? 'invalid' : 'missing')
+      const r = q.Order?.OrderInqResult
+      const response = q.Transaction?.Response
+      const mode = optional(q.Mode)
+      const orderId = optional(q.Order?.OrderID)
+      const terminalId = optional(q.Terminal?.ID)
+      const merchantId = optional(q.Terminal?.MerchantID)
+      const authAmount = optional(r?.AuthAmount)
+      const responseCode = optional(response?.Code)
+      const reasonCode = optional(response?.ReasonCode)
+      const bankAuthCode = optional(r?.AuthCode)
+      const presentResponseCodes = [responseCode, reasonCode].filter(Boolean)
+      const checks = {
+        order_match: orderId === order.merchantReference,
+        terminal_match: terminalId === this.config.terminalId && merchantId === this.config.merchantId,
+        mode_match: mode === '' ? null : mode === 'PROD',
+        amount_match: authAmount === '' ? null : authAmount === String(order.amountMinor),
+        explicit_response_ok: presentResponseCodes.length ? presentResponseCodes.every(code => code === '00') : null,
+        signed_return_verified: signedReturnVerified,
+        auth_code_match: authCode === undefined || !bankAuthCode ? null : bankAuthCode === authCode,
+      }
+      console.info(JSON.stringify({ event: 'garanti_live_observation', order_id: order.id, http,
+        ...checks, mode: safe(mode), response_code: safe(responseCode), reason_code: safe(reasonCode),
+        status: safe(optional(r?.Status)), charge_type: safe(optional(r?.ChargeType)),
+        result_code: safe(optional(r?.Code)), auth_date_present: !!optional(r?.AuthDate) }))
+      // Live response-field semantics are not confirmed. Preserve all positive
+      // evidence for review, but never create a settlement DTO in this mode.
+    } catch {
+      console.info(JSON.stringify({ event: 'garanti_live_observation', order_id: order.id,
+        signed_return_verified: signedReturnVerified, query_received: false,
+        order_match: null, query_result: 'unavailable_or_ambiguous' }))
+    }
+    throw new GarantiPending(order.id)
+  }
+  async query(order: PaymentOrder, ip: string, authCode?: string, signedReturnVerified = false): Promise<VerifiedPayment> {
     const c = this.config
     if (c.observationOnly) {
       await this.observeQuery(order, ip, authCode)
       throw new GarantiPending(order.id)
     }
+    if (c.liveObservationOnly) return this.observeLiveQuery(order, ip, authCode, signedReturnVerified)
     const { http, q } = await this.inquire(order, ip)
     const echoedMode = q.Mode === undefined ? '' : scalar(q.Mode)
     const modeMatches = echoedMode === c.mode || (c.mode === 'TEST' && echoedMode === ''

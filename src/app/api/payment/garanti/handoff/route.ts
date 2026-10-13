@@ -35,10 +35,13 @@ function html(body: string, formOrigin: string, script?: { nonce: string; text: 
 export async function GET(request: Request) {
   if (!paymentAvailable()) return unavailable()
   try {
-    const { redirect, provider } = await authorized(request)
+    const { redirect, provider, order } = await authorized(request)
     // GET never sends a sale or consumes the token; user explicitly posts once.
     const notice = provider.config.observationOnly ? '<p>Yalnızca Garanti TEST kartı kullanın. Sonuç her durumda doğrulama bekliyor olarak tutulur; sipariş ödenmiş sayılmaz.</p>' : ''
-    return html(`<h1>Garanti BBVA ${provider.config.observationOnly ? 'TEST' : 'güvenli ödeme'}</h1>${notice}<p>Kart bilgilerinizi bankanın sayfasında gireceksiniz.</p><form method="post" action="${escapeMarkup(redirect)}"><button type="submit">Banka Ödeme Sayfasına Geç</button></form>`, provider.config.siteOrigin)
+    const liveNotice = provider.config.liveObservationOnly
+      ? `<p><strong>Kontrollü canlı deneme — gerçek tahsilat yapılabilir.</strong> Sipariş tutarı: ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.amountMinor / 100)}. Banka yanıtı doğrulanıp incelenene kadar bu uygulama siparişi paid yapmaz. Tutar beklediğiniz tutar değilse devam etmeyin.</p>` : ''
+    const title = provider.config.observationOnly ? 'TEST' : provider.config.liveObservationOnly ? 'Kontrollü canlı deneme' : 'güvenli ödeme'
+    return html(`<h1>Garanti BBVA ${title}</h1>${notice}${liveNotice}<p>Kart bilgilerinizi bankanın sayfasında gireceksiniz.</p><form method="post" action="${escapeMarkup(redirect)}"><button type="submit">Banka Ödeme Sayfasına Geç</button></form>`, provider.config.siteOrigin)
   } catch { return new Response('Ödeme geçişi kullanılamıyor. Siparişinizin durumunu kontrol edin.', { status: 409, headers: { 'Cache-Control': 'no-store' } }) }
 }
 export async function POST(request: Request) {

@@ -63,6 +63,39 @@ test('A controlled live trial does not claim sandbox decline/cancel completion a
  const config=garantiConfig(live);assert.equal(config.mode,'PROD');assert.equal(config.initiationMaxAmountMinor,5000);
  assert.throws(()=>garantiConfig({...live,GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:''}));
 });
+test('Isolated live observation keeps bank-confirmation flags false, verifies the signed return and order inquiry, and never yields paid',async()=>{
+ const live={...env,GARANTI_MODE:'PROD',VERCEL_ENV:'production',NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',
+  GARANTI_SITE_ORIGIN:'https://nrsbequiteluminous.com',GARANTI_SUCCESS_URL:'https://nrsbequiteluminous.com/api/payment/garanti/success',
+  GARANTI_ERROR_URL:'https://nrsbequiteluminous.com/api/payment/garanti/failure',GARANTI_OOS_VERIFIED:'false',GARANTI_LIVE_APPROVED:'false',
+  GARANTI_SANDBOX_PASSED:'false',GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:'false',GARANTI_LIVE_CONTROLLED_ONLY:'true',
+  GARANTI_LIVE_OBSERVATION_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000',
+  GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',
+  GARANTI_LIVE_PROVISION_USER:'PROVOOS',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-live-password',GARANTI_LIVE_QUERY_USER:'PROVOOS',
+  GARANTI_LIVE_QUERY_PASSWORD:'synthetic-live-query-password',GARANTI_LIVE_STORE_KEY:'synthetic-live-store-key',
+  GARANTI_LIVE_FORM_URL:'https://sanalposprov.garanti.com.tr/servlet/gt3dengine',GARANTI_LIVE_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet',
+  GARANTI_CAPTURED_STATUS:'',GARANTI_CAPTURED_RESULT_CODE:'',GARANTI_SALE_CHARGE_TYPE:'',GARANTI_FINAL_FAILED_STATUSES:''};
+ const config=garantiConfig(live);assert.equal(config.liveObservationOnly,true);assert.equal(config.initiationMaxAmountMinor,5000);
+ assert.throws(()=>garantiConfig({...live,GARANTI_LIVE_OBSERVATION_ONLY:'false'}));
+ assert.throws(()=>garantiConfig({...live,VERCEL_ENV:'preview'}));
+ assert.throws(()=>garantiConfig({...live,NEXT_PUBLIC_SUPABASE_URL:'https://dzuxhwtbuojnhibzfxqy.supabase.co'}));
+ const liveOrder={...order,state:'pending'};let calls=0;const logs=[];
+ const provider=new GarantiProvider(config,async()=>liveOrder,async(url,options)=>{
+  calls++;assert.equal(url,config.queryUrl);assert.match(Buffer.from(options.body).toString(),/<Mode>PROD<\/Mode>/);
+  return response({mode:'',omitMode:true,omitAuthDate:true,code:'',responseCode:'00',terminal:config.terminalId,merchant:config.merchantId});
+ });
+ const originalInfo=console.info;console.info=(value)=>logs.push(JSON.parse(value));
+ try { await assert.rejects(provider.verifyReturn(signedReturn({},config),headers),GarantiPending); }
+ finally { console.info=originalInfo; }
+ assert.equal(calls,1);assert.equal(logs.length,2);
+ assert.equal(logs[0].event,'garanti_live_return_verified');assert.equal(logs[0].signature_verified,true);
+ assert.equal(logs[0].order_match,true);assert.equal(logs[0].amount_match,true);assert.equal(logs[0].currency_match,true);
+ assert.equal(logs[0].terminal_match,true);assert.equal(logs[0].request_match,true);
+ assert.equal(logs[1].event,'garanti_live_observation');assert.equal(logs[1].signed_return_verified,true);
+ assert.equal(logs[1].order_match,true);assert.equal(logs[1].terminal_match,true);assert.equal(logs[1].amount_match,true);
+ assert.equal(logs[1].mode_match,null);assert.equal(logs[1].auth_date_present,false);
+ assert.equal(logs[1].status,'CAPTURED');assert.equal(logs[1].result_code,'00');
+ const serialized=JSON.stringify(logs);for(const secret of ['synthetic-live-password','synthetic-live-query-password','synthetic-live-store-key','123456','987654','authcode'])assert.equal(serialized.includes(secret),false);
+});
 test('ISO-8859-9 hash encoding uses Turkish bytes and rejects replacement characters',()=>{
  assert.deepEqual([...protocol.isoBytes('ĞİŞğış')],[208,221,222,240,253,254]);
  assert.throws(()=>protocol.isoBytes('😀'));assert.throws(()=>protocol.isoBytes('Ð'));

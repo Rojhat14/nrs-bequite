@@ -122,10 +122,12 @@ Aşağıdaki `GARANTI_{TEST|LIVE}_...` adları iki ayrı gerçek değişkeni ifa
 | GARANTI_LIVE_CONTROLLED_ONLY | Yalnızca kontrollü Production denemesi hazırlanırken `true`; başka hesapları açmaz |
 | GARANTI_LIVE_ALLOWED_USER_ID | İzin verilecek tek Supabase Auth kullanıcı UUID'si; yalnızca Vercel Production'da girilir |
 | GARANTI_LIVE_MAX_AMOUNT_MINOR | Kuruş cinsinden üst sınır; en fazla `50000` (500 TL), küçük deneme için daha düşük seçilir |
+| GARANTI_LIVE_OBSERVATION_ONLY | Yalnızca kullanıcı tarafından başlatılan tek hesaplı gerçek PROD denemesi; imzalı dönüş/orderinq kanıtını kaydeder ve siparişi pending bırakır. Banka teyit bayraklarını doğrulanmış yapmaz |
 
 Genel PAYMENT_API_KEY/API_SECRET alanları bu adaptörde kullanılmaz; Garanti
 şifreleri bu alanlara tahminî olarak eşleştirilmez. TEST modu Production'da
-reddedilir. Canlı mod ayrıca sandbox kabulü ve canlı onayı olmadan çalışmaz.
+reddedilir. `GARANTI_SANDBOX_PASSED`, canlı gözlem için kullanılmaz ve bu akış
+ret/iptal TEST senaryolarını tamamlanmış göstermez.
 
 ## Dönüş URL'leri ve banka tanımları
 
@@ -192,6 +194,22 @@ değerlerinden varsayılmaz. Bankadan Production başarılı/ret/iptal yanıtlar
 `GARANTI_LIVE_APPROVED` ve `PAYMENT_DATABASE_VERIFIED` etkinleştirilmemelidir.
 Kontrollü tek-hesap canlı denemesi `GARANTI_SANDBOX_PASSED` değerini doldurmaz;
 ret/iptal testleri eksiktir, bu yüzden geniş müşteri açılımı yapılmaz.
+
+`GARANTI_LIVE_OBSERVATION_ONLY=true` ayrı bir kullanıcı kontrollü köprü sağlar:
+Production URL/DB, tek Auth UUID, tutar tavanı, canlı Garanti kimlik bilgileri ve
+yetkili servis DB erişimi yine zorunludur; `/api/payment/quote` ve `/create` diğer
+hesapları reddeder. Bu özel modda `GARANTI_OOS_VERIFIED`, `GARANTI_LIVE_APPROVED`
+ve `GARANTI_LIVE_QUERY_FIELDS_CONFIRMED` doğruymuş gibi ayarlanmaz ve bu bayraklar
+canlı başlatmayı engellemez. Kullanıcı banka sayfasına geçmeden kesin TRY tutarını
+görür; banka terminali yetkisizse gerçek banka yanıtını alır. Dönüş imzası ve
+bağımsız orderinq sorgusu kontrol edilir; kimlik/terminal eşleşmeleri veya açık
+banka hata kodları çelişirse kanıt başarı sayılmaz. Bilinmeyen/boş durum
+eşleştirmelerinde de sipariş `pending` kalır. Bu gözlem yolunda finalize RPC
+çağrılmaz; banka kartı tahsil etmiş olabilir, bu nedenle yeni deneme yapılmadan
+önce banka sonucu incelenmelidir. Log yalnızca sipariş korelasyonu, doğrulama
+boole'ları, HTTP ve temizlenmiş banka durum/kod alanlarını içerir; ham POST,
+kart alanları, parola ve StoreKey içermez. Genel müşteri açılımı için ret/iptal
+TEST'leri ve bankanın Production alan eşleştirmeleri ayrıca tamamlanmalıdır.
 
 ## Son doğrulama sonucu — 13 Ekim 2026
 

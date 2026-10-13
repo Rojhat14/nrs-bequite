@@ -7,7 +7,7 @@ const digest=createHash('sha256').update(JSON.stringify({items:input.items,custo
 function fixture(observation=true, sameKey=false){
  let order={id,userId:'owner',merchantReference:id,state:'pending',redirectUrl:origin+'/api/payment/garanti/handoff?token=old',amountMinor:100,currency:'TRY',legal:{}};
  let writes=0,creates=0,signs=0;
- class GarantiProvider{constructor(){this.name='garanti-oos';this.settlementDisabled=true;this.config={observationOnly:true,siteOrigin:origin};this.allowedRedirectOrigins=[origin]}
+ class GarantiProvider{constructor(){this.name='garanti-oos';this.settlementDisabled=true;this.testObservationOnly=true;this.config={observationOnly:true,siteOrigin:origin};this.allowedRedirectOrigins=[origin]}
  handoff(token){if(token!=='old')throw new Error('expired');return{id}}
  async initiate(o){signs++;assert.equal(o.state,'initiating');return {redirectUrl:origin+'/api/payment/garanti/handoff?token=fresh'}}}
  const db={from(){return{select(){return this},eq(){return this},in(){return this},async maybeSingle(){return{data:sameKey?{order_id:id,user_id:order.userId,guest_hash:null,request_hash:digest,merchant_reference:id,amount_minor:100,currency:'TRY',state:order.state,provider:'garanti-oos'}:null,error:null}},async limit(){return{data:[{order_id:id,user_id:'owner',guest_hash:null,request_hash:digest,merchant_reference:id,amount_minor:100,currency:'TRY',state:order.state,provider:'garanti-oos'}],error:null}}}}};
@@ -25,6 +25,15 @@ test('A distinct TEST key never silently reuses another pending order',async()=>
  for(const changed of [{...input,quoteHash:'b'.repeat(64)},{...input,customer:{...input.customer,address:'Changed'}},{...input,items:[{...input.items[0],quantity:2}]}]){
  const f=fixture();assert.equal(await f.repo.findExisting(changed,'owner',null),null);
  assert.deepEqual(f.counts(),{writes:0,creates:0,signs:0});}
+});
+test('Live observation never calls the TEST-only pending order resume path',async()=>{
+ const service=loader()('src/lib/payment/service.ts');let resumes=0;
+ const existing={id,merchantReference:id,state:'pending',amountMinor:100,currency:'TRY'};
+ const repository={findExisting:async()=>existing,getRedirect:async()=>({redirectUrl:origin+'/api/payment/garanti/handoff?token=existing'}),resumeUnsubmittedTest:async()=>{resumes++;throw Error('TEST-only RPC must not run')}};
+ const provider={name:'garanti-oos',merchantId:'live-terminal',settlementDisabled:true,testObservationOnly:false,
+  initiationMaxAmountMinor:5000,allowedRedirectOrigins:[origin]};
+ const result=await service.initiatePayment(input,'owner',null,repository,provider,{customerIp:'127.0.0.1'});
+ assert.equal(result.orderId,id);assert.equal(resumes,0);
 });
 test('Submitted, wrong-owner and in-flight TEST handoffs cannot be renewed',async()=>{
  for(const change of [{redirectUrl:origin+'/api/payment/garanti/handoff?token=old&used=1'},{userId:'other'},{state:'initiating'}]){

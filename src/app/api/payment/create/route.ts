@@ -17,11 +17,12 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Kartla ödeme için hesabınıza giriş yapın.' }, { status: 401 })
     const provider = getPaymentProvider()
     if (!paymentAvailableForUser(user.id)) return NextResponse.json({ error: 'Kartla ödeme bu hesap için açık değil.' }, { status: 403 })
+    const { GarantiProvider } = await import('@/lib/payment/garanti/adapter')
     const rawIp = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
     const { isIP } = await import('node:net')
-    // The bank's published TEST example IP lets IPv6 users exercise this
-    // observation-only simulator. Actual/live payments never use this fallback.
-    const customerIp = provider.settlementDisabled && isIP(rawIp) !== 4 ? '192.168.0.1' : rawIp
+    // Only the published TEST simulator may use its sample IP fallback.
+    // A live observation is still a real bank request and uses the real client IP.
+    const customerIp = provider instanceof GarantiProvider && provider.config.observationOnly && isIP(rawIp) !== 4 ? '192.168.0.1' : rawIp
     const result = await initiatePayment(await boundedJson(request), user.id,
       null, createPaymentRepository(), provider, { customerIp })
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
