@@ -3,7 +3,7 @@ import { isoBytes } from './protocol'
 
 export interface GarantiConfig {
   observationOnly?: boolean; liveObservationOnly?: boolean; singleFinalizeTest?: boolean
-  mode: 'TEST' | 'PROD'; merchantId: string; terminalId: string; userId: string
+  mode: 'TEST' | 'PROD'; merchantId: string; terminalId: string; userId: string; queryAgentUserId: string
   provisionUser: string; provisionPassword: string; queryUser: string; queryPassword: string
   storeKey: string; handoffSecret: string; siteOrigin: string; formUrl: string; queryUrl: string
   successUrl: string; errorUrl: string; installment: '' | '0'
@@ -80,6 +80,13 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
   if (!['PROVAUT', 'PROVOOS'].includes(provisionUser) || !['PROVAUT', 'PROVOOS', 'PROVRFN'].includes(queryUser)) throw new Error('Garanti user invalid.')
   const userId = field('USER_ID')
   if (!/^[A-Za-z0-9_]{1,32}$/.test(userId)) throw new Error('Garanti user invalid.')
+  // Common-payment terminaluserid and orderinq Terminal/UserID are separate
+  // bank fields. Preserve TEST's previous value by default; require explicit
+  // Production configuration so the two official examples cannot be conflated.
+  const queryAgentUserId = test
+    ? (env[prefix + 'QUERY_AGENT_USER_ID'] || userId)
+    : field('QUERY_AGENT_USER_ID')
+  if (!/^[A-Za-z0-9_]{1,32}$/.test(queryAgentUserId)) throw new Error('Garanti user invalid.')
   const site = new URL(env.GARANTI_SITE_ORIGIN || '')
   if (site.protocol !== 'https:' || site.username || site.password || site.pathname !== '/' || site.search || site.hash) throw new Error('Garanti site URL invalid.')
   const url = (name: string, path: string) => {
@@ -107,7 +114,7 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
   if (!test && !controlledLiveAmountAllowed(Number(initiationMaxAmountMinor), env)) {
     throw new Error('A small controlled live amount ceiling is required.')
   }
-  return { observationOnly, liveObservationOnly, singleFinalizeTest, mode: test ? 'TEST' : 'PROD', merchantId, terminalId, userId, provisionUser,
+  return { observationOnly, liveObservationOnly, singleFinalizeTest, mode: test ? 'TEST' : 'PROD', merchantId, terminalId, userId, queryAgentUserId, provisionUser,
     provisionPassword: field('PROVISION_PASSWORD'), queryUser, queryPassword: field('QUERY_PASSWORD'),
     storeKey: field('STORE_KEY'), handoffSecret, siteOrigin: site.origin,
     formUrl: endpoint('FORM_URL', '/servlet/gt3dengine'), queryUrl: endpoint('QUERY_URL', '/VPServlet'),

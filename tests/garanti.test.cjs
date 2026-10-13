@@ -50,17 +50,30 @@ test('Controlled live eligibility is tied to one Production auth UUID and a posi
   {GARANTI_LIVE_MAX_AMOUNT_MINOR:'5e3'}])
   assert.equal(controlledLiveAmountAllowed(1,{...live,...changes}),false);
 });
+test('Common-payment and orderinq agent UserID values are independently configured',()=>{
+ const common=protocol.bankFields(c,order,'127.0.0.1');
+ assert.equal(common.terminaluserid,'PROVAUT');assert.equal(common.terminalprovuserid,'PROVAUT');
+ const xml=protocol.queryXml({...c,queryAgentUserId:'QUERY_AGENT'},order,'127.0.0.1');
+ assert.match(xml,/<ProvUserID>PROVAUT<\/ProvUserID>/);assert.match(xml,/<UserID>QUERY_AGENT<\/UserID>/);
+ assert.equal(c.queryAgentUserId,c.userId,'TEST keeps its pre-existing default when the new variable is absent');
+});
 test('A controlled live trial does not claim sandbox decline/cancel completion and still requires bank query-field confirmation',()=>{
  const live={...env,GARANTI_MODE:'PROD',VERCEL_ENV:'production',NEXT_PUBLIC_SUPABASE_URL:'https://moiynemxthkmgpgnfajd.supabase.co',
   GARANTI_SITE_ORIGIN:'https://nrsbequiteluminous.com',GARANTI_SUCCESS_URL:'https://nrsbequiteluminous.com/api/payment/garanti/success',
   GARANTI_ERROR_URL:'https://nrsbequiteluminous.com/api/payment/garanti/failure',GARANTI_OOS_VERIFIED:'true',GARANTI_LIVE_APPROVED:'true',
   GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:'true',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-  GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000',GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',
-  GARANTI_LIVE_PROVISION_USER:'PROVOOS',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-live-password',GARANTI_LIVE_QUERY_USER:'PROVOOS',
+  GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000',GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',GARANTI_LIVE_QUERY_AGENT_USER_ID:'PROVAUT',
+  GARANTI_LIVE_PROVISION_USER:'PROVAUT',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-live-password',GARANTI_LIVE_QUERY_USER:'PROVAUT',
   GARANTI_LIVE_QUERY_PASSWORD:'synthetic-live-query-password',GARANTI_LIVE_STORE_KEY:'synthetic-live-store-key',
   GARANTI_LIVE_FORM_URL:'https://sanalposprov.garanti.com.tr/servlet/gt3dengine',GARANTI_LIVE_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet'};
  delete live.GARANTI_SANDBOX_PASSED;
  const config=garantiConfig(live);assert.equal(config.mode,'PROD');assert.equal(config.initiationMaxAmountMinor,5000);
+ assert.equal(config.userId,'GARANTI');assert.equal(config.queryAgentUserId,'PROVAUT');
+ assert.equal(config.provisionUser,'PROVAUT');assert.equal(config.queryUser,'PROVAUT');
+ const liveForm=protocol.bankFields(config,order,'127.0.0.1');
+ assert.equal(liveForm.terminaluserid,'GARANTI');assert.equal(liveForm.terminalprovuserid,'PROVAUT');
+ const liveQuery=protocol.queryXml(config,order,'127.0.0.1');
+ assert.match(liveQuery,/<ProvUserID>PROVAUT<\/ProvUserID>/);assert.match(liveQuery,/<UserID>PROVAUT<\/UserID>/);
  assert.throws(()=>garantiConfig({...live,GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:''}));
 });
 test('Isolated live observation keeps bank-confirmation flags false, verifies the signed return and order inquiry, and never yields paid',async()=>{
@@ -69,8 +82,8 @@ test('Isolated live observation keeps bank-confirmation flags false, verifies th
   GARANTI_ERROR_URL:'https://nrsbequiteluminous.com/api/payment/garanti/failure',GARANTI_OOS_VERIFIED:'false',GARANTI_LIVE_APPROVED:'false',
   GARANTI_SANDBOX_PASSED:'false',GARANTI_LIVE_QUERY_FIELDS_CONFIRMED:'false',GARANTI_LIVE_CONTROLLED_ONLY:'true',
   GARANTI_LIVE_OBSERVATION_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',GARANTI_LIVE_MAX_AMOUNT_MINOR:'5000',
-  GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',
-  GARANTI_LIVE_PROVISION_USER:'PROVOOS',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-live-password',GARANTI_LIVE_QUERY_USER:'PROVOOS',
+  GARANTI_LIVE_MERCHANT_ID:'1000001',GARANTI_LIVE_TERMINAL_ID:'12345678',GARANTI_LIVE_USER_ID:'GARANTI',GARANTI_LIVE_QUERY_AGENT_USER_ID:'PROVAUT',
+  GARANTI_LIVE_PROVISION_USER:'PROVAUT',GARANTI_LIVE_PROVISION_PASSWORD:'synthetic-live-password',GARANTI_LIVE_QUERY_USER:'PROVAUT',
   GARANTI_LIVE_QUERY_PASSWORD:'synthetic-live-query-password',GARANTI_LIVE_STORE_KEY:'synthetic-live-store-key',
   GARANTI_LIVE_FORM_URL:'https://sanalposprov.garanti.com.tr/servlet/gt3dengine',GARANTI_LIVE_QUERY_URL:'https://sanalposprov.garanti.com.tr/VPServlet',
   GARANTI_CAPTURED_STATUS:'',GARANTI_CAPTURED_RESULT_CODE:'',GARANTI_SALE_CHARGE_TYPE:'',GARANTI_FINAL_FAILED_STATUSES:''};

@@ -36,6 +36,13 @@ Başka hedef verilirse banka belgesi incelenmeden izin listesi genişletilmez.
   gösterir. TEST yayını bu değerlerle hazırlanmıştır. Önceki salt okunur sorgu
   PROVAUT ile HTTP 200 / 0110 döndü. Bu belgelenmiş test bilgileri kullanıcıdan
   tekrar istenmez; canlı terminal/kullanıcı onayı ayrı koşuldur.
+- Canlı ortak ödeme formundaki `terminaluserid` (`GARANTI_LIVE_USER_ID`) ile
+  orderinq XML'indeki `<UserID>` (`GARANTI_LIVE_QUERY_AGENT_USER_ID`) ayrı
+  sunucu ayarlarıdır. Orderinq `<ProvUserID>` için
+  `GARANTI_LIVE_QUERY_USER` kullanılır. Resmî örneklerin başlangıç eşlemesi
+  form `GARANTI` / form `PROVAUT` / sorgu `PROVAUT` / sorgu `PROVAUT` şeklindedir.
+  Bu örnekler canlı terminal yetkisini kanıtlamaz. `GARANTI_LIVE_PROVISION_USER`
+  ayrıca atanır; `PROVOOS` yalnızca aktif olduğu bilgisine dayanarak seçilmez.
 - C#/Java terminalin başına `0` ekler; PHP dokuz haneye doldurur. Sekiz haneli,
   başında sıfır olmayan terminalde eşleşirler. Diğer biçimler otomatik kabul edilmez.
 - PDF canlı StoreKey temsili ile kamuya açık test StoreKey'i farklı kurulumlar
