@@ -16,7 +16,7 @@ export default function LegalOrderSummary({ summary, preview = false }: { summar
         {item.measurements && <p>Özel ölçüler: {formatMeasurements(item.measurements) || 'Belirtilmedi'}</p>}
         <p>{item.quantity} adet × {money(item.unitPrice)} = {money(Math.round(item.unitPrice * 100) * item.quantity / 100)}</p>
         <p className="text-xs text-nrs-ink/60">Ürün kodu: {item.productId}</p>
-        {preview && <Link href={`/product/${encodeURIComponent(item.productId)}`} target="_blank" rel="noopener noreferrer"
+        {preview && item.productId !== 'nrs-garanti-live-3try' && <Link href={`/product/${encodeURIComponent(item.productId)}`} target="_blank" rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center underline underline-offset-4">Ürünün temel özelliklerini incele</Link>}
       </li>)}
     </ul>

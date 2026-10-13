@@ -3,6 +3,7 @@ const {loader}=require('./source-loader.cjs');
 const load=loader();
 const {GarantiProvider,GarantiPending}=load('src/lib/payment/garanti/adapter.ts');
 const {garantiConfig,controlledLiveAccountAllowed,controlledLiveAmountAllowed}=load('src/lib/payment/garanti/config.ts');
+const {isLiveObservationProduct,LIVE_OBSERVATION_PRODUCT_ID}=load('src/lib/payment/garanti/live-observation-product.ts');
 const protocol=load('src/lib/payment/garanti/protocol.ts');
 const id='11111111-1111-4111-8111-111111111111';
 // Synthetic credentials and bank responses only; no customer/bank access data.
@@ -58,6 +59,13 @@ test('Controlled live eligibility is tied to one Production auth UUID and a posi
   {GARANTI_LIVE_MAX_AMOUNT_MINOR:'50001'},{GARANTI_LIVE_MAX_AMOUNT_MINOR:'1.5'},
   {GARANTI_LIVE_MAX_AMOUNT_MINOR:'5e3'}])
   assert.equal(controlledLiveAmountAllowed(1,{...live,...changes}),false);
+});
+test('Live observation product is fixed to the hidden 3 TRY catalog row',()=>{
+ const valid={id:LIVE_OBSERVATION_PRODUCT_ID,name:'controlled observation',description:null,price_amount:'3.00',currency:'TRY',status:'active',in_stock:true,payment_test_only:true};
+ assert.equal(isLiveObservationProduct(valid),true);
+ for(const changes of [{id:'other'},{price_amount:'3.01'},{currency:'USD'},{payment_test_only:false},{status:'draft'},{in_stock:false}])
+  assert.equal(isLiveObservationProduct({...valid,...changes}),false);
+ assert.equal(isLiveObservationProduct(null),false);
 });
 test('Common-payment and orderinq agent UserID values are independently configured',()=>{
  const common=protocol.bankFields(c,order,'127.0.0.1');
