@@ -72,6 +72,13 @@ export async function saveGarantiOrderinqReconciliation(orderId: string,
   })
   if (error) throw new Error('Garanti reconciliation evidence could not be stored.')
 }
+export async function closeExpiredGarantiNoRecordOrder(orderId: string, handoffExpiresAt: number) {
+  const { data, error } = await paymentDatabase().rpc('nrs_close_expired_garanti_no_record_order', {
+    p_order_id: orderId, p_handoff_expires_at: handoffExpiresAt,
+  })
+  if (error) throw new Error('Unverified expired payment could not be closed.')
+  return data as { closed: boolean; idempotent: boolean; reason: string }
+}
 export async function readGarantiOrderinqReconciliation(orderId: string) {
   const { data, error } = await paymentDatabase().from('garanti_orderinq_reconciliations')
     .select('decision,reason,evidence,updated_at').eq('order_id', orderId).maybeSingle()
@@ -261,8 +268,11 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       if (error) throw new Error('Ödeme durumu yüklenemedi.')
       return data?.redirect_url ? { redirectUrl: data.redirect_url } : null
     },
-    async finalizeAtomic(payment: VerifiedPayment, provider: string) {
-      const { error } = await db.rpc('nrs_finalize_payment', { p_payment: payment, p_provider: provider })
+    async finalizeAtomic(payment: VerifiedPayment, provider: string, callbackSignatureVerified = false) {
+      const callbackPayment = callbackSignatureVerified
+        ? { ...payment, callbackSignatureVerified: true }
+        : payment
+      const { error } = await db.rpc('nrs_finalize_payment', { p_payment: callbackPayment, p_provider: provider })
       if (error) throw new Error('Payment result could not be committed.')
     },
   }
@@ -279,5 +289,5 @@ export async function readAccessiblePaymentOrder(id: string) {
   const { data, error } = await paymentDatabase().rpc('nrs_read_payment_order',
     { p_order_id: id, p_user_id: user?.id ?? null, p_guest_hash: guestHash })
   if (error || !data) return null
-  return data as { id: string; status: PaymentOrder['state']; legal: OrderLegalRecord }
+  return data as { id: string; status: PaymentOrder['state'] | 'payment_unverified'; legal: OrderLegalRecord }
 }

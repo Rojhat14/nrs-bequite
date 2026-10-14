@@ -11,18 +11,21 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
   const paid = status === 'paid'
   const cancelled = status === 'cancelled' || status === 'canceled'
   const verifiedFailure = status === 'failed' || status === 'payment_failed'
+  const unverifiedClosed = status === 'payment_unverified'
 
   const title = !order
     ? orderId ? 'Sipariş bilgisi görüntülenemiyor' : 'Ödeme durumu kontrol ediliyor'
     : paid ? 'Ödemeniz alındı'
       : cancelled ? 'Siparişiniz iptal edildi'
         : verifiedFailure ? 'Ödeme tamamlanamadı'
+          : unverifiedClosed ? 'Ödeme doğrulanamadı'
           : 'Ödeme durumu kontrol ediliyor'
   const description = !order
     ? 'Sipariş bilgilerine erişim doğrulanamadı. Hesabınızdaki siparişler bölümünden kontrol edebilir veya bize ulaşabilirsiniz.'
     : paid ? 'Ödemeniz doğrulandı. Siparişinizin ayrıntılarına hesabınızdan ulaşabilirsiniz.'
       : cancelled ? 'Siparişiniz uygulamada iptal edildi olarak doğrulandı. Yeni bir alışverişe başlayabilirsiniz.'
         : verifiedFailure ? 'Ödeme alınamadı. Lütfen tekrar deneyin.'
+          : unverifiedClosed ? 'Ödeme doğrulanamadı. Sipariş tamamlanmadı.'
           : 'Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'
 
   const Icon = paid ? CheckCircle2 : verifiedFailure || cancelled ? XCircle : Clock3

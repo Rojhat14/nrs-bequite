@@ -37,5 +37,5 @@ export interface PaymentRepository {
   createAtomic(request: CheckoutRequest, userId: string | null, guestHash: string | null, quote: Quote): Promise<{ order: PaymentOrder; created: boolean }>
   storeRedirect(orderId: string, redirect: PaymentRedirect): Promise<void>
   getRedirect(orderId: string): Promise<PaymentRedirect | null>
-  finalizeAtomic(payment: VerifiedPayment, provider: string): Promise<void>
+  finalizeAtomic(payment: VerifiedPayment, provider: string, callbackSignatureVerified?: boolean): Promise<void>
 }

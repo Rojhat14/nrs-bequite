@@ -4,7 +4,7 @@ import { getPaymentProvider } from '@/lib/payment/provider'
 import { controlledLiveAccountAllowed } from '@/lib/payment/garanti/config'
 import { GarantiPending, GarantiProvider } from '@/lib/payment/garanti/adapter'
 import { loadGarantiOrder } from '@/lib/payment/garanti/order'
-import { createPaymentRepository, readGarantiSettlementEvidence, saveGarantiOrderinqReconciliation } from '@/lib/payment/repository'
+import { closeExpiredGarantiNoRecordOrder, createPaymentRepository, readGarantiSettlementEvidence, saveGarantiOrderinqReconciliation } from '@/lib/payment/repository'
 import { sameOrigin, boundedJson } from '@/lib/payment/http'
 import { UUID } from '@/lib/payment/request'
 
@@ -55,7 +55,16 @@ export async function POST(request: Request) {
       const evidence = provider.takeLiveReconciliationEvidence()
       if (evidence && evidence.order_id === targetOrderId) {
         const reason = error instanceof GarantiPending ? evidence.reason : 'GARANTI_RECONCILIATION_UNAVAILABLE'
-        try { await saveGarantiOrderinqReconciliation(targetOrderId, 'pending', reason, { ...evidence, decision: 'pending', reason }) }
+        try {
+          await saveGarantiOrderinqReconciliation(targetOrderId, 'pending', reason, { ...evidence, decision: 'pending', reason })
+          if (error instanceof GarantiPending && reason === 'GARANTI_BANK_RECORD_NOT_FOUND') {
+            const handoff = await provider.expiredSubmittedHandoff(targetOrderId, user.id)
+            if (handoff?.expired) {
+              const result = await closeExpiredGarantiNoRecordOrder(targetOrderId, handoff.expiresAt)
+              return json(200, { state: result.closed || result.idempotent ? 'unverified_closed' : 'pending' })
+            }
+          }
+        }
         catch { console.warn(JSON.stringify({ event: 'garanti_reconciliation_evidence_store_failed', order_id: targetOrderId })) }
       }
     }

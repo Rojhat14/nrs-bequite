@@ -5,7 +5,7 @@ import { assertFinalLegalOrderSummary } from '@/lib/legal/order-summary'
 import type { PaymentOrder } from '@/lib/payment/types'
 import { garantiLiveSingleFinalizeArmed, garantiSingleFinalizeTest } from './config'
 
-export interface StoredGarantiOrder extends PaymentOrder { userId: string; redirectUrl: string | null }
+export interface StoredGarantiOrder extends PaymentOrder { userId: string; redirectUrl: string | null; appStatus?: string }
 // Bank returns use server credentials and a verified bank signature, not cookies.
 export async function loadGarantiOrder(reference: string): Promise<StoredGarantiOrder> {
   if (!UUID.test(reference)) throw new Error('Invalid payment reference.')
@@ -17,10 +17,12 @@ export async function loadGarantiOrder(reference: string): Promise<StoredGaranti
   const { data: legal, error: legalError } = await db.from('order_legal_records').select('*').eq('order_id', p.order_id).single()
   if (legalError || !legal) throw new Error('Legal order record unavailable.')
   assertFinalLegalOrderSummary(legal.order_summary)
+  const { data: appOrder, error: appOrderError } = await db.from('orders').select('status').eq('id', p.order_id).single()
+  if (appOrderError || !appOrder) throw new Error('Application order unavailable.')
   const amountMinor = Number(p.amount_minor)
   if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || Math.round(legal.order_summary.total * 100) !== amountMinor) throw new Error('Payment amount mismatch.')
   return { id: p.order_id, userId: p.user_id, merchantReference: p.merchant_reference, amountMinor,
-    currency: p.currency, state: p.state, legal, redirectUrl: p.redirect_url }
+    currency: p.currency, state: p.state, legal, redirectUrl: p.redirect_url, appStatus: appOrder.status }
 }
 // Existing redirect column is a one-use handoff capability. Atomic compare-and-set
 // across instances prevents two browsers/requests from submitting the bank form.

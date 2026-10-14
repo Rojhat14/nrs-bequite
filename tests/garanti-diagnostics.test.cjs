@@ -169,6 +169,9 @@ test('Cancellation result is shown only when the accessible database order is ca
  assert.match(pending,/Ödeme durumu kontrol ediliyor/);assert.doesNotMatch(pending,/Siparişiniz iptal edildi/);assert.equal(pending.includes('href="/checkout"'),false);
  const failed=renderToStaticMarkup(await makeView('payment_failed')({orderId:id,failure:true}));
  assert.match(failed,/Ödeme alınamadı\. Lütfen tekrar deneyin\./);assert.match(failed,/href="\/collections"/);
+ const unverified=renderToStaticMarkup(await makeView('payment_unverified')({orderId:id,failure:true}));
+ assert.match(unverified,/Ödeme doğrulanamadı\. Sipariş tamamlanmadı\./);
+ assert.doesNotMatch(unverified,/href="\/collections"|yeniden ödeme/i);
 });
 
 test('Unassociated receipts retain separate timestamps instead of deduping a new parse failure into an old probe',async()=>{

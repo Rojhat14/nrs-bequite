@@ -19,7 +19,7 @@ const items=[{productId:'product',variantId,quantity:1}];
 const create = async (id=orderId, key=orderId, owner=userId, guest=null, snapshot=summary) => db.query('select public.nrs_create_payment_order($1::uuid,$2::uuid,$3,$4::uuid,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9) as result',
  [id,owner,guest,key,'a'.repeat(64),JSON.stringify(items),JSON.stringify(customer),JSON.stringify(historicalRecord(id,snapshot)),'test-bank']);
 const callback=(changes={})=>({eventId:'event',merchantId:'test',merchantReference:orderId,transactionId:'transaction',amountMinor:12000,currency:'TRY',status:'paid',threeDS:'authenticated',...changes});
-const finalize=async changes=>db.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(callback(changes)),'test-bank']);
+const finalize=async (changes,provider='test-bank')=>db.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(callback(changes)),provider]);
 async function asCustomer(id, sql, params=[]) {
  await db.exec('SET ROLE authenticated');
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);
@@ -81,7 +81,7 @@ $$;
  await db.exec(fs.readFileSync('supabase/migrations/20261009130000_payment_transaction_hardening.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261009140000_final_security_review_fixes.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261013120000_customer_payment_cancellation.sql','utf8'));
- await db.exec("CREATE TABLE public.garanti_orderinq_reconciliations(order_id uuid PRIMARY KEY,evidence jsonb NOT NULL,CONSTRAINT garanti_orderinq_reconciliations_evidence_check CHECK(evidence='{}'::jsonb))");
+ await db.exec("CREATE TABLE public.garanti_orderinq_reconciliations(order_id uuid PRIMARY KEY,decision text,reason text,evidence jsonb NOT NULL,CONSTRAINT garanti_orderinq_reconciliations_evidence_check CHECK(evidence='{}'::jsonb))");
  await db.exec("ALTER TABLE public.garanti_orderinq_reconciliations ADD CONSTRAINT garanti_orderinq_reconciliations_evidence_check1 CHECK(evidence - ARRAY['order_id','decision','reason','order_match','terminal_match','mode_match','amount_match','outer_response_code','outer_reason_code','result_code','result_reason_code','status','charge_type','auth_amount_state','auth_code_present','bank_reference_present','history_http','history_transaction_code','history_transaction_reason_code','history_result_state','history_record_count','history_identity_match','callback_signature_verified','signature_evidence_present']::text[]='{}'::jsonb)");
  await db.exec(`CREATE FUNCTION public.nrs_garanti_service_role_request() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('request.jwt.claim.role',true),'')='service_role' $$`);
  await db.exec(`CREATE FUNCTION public.nrs_record_garanti_orderinq_reconciliation(p_order_id uuid,p_decision text,p_reason text,p_evidence jsonb)
@@ -89,6 +89,10 @@ $$;
   IF coalesce(current_setting('request.jwt.claim.role',true),'') <> 'service_role' OR (p_evidence - ARRAY['order_id','decision','reason','order_match','terminal_match','mode_match','amount_match','outer_response_code','outer_reason_code','result_code','result_reason_code','status','charge_type','auth_amount_state','auth_code_present','bank_reference_present','history_http','history_transaction_code','history_transaction_reason_code','history_result_state','history_record_count','history_identity_match','callback_signature_verified','signature_evidence_present']::text[]) <> '{}'::jsonb THEN RAISE EXCEPTION 'invalid evidence'; END IF;
   END $$`);
  await db.exec(fs.readFileSync('supabase/migrations/20261014150000_garanti_no_record_checkout.sql','utf8'));
+ await db.exec(`CREATE TABLE public.garanti_payment_return_diagnostics(order_id uuid,diagnostic jsonb);
+ CREATE TABLE public.garanti_live_single_finalize_evidence(order_id uuid,signature_verified boolean);
+ CREATE TABLE public.garanti_live_single_finalize_failures(order_id uuid,callback_signature_verified boolean);`);
+ await db.exec(fs.readFileSync('supabase/migrations/20261014170000_garanti_expired_no_record_close.sql','utf8'));
 });
 test.after(async()=>{ await db.close() });
 test('Local PostgreSQL: atomic creation saves one order, items, legal snapshot and stock reservation',async()=>{
@@ -129,6 +133,63 @@ test('Local PostgreSQL: reconciliation RPC accepts only the expanded safe no-rec
   await db.query("UPDATE public.payment_orders SET state='pending',provider='garanti-oos' WHERE order_id=$1::uuid",[orderId]);
   await db.query("select set_config('request.jwt.claim.role','service_role',true)");
   await db.query("select public.nrs_record_garanti_orderinq_reconciliation($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify({order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND',order_currency_match:true,prov_user_match:true,agent_user_match:true,order_result_present:false,payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0})]);
+ } finally { await db.exec('ROLLBACK'); }
+});
+test('Local PostgreSQL: expired paired no-record closes only app order and releases stock exactly once',async()=>{
+ await db.exec('BEGIN');
+ try {
+  if (!(await db.query('select 1 from public.payment_orders where order_id=$1::uuid',[orderId])).rows.length) await create();
+  await db.query("UPDATE public.payment_orders SET state='pending',provider='garanti-oos',redirect_url='submitted' WHERE order_id=$1::uuid",[orderId]);
+  await db.query("UPDATE public.orders SET status='payment_pending' WHERE id=$1::uuid",[orderId]);
+  await db.query("UPDATE public.product_variants SET stock_quantity=0 WHERE id=$1::uuid",[variantId]);
+  await db.query("UPDATE public.payment_stock_reservations SET quantity=1,released=false WHERE order_id=$1::uuid AND variant_id=$2::uuid",[orderId,variantId]);
+  const evidence={order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND',outer_response_code:'92',outer_reason_code:'0110',history_http:200,history_transaction_code:'92',history_transaction_reason_code:'0108',history_result_state:'empty',history_record_count:0,order_match:true,terminal_match:true,order_currency_match:true,prov_user_match:true,agent_user_match:true,history_identity_match:true,payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0};
+  await db.query("INSERT INTO public.garanti_orderinq_reconciliations(order_id,decision,reason,evidence) VALUES($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify(evidence)]);
+  await db.query("select set_config('request.jwt.claim.role','service_role',true)");
+  const close=()=>db.query("select public.nrs_close_expired_garanti_no_record_order($1::uuid,$2::bigint) result",[orderId,1]);
+  assert.equal((await close()).rows[0].result.closed,true);
+  assert.equal((await db.query('select status from public.orders where id=$1::uuid',[orderId])).rows[0].status,'payment_unverified');
+  const bank=await db.query('select state,redirect_url from public.payment_orders where order_id=$1::uuid',[orderId]);
+  assert.equal(bank.rows[0].state,'pending');assert.equal(bank.rows[0].redirect_url,null);
+  assert.equal((await db.query('select stock_quantity from public.product_variants where id=$1::uuid',[variantId])).rows[0].stock_quantity,1);
+  assert.equal((await db.query('select count(*)::int n from public.payment_stock_reservations where order_id=$1::uuid and released',[orderId])).rows[0].n,1);
+  assert.equal((await close()).rows[0].result.idempotent,true);
+  assert.equal((await db.query('select stock_quantity from public.product_variants where id=$1::uuid',[variantId])).rows[0].stock_quantity,1);
+ } finally { await db.exec('ROLLBACK'); }
+});
+test('Local PostgreSQL: late signed success is recorded for admin review without paid/event/stock mutation',async()=>{
+ await db.exec('BEGIN');
+ try {
+  if (!(await db.query('select 1 from public.payment_orders where order_id=$1::uuid',[orderId])).rows.length) await create();
+  await db.query("UPDATE public.payment_orders SET state='pending',provider='garanti-oos',redirect_url=NULL WHERE order_id=$1::uuid",[orderId]);
+  await db.query("UPDATE public.orders SET status='payment_unverified' WHERE id=$1::uuid",[orderId]);
+  await db.query("UPDATE public.product_variants SET stock_quantity=1 WHERE id=$1::uuid",[variantId]);
+  await db.query("UPDATE public.payment_stock_reservations SET quantity=1,released=true WHERE order_id=$1::uuid AND variant_id=$2::uuid",[orderId,variantId]);
+  const evidence={order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND'};
+  await db.query("INSERT INTO public.garanti_orderinq_reconciliations(order_id,decision,reason,evidence) VALUES($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify(evidence)]);
+  await db.query("select set_config('request.jwt.claim.role','service_role',true)");
+  await db.exec('SAVEPOINT unsigned_late');
+  await assert.rejects(finalize({},'garanti-oos'),/late verified callback review requires signed callback evidence/);
+  await db.exec('ROLLBACK TO SAVEPOINT unsigned_late');
+  await db.exec('RELEASE SAVEPOINT unsigned_late');
+  await finalize({callbackSignatureVerified:true},'garanti-oos');
+  await finalize({callbackSignatureVerified:true},'garanti-oos');
+  assert.equal((await db.query('select status from public.orders where id=$1::uuid',[orderId])).rows[0].status,'payment_unverified');
+  assert.equal((await db.query('select state from public.payment_orders where order_id=$1::uuid',[orderId])).rows[0].state,'pending');
+  assert.equal((await db.query('select count(*)::int n from public.payment_events where order_id=$1::uuid',[orderId])).rows[0].n,0);
+  assert.equal((await db.query('select count(*)::int n from public.garanti_late_settlement_reviews where order_id=$1::uuid',[orderId])).rows[0].n,1);
+  assert.equal((await db.query('select stock_quantity from public.product_variants where id=$1::uuid',[variantId])).rows[0].stock_quantity,1);
+  await db.exec('update public.admin_users set is_active=true');
+  await db.exec('SET ROLE authenticated');
+  await db.query("select set_config('request.jwt.claim.sub',$1,true)",[otherId]);
+  assert.equal((await db.query('select * from public.nrs_admin_late_settlement_reviews($1::uuid)',[orderId])).rows.length,1);
+  await db.exec('RESET ROLE');
+  await db.exec('update public.admin_users set is_active=false');
+  await db.exec('SET ROLE authenticated');
+  await db.query("select set_config('request.jwt.claim.sub',$1,true)",[otherId]);
+  assert.equal((await db.query('select * from public.nrs_admin_late_settlement_reviews($1::uuid)',[orderId])).rows.length,0);
+  await db.exec('RESET ROLE');
+  assert.equal((await db.query("select has_function_privilege('anon','public.nrs_admin_late_settlement_reviews(uuid)','execute') allowed")).rows[0].allowed,false);
  } finally { await db.exec('ROLLBACK'); }
 });
 test('Local PostgreSQL: second buyer cannot consume reserved last stock; transaction leaves no partial order',async()=>{

@@ -196,6 +196,17 @@ export class GarantiProvider implements PaymentProvider {
     this.lastLiveReconciliationEvidence = null
     return evidence
   }
+  async expiredSubmittedHandoff(orderId: string, userId: string) {
+    const stored = await this.loadOrder(orderId) as PaymentOrder & { userId?: string; redirectUrl?: string | null }
+    if (stored.userId !== userId || stored.state !== 'pending' || !stored.redirectUrl) return null
+    const redirect = new URL(stored.redirectUrl)
+    const tokens = redirect.searchParams.getAll('token')
+    if (redirect.origin !== this.config.siteOrigin || redirect.pathname !== '/api/payment/garanti/handoff'
+      || redirect.searchParams.get('used') !== '1' || tokens.length !== 1) return null
+    const payload = this.handoff(tokens[0], true)
+    if (payload.id !== stored.id) return null
+    return { expiresAt: payload.exp, expired: payload.exp < Math.floor(Date.now() / 1000) }
+  }
   private async inquire(order: PaymentOrder, ip: string, queryType: 'orderinq' | 'orderhistoryinq' = 'orderinq') {
     if (isIP(ip) !== 4) throw new GarantiPending(order.id)
     const c = this.config

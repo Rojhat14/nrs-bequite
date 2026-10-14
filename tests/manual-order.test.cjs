@@ -14,7 +14,7 @@ const customer={firstName:'Test',lastName:'Alıcı',email:'test@example.com',pho
 const items=[{productId:'product',variantId,quantity:1,measurements:{chest:92,waist:72,hips:98,height:168,length:110}}];
 const summary={items:[{...items[0],measurementKind:'dress',name:'Test Ürün',description:'Pamuk',size:'M',unitPrice:100}],buyer:{name:'Test Alıcı',email:customer.email,phone:customer.phone,address:'Beytepe, Çankaya, Ankara, 06800'},orderNote:customer.orderNote,subtotal:120,discount:20,shipping:0,total:100,currency:'TRY',paymentMethod:'Havale / EFT — ödeme henüz doğrulanmadı',deliveryTerms:load('src/lib/delivery-policy.ts').DELIVERY_TERMS,orderedAt:new Date().toISOString()};
 async function setup() {
- const db=new PGlite(); await fixture.setup(db);
+ const db=new PGlite(); await fixture.setup(db,true,{omitManualOrderColumns:true});
  const foundation=fixture.read('supabase/migrations/20260928120000_product_database_foundation.sql');
  await db.exec(foundation.slice(foundation.indexOf('CREATE OR REPLACE FUNCTION public.nrs_is_active_admin()'),foundation.indexOf('REVOKE ALL ON FUNCTION public.nrs_is_active_admin()')));
  await db.exec(fs.readFileSync('supabase/migrations/20261009150000_customer_access_hardening.sql','utf8'));

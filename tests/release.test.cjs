@@ -1,20 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
-const Module = require('node:module');
-const ts = require('typescript');
+const { loader } = require('./source-loader.cjs');
 
 // Compile the existing TypeScript in memory; no test dependency or DB access.
 function loadSource(relativePath) {
-  const filename = path.resolve(__dirname, '..', relativePath);
-  const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText;
-  const loaded = new Module(filename, module);
-  loaded.paths = Module._nodeModulePaths(path.dirname(filename));
-  loaded._compile(compiled, filename);
-  return loaded.exports;
+  return loader()(path.resolve(__dirname, '..', relativePath));
 }
 
 const memory = new Map();

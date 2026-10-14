@@ -60,7 +60,7 @@ export async function garantiReturn(request: Request) {
               else console.warn('garanti_test_verified_return_diagnostic_incomplete')
             } catch { console.warn('garanti_test_verified_return_diagnostic_storage_unavailable') }
           }
-          await createPaymentRepository().finalizeAtomic(verified, settlementProvider.name)
+          await createPaymentRepository().finalizeAtomic(verified, settlementProvider.name, true)
           return destination(`/checkout/verify?orderId=${encodeURIComponent(verified.merchantReference)}`)
         }
       } catch {
@@ -107,6 +107,23 @@ export async function garantiReturn(request: Request) {
       const order = await loadGarantiOrder(fields.oid)
       orderId = order.id
       failureStage = 'permission_lookup'
+      if (order.appStatus === 'payment_unverified' && order.state === 'pending') {
+        settlementProvider = new GarantiProvider({ ...provider.config, liveObservationOnly: false, liveDiagnostics: true,
+          capturedStatus: 'APPROVED', capturedResultCode: '00', saleChargeType: 'S', failedStatuses: [] })
+        failureStage = 'callback_signature'
+        const verified = await settlementProvider.verifyReturn(raw, request.headers)
+        failureStage = 'verified_payment'
+        validateVerifiedPayment(verified, settlementProvider)
+        failureStage = 'verified_evidence'
+        const evidence = settlementProvider.takeSuccessfulLiveReturnEvidence()
+        if (!evidence || evidence.order_id !== order.id) throw new Error('Verified live evidence missing.')
+        // The DB function writes a one-time admin review row for a late signed
+        // approval; it leaves the closed app order, pending bank state and the
+        // already-released reservation untouched.
+        failureStage = 'finalize_rpc'
+        await createPaymentRepository().finalizeAtomic(verified, settlementProvider.name, true)
+        return destination(`/checkout/verify?orderId=${encodeURIComponent(order.id)}`)
+      }
       if (await isGarantiLiveSingleFinalizeOrder(order)) {
         settlementProvider = new GarantiProvider({ ...provider.config, liveObservationOnly: false, liveDiagnostics: true,
           capturedStatus: 'APPROVED', capturedResultCode: '00', saleChargeType: 'S', failedStatuses: [] })
@@ -160,7 +177,7 @@ export async function garantiReturn(request: Request) {
     if (!raw) raw = await boundedText(request)
     const verified = await provider.verifyReturn(raw, request.headers)
     validateVerifiedPayment(verified, provider)
-    await createPaymentRepository().finalizeAtomic(verified, provider.name)
+    await createPaymentRepository().finalizeAtomic(verified, provider.name, true)
     return destination(`/checkout/verify?orderId=${encodeURIComponent(verified.merchantReference)}`)
   } catch (error) {
     if (provider.config.liveObservationOnly) {

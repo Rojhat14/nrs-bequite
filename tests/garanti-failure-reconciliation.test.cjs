@@ -1,4 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
+const {createHmac}=require('node:crypto');
 const {loader}=require('./source-loader.cjs');
 const load=loader();
 const {GarantiProvider,GarantiPending}=load('src/lib/payment/garanti/adapter.ts');
@@ -53,6 +54,21 @@ test('Paired 92/0110 and 92/0108 empty history is no-record pending even with a 
   assert.equal(result.evidence.history_transaction_reason_code,'0108');assert.equal(result.evidence.history_result_state,'empty');
   assert.equal(result.evidence.payment_event_count,0);assert.equal(result.evidence.signed_callback_evidence_count,0);
  }finally{for(const key of Object.keys(process.env))if(!(key in old))delete process.env[key];Object.assign(process.env,old)}
+});
+test('The existing signed handoff expiry is the only close clock; active or unsubmitted handoffs are not expired',async()=>{
+ const result=await run({mapping:'',queryOptions:{noRecord:true}});
+ const active=await result.provider.expiredSubmittedHandoff(id,owner);
+ assert.equal(active.expired,false);
+ const payload=Buffer.from(JSON.stringify({id,ip:'127.0.0.1',exp:1})).toString('base64url');
+ const signature=createHmac('sha256','a'.repeat(64)).update(payload).digest('hex');
+ const original=order.redirectUrl;
+ try {
+  order.redirectUrl=`${origin}/api/payment/garanti/handoff?token=${payload}.${signature}&used=1`;
+  const expired=await result.provider.expiredSubmittedHandoff(id,owner);
+  assert.deepEqual(expired,{expiresAt:1,expired:true});
+  order.redirectUrl=order.redirectUrl.replace('&used=1','');
+  assert.equal(await result.provider.expiredSubmittedHandoff(id,owner),null);
+ } finally { order.redirectUrl=original }
 });
 
 test('No-record pair remains pending when payment proof exists or either bank identity/result conflicts',async()=>{

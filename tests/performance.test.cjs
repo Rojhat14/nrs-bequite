@@ -1,21 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
-const Module = require('node:module');
-const ts = require('typescript');
+const { loader } = require('./source-loader.cjs');
 
 function loadSource(relativePath, mocks = {}) {
-  const filename = path.resolve(__dirname, '..', relativePath);
-  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-  }).outputText;
-  const loaded = new Module(filename, module);
-  loaded.paths = Module._nodeModulePaths(path.dirname(filename));
-  const originalRequire = loaded.require.bind(loaded);
-  loaded.require = name => Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
-  loaded._compile(output, filename);
-  return loaded.exports;
+  return loader(mocks)(path.resolve(__dirname, '..', relativePath));
 }
 
 const { createWishlistLookup } = loadSource('src/lib/wishlistLookup.ts');
