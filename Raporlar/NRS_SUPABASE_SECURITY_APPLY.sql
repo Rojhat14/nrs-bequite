@@ -241,7 +241,9 @@ BEGIN
     OR has_table_privilege('authenticated','public.admin_users','DELETE,TRUNCATE,TRIGGER') THEN
     RAISE EXCEPTION 'STOP: unexpected admin registry destructive permission';
   END IF;
-  -- Exact current repository body fingerprints, not a name-only allowlist.
+  -- Exact reviewed repository body fingerprints, not a name-only allowlist.
+  -- Payment creation includes the separately keyed checkout guard removal;
+  -- customer cancellation remains service-role-only and is not exposed in UI.
   -- Exact UTF-8 body bytes, including whitespace in literals and comments.
   FOR r IN SELECT p.*,n.nspname,l.lanname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     JOIN pg_language l ON l.oid=p.prolang WHERE (p.prosecdef AND n.nspname NOT IN ('pg_catalog','information_schema')
@@ -251,8 +253,9 @@ BEGIN
 ('public.nrs_admin_payment_summary(uuid)','a8a0fb47cb13dc18e7448ce511d89e87d1f175ab81db760b4533878606c00d67','plpgsql'),
 ('public.nrs_admin_update_order_status(uuid,text)','fa5a7e69a3c5860d76298d71a22cff5ff870dff98029354ca25284539e4b4131','plpgsql'),
 ('public.nrs_admin_user_summary(uuid)','1ccc32a083b238f9dc836113de6e3f23360f26f4238babbb5a9437ada41c99ed','plpgsql'),
-('public.nrs_create_payment_order(uuid,uuid,text,uuid,text,jsonb,jsonb,jsonb,text)','c01f16f3c1b64e49ee92821e9369cfd332d87b3cac8e6f176aca02263ae40ef3','plpgsql'),
+('public.nrs_create_payment_order(uuid,uuid,text,uuid,text,jsonb,jsonb,jsonb,text)','462d3229c9a46cc561a264343192b57e60c49b8ef89eb300a37cc4eebbe0fcf4','plpgsql'),
 ('public.nrs_finalize_payment(jsonb,text)','92480c6bfb0cf214f00418c791307d70dc6f76de53d2192f862db995746313a7','plpgsql'),
+('public.nrs_customer_cancel_order(uuid,uuid)','f49b32c74839ff722544d30d1f8c7d2cf858a673e578f302a733b3d4fb6b7f72','plpgsql'),
 ('public.nrs_is_active_admin()','b13925b08fe9c02ca430c6f941888aa9aee3f97466a2a37bb5a28140ded5ba80','sql'),
 ('public.nrs_read_payment_order(uuid,uuid,text)','f0e801d74fbabac50dacaac901d980ec8d3f5e859cef84bb53442fd25c177dc8','sql'),
 ('public.nrs_store_payment_redirect(uuid,text)','f724dc0fc8dbf8d63d2fb91a0fcb8d74d8977e04bac20d21a48508acb29ea2ca','plpgsql')
@@ -261,8 +264,9 @@ BEGIN
 ('public.nrs_admin_payment_summary(uuid)','a8a0fb47cb13dc18e7448ce511d89e87d1f175ab81db760b4533878606c00d67','plpgsql'),
 ('public.nrs_admin_update_order_status(uuid,text)','fa5a7e69a3c5860d76298d71a22cff5ff870dff98029354ca25284539e4b4131','plpgsql'),
 ('public.nrs_admin_user_summary(uuid)','1ccc32a083b238f9dc836113de6e3f23360f26f4238babbb5a9437ada41c99ed','plpgsql'),
-('public.nrs_create_payment_order(uuid,uuid,text,uuid,text,jsonb,jsonb,jsonb,text)','c01f16f3c1b64e49ee92821e9369cfd332d87b3cac8e6f176aca02263ae40ef3','plpgsql'),
+('public.nrs_create_payment_order(uuid,uuid,text,uuid,text,jsonb,jsonb,jsonb,text)','462d3229c9a46cc561a264343192b57e60c49b8ef89eb300a37cc4eebbe0fcf4','plpgsql'),
 ('public.nrs_finalize_payment(jsonb,text)','92480c6bfb0cf214f00418c791307d70dc6f76de53d2192f862db995746313a7','plpgsql'),
+('public.nrs_customer_cancel_order(uuid,uuid)','f49b32c74839ff722544d30d1f8c7d2cf858a673e578f302a733b3d4fb6b7f72','plpgsql'),
 ('public.nrs_is_active_admin()','b13925b08fe9c02ca430c6f941888aa9aee3f97466a2a37bb5a28140ded5ba80','sql'),
 ('public.nrs_read_payment_order(uuid,uuid,text)','f0e801d74fbabac50dacaac901d980ec8d3f5e859cef84bb53442fd25c177dc8','sql'),
 ('public.nrs_store_payment_redirect(uuid,text)','f724dc0fc8dbf8d63d2fb91a0fcb8d74d8977e04bac20d21a48508acb29ea2ca','plpgsql')
@@ -274,7 +278,7 @@ BEGIN
       OR pg_get_userbyid(r.proowner) IN ('anon','authenticated','service_role') THEN
       RAISE EXCEPTION 'STOP: unknown/changed SECURITY DEFINER %.%; preserve function and review',r.nspname,r.proname;
     END IF;
-    IF r.proname IN ('nrs_create_payment_order','nrs_store_payment_redirect','nrs_finalize_payment','nrs_read_payment_order') THEN
+    IF r.proname IN ('nrs_create_payment_order','nrs_store_payment_redirect','nrs_finalize_payment','nrs_read_payment_order','nrs_customer_cancel_order') THEN
       IF has_function_privilege('anon',r.oid,'EXECUTE') OR has_function_privilege('authenticated',r.oid,'EXECUTE')
         OR NOT has_function_privilege('service_role',r.oid,'EXECUTE') THEN
         RAISE EXCEPTION 'STOP: unexpected service-only payment RPC permissions on %',r.proname;

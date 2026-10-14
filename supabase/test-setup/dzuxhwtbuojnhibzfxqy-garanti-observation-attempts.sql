@@ -23,11 +23,21 @@ BEGIN
   guard := $guard$  IF EXISTS (SELECT FROM public.payment_orders WHERE user_id=p_user_id AND state IN ('initiating','pending')) THEN
     RAISE EXCEPTION 'Unresolved payment exists; reconcile before a new attempt';
   END IF;$guard$;
-  IF position(guard IN source)=0 OR position(E'BEGIN\n  IF p_user_id IS NULL' IN source)=0 THEN
+  IF position(E'BEGIN\n  IF p_user_id IS NULL' IN source)=0
+    OR position('idempotency_key=p_key FOR UPDATE' IN source)=0
+    OR position('stock_quantity<quantity' IN source)=0 THEN
     RAISE EXCEPTION 'Payment implementation changed; review TEST policy before installation';
   END IF;
+  -- Older TEST functions still carried a user-wide pending guard. Remove it
+  -- only when present; current production code already permits independently
+  -- keyed orders and checks each order's variants under lock.
+  IF position(guard IN source)>0 THEN
+    source := replace(source,guard,'  -- Isolated observation keeps prior reservations; this new key checks its own stock.');
+  END IF;
+  IF position('Unresolved payment exists; reconcile before a new attempt' IN source)>0 THEN
+    RAISE EXCEPTION 'TEST observation RPC retains a user-wide pending guard';
+  END IF;
   source := replace(source,'FUNCTION public.nrs_create_payment_order(', 'FUNCTION public.nrs_create_garanti_test_observation_order(');
-  source := replace(source,guard,'  -- Isolated observation permits distinct keys; existing reservations remain.');
   replacement := $guard$BEGIN
   IF p_provider IS DISTINCT FROM 'garanti-oos'
     OR NOT EXISTS(SELECT FROM public.garanti_test_observation_policy WHERE project_ref='dzuxhwtbuojnhibzfxqy' AND site_origin='https://nrs-bequite-garanti-test.vercel.app')
