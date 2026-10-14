@@ -10,6 +10,7 @@ const roleClaimMigration = fs.readFileSync('supabase/migrations/20261013170000_g
 const additionalSlotMigration = fs.readFileSync('supabase/migrations/20261013180000_garanti_live_additional_controlled_slot.sql', 'utf8')
 const selfTestMigration = fs.readFileSync('supabase/migrations/20261013190000_garanti_live_rpc_rollback_selftest.sql', 'utf8')
 const liveFailureDiagnosticsMigration = fs.readFileSync('supabase/migrations/20261013200000_garanti_live_failure_diagnostics.sql', 'utf8')
+const catalogItemMigration = fs.readFileSync('supabase/migrations/20261014100000_garanti_controlled_catalog_item.sql', 'utf8')
 const target = '88888888-8888-4888-8888-888888888888'
 const id = '77777777-7777-4777-8777-777777777777'
 const variantId = '44444444-4444-4444-8444-444444444444'
@@ -26,6 +27,7 @@ test('Production one-order claim, evidence gate and finalize are atomic and idem
     await db.exec(additionalSlotMigration)
     await db.exec(selfTestMigration)
     await db.exec(liveFailureDiagnosticsMigration)
+    await db.exec(catalogItemMigration)
     await db.exec("UPDATE public.products SET price_amount=2.80,compare_at_price=2.80; UPDATE public.product_variants SET stock_quantity=4")
     await db.query("INSERT INTO public.products(id,name,description,price_amount,currency,status,in_stock,payment_test_only) VALUES('nrs-garanti-live-3try','Controlled 3 TRY','Private',3,'TRY','active',true,true)")
     await db.query("INSERT INTO public.product_variants(id,product_id,size,stock_quantity,is_active) VALUES('55555555-5555-4555-8555-555555555555','nrs-garanti-live-3try',NULL,2,true)")
@@ -121,7 +123,7 @@ test('Production one-order claim, evidence gate and finalize are atomic and idem
   } finally { await db.close() }
 })
 
-test('additional live slot preserves old claim and only permits the private 3 TRY item', async () => {
+test('additional live slot preserves old claim and rejects non-approved products', async () => {
   const db = new PGlite()
   const oldId = '66666666-6666-4666-8666-666666666666', id = '99999999-9999-4999-8999-999999999999'
   const newKey = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', variant = '55555555-5555-4555-8555-555555555555'
@@ -139,7 +141,7 @@ test('additional live slot preserves old claim and only permits the private 3 TR
     await db.query('SELECT public.nrs_create_payment_order($1::uuid,$2::uuid,$3,$4::uuid,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9)', oldArgs)
     await db.query("UPDATE public.payment_orders SET state='pending' WHERE order_id=$1::uuid", [oldId])
     await db.query('INSERT INTO public.garanti_live_single_finalize_slots(user_id,claimed_order_id,claimed_at) VALUES($1::uuid,$2::uuid,now())', [fixture.userId, oldId])
-    await db.exec(additionalSlotMigration); await db.exec(selfTestMigration); await db.exec(liveFailureDiagnosticsMigration)
+    await db.exec(additionalSlotMigration); await db.exec(selfTestMigration); await db.exec(liveFailureDiagnosticsMigration); await db.exec(catalogItemMigration)
     await db.query("INSERT INTO public.products(id,name,description,price_amount,currency,status,in_stock,payment_test_only) VALUES('nrs-garanti-live-3try','Controlled 3 TRY','Private',3,'TRY','active',true,true)")
     await db.query("INSERT INTO public.product_variants(id,product_id,size,stock_quantity,is_active) VALUES($1::uuid,'nrs-garanti-live-3try',NULL,1,true)", [variant])
     await db.query("SELECT set_config('request.jwt.claims','{\"role\":\"service_role\"}',false)")
@@ -159,8 +161,47 @@ test('additional live slot preserves old claim and only permits the private 3 TR
     await assert.rejects(db.query('SELECT public.nrs_create_garanti_live_single_finalize_order($1::uuid,$2::uuid,$3,$4::uuid,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10::uuid)',
       [disallowedId, fixture.userId, null, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'e'.repeat(64),
         JSON.stringify([{ productId: 'product', variantId, quantity: 1 }]), JSON.stringify(customer),
-        JSON.stringify(fixture.historicalRecord(disallowedId, oldSummary)), 'garanti-oos', fixture.userId]), /private 3 TRY item/)
+        JSON.stringify(fixture.historicalRecord(disallowedId, oldSummary)), 'garanti-oos', fixture.userId]), /item not approved/)
     assert.equal((await db.query('SELECT count(*)::int n FROM public.payment_orders')).rows[0].n, 2)
+  } finally { await db.close() }
+})
+
+test('the controlled slot accepts only the selected public deneme item and remains one-use', async () => {
+  const db = new PGlite()
+  try {
+    await fixture.setup(db)
+    await db.exec('ALTER TABLE public.products ADD COLUMN payment_test_only boolean NOT NULL DEFAULT false')
+    await db.exec(migration); await db.exec(failureMigration); await db.exec(slotMigration); await db.exec(roleClaimMigration)
+    await db.exec(additionalSlotMigration); await db.exec(selfTestMigration); await db.exec(liveFailureDiagnosticsMigration)
+    await db.exec(catalogItemMigration)
+    await db.query("INSERT INTO public.products(id,name,description,price_amount,currency,status,in_stock,payment_test_only) VALUES('deneme','ben','Listed product',3,'TRY','active',true,false)")
+    const catalogVariant = '33333333-3333-4333-8333-333333333333'
+    await db.query("INSERT INTO public.product_variants(id,product_id,size,stock_quantity,is_active) VALUES($1::uuid,'deneme','M',2,true)", [catalogVariant])
+    await db.query('INSERT INTO public.garanti_live_single_finalize_slots(user_id) VALUES($1::uuid)', [fixture.userId])
+    await db.query("SELECT set_config('request.jwt.claims','{\"role\":\"service_role\"}',false)")
+    const orderId = '22222222-2222-4222-8222-222222222222'
+    const key = '11111111-1111-4111-8111-111111111111'
+    const summary = { items: [{ productId: 'deneme', name: 'ben', description: 'Listed product', size: 'M', quantity: 1, unitPrice: 3 }],
+      buyer: { name: 'Test Alıcı', email: 'test@example.com', phone: '905551234567', address: 'Beytepe, Ankara' },
+      subtotal: 3, discount: 0, shipping: 0, total: 3, currency: 'TRY', paymentMethod: 'Online kartla ödeme',
+      deliveryTerms: 'Teyit edilmiş süre', orderedAt: new Date().toISOString() }
+    const args = [orderId, fixture.userId, null, key, 'f'.repeat(64), JSON.stringify([{ productId: 'deneme', variantId: catalogVariant, quantity: 1 }]),
+      JSON.stringify({ firstName: 'Test', lastName: 'Alıcı', email: 'test@example.com', phone: '905551234567', address: 'Beytepe', city: 'Ankara', district: 'Çankaya', postalCode: '' }),
+      JSON.stringify(fixture.historicalRecord(orderId, summary)), 'garanti-oos', fixture.userId]
+    const create = () => db.query('SELECT public.nrs_create_garanti_live_single_finalize_order($1::uuid,$2::uuid,$3,$4::uuid,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10::uuid) result', args)
+    const first = (await create()).rows[0].result
+    assert.equal(first.created, true); assert.equal(first.order.amountMinor, 300)
+    const retry = (await create()).rows[0].result
+    assert.equal(retry.created, false); assert.equal(retry.order.id, orderId)
+    assert.equal((await db.query('SELECT claimed_order_id=$1::uuid claimed FROM public.garanti_live_single_finalize_slots WHERE user_id=$2::uuid', [orderId, fixture.userId])).rows[0].claimed, true)
+    assert.equal((await db.query('SELECT order_id=$1::uuid bound FROM public.garanti_live_single_finalize_allowances WHERE order_id=$1::uuid', [orderId])).rows[0].bound, true)
+    assert.equal((await db.query("SELECT stock_quantity FROM public.product_variants WHERE id=$1::uuid", [catalogVariant])).rows[0].stock_quantity, 1)
+
+    const disallowedId = '44444444-4444-4444-8444-444444444444'
+    await assert.rejects(db.query('SELECT public.nrs_create_garanti_live_single_finalize_order($1::uuid,$2::uuid,$3,$4::uuid,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10::uuid)',
+      [disallowedId, fixture.userId, null, '55555555-5555-4555-8555-555555555555', 'a'.repeat(64), JSON.stringify([{ productId: 'product', variantId, quantity: 1 }]),
+        JSON.stringify({}), JSON.stringify(fixture.historicalRecord(disallowedId, summary)), 'garanti-oos', fixture.userId]), /item not approved/)
+    assert.equal((await db.query('SELECT count(*)::int n FROM public.payment_orders')).rows[0].n, 1)
   } finally { await db.close() }
 })
 
