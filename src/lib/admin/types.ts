@@ -11,6 +11,7 @@ export interface ProductRow {
   currency: string
   compare_at_price: number | string | null
   status: ProductStatus
+  payment_test_only: boolean
   in_stock: boolean
   fabric: string | null
   care: string | null

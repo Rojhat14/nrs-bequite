@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getProductImageUrl } from '@/lib/storage/products'
 import type { ProductImageRow } from '@/lib/admin/types'
 
-const PRODUCT_COLUMNS = 'id,name,slug,description,price_amount,currency,compare_at_price,in_stock'
+const PRODUCT_COLUMNS = 'id,name,slug,description,price_amount,currency,compare_at_price,in_stock,payment_test_only'
 const IMAGE_COLUMNS = 'id,product_id,provider,storage_key,url,sort_order,is_primary,created_at'
 const VARIANT_COLUMNS = 'id,product_id,sku,stock_quantity,is_active'
 const PAGE_SIZE = 500
@@ -13,7 +13,7 @@ const HEADERS = ['id', 'title', 'description', 'availability', 'condition', 'pri
 
 interface FeedProduct {
   id: string; name: string; slug: string; description: string | null
-  price_amount: number | string; currency: string; compare_at_price: number | string | null; in_stock: boolean
+  price_amount: number | string; currency: string; compare_at_price: number | string | null; in_stock: boolean; payment_test_only: boolean
 }
 interface FeedVariant { id: string; product_id: string; sku: string | null; stock_quantity: number; is_active: boolean }
 
@@ -69,14 +69,15 @@ export async function createMetaProductFeed(client: SupabaseClient) {
   let included = 0
   let skippedImages = 0
   for (;;) {
-    let query = client.from('products').select(PRODUCT_COLUMNS).eq('status', 'active').order('id').limit(PAGE_SIZE)
+    let query = client.from('products').select(PRODUCT_COLUMNS).eq('status', 'active').eq('payment_test_only', false).order('id').limit(PAGE_SIZE)
     if (cursor) query = query.gt('id', cursor)
     const { data, error } = await query
     if (error || !Array.isArray(data)) throw new MetaFeedError('Unable to read active products.')
     if (!data.length) break
-    const products = data as unknown as FeedProduct[]
-    const next = products[products.length - 1].id
+    const pageProducts = data as unknown as FeedProduct[]
+    const next = pageProducts[pageProducts.length - 1].id
     if (!next || next === cursor) throw new MetaFeedError('Invalid product pagination.')
+    const products = pageProducts.filter(product => product.payment_test_only !== true)
 
     for (let offset = 0; offset < products.length; offset += RELATION_BATCH_SIZE) {
       const batch = products.slice(offset, offset + RELATION_BATCH_SIZE)

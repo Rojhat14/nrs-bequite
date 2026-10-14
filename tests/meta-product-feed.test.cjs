@@ -23,11 +23,11 @@ const feedModule = loadSource('src/lib/meta-product-feed.ts', {
 });
 
 function fixture(rowCap = 2) {
-  const product = id => ({ id, name: 'NRS "Elbise", özel', slug: `elbise ${id}`, description: 'İlk satır\nİkinci satır', price_amount: '125.50', currency: 'TRY', compare_at_price: '200', in_stock: true, status: 'active', internal_secret: 'PRIVATE-DATA' });
+  const product = id => ({ id, name: 'NRS "Elbise", özel', slug: `elbise ${id}`, description: 'İlk satır\nİkinci satır', price_amount: '125.50', currency: 'TRY', compare_at_price: '200', in_stock: true, status: 'active', payment_test_only: false, internal_secret: 'PRIVATE-DATA' });
   const image = (id, product_id, options = {}) => ({ id, product_id, provider: 'external', storage_key: null, url: `https://images.example/${id}.jpg`, is_primary: false, sort_order: 0, created_at: '2026-01-01', ...options });
   const tables = {
-    products: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map(product),
-    product_images: [image('i1', 'p1'), image('i2', 'p1', { is_primary: true, sort_order: 20, provider: 'supabase', storage_key: 'primary.jpg' }), image('i3', 'p2', { sort_order: 10 }), image('i4', 'p2', { sort_order: 2 }), image('i5', 'p3'), image('i6', 'p4', { url: '/legacy.jpg' }), image('i7', 'p5'), image('i8', 'p6')],
+    products: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'nrs-garanti-live-3try'].map(product),
+    product_images: [image('i1', 'p1'), image('i2', 'p1', { is_primary: true, sort_order: 20, provider: 'supabase', storage_key: 'primary.jpg' }), image('i3', 'p2', { sort_order: 10 }), image('i4', 'p2', { sort_order: 2 }), image('i5', 'p3'), image('i6', 'p4', { url: '/legacy.jpg' }), image('i7', 'p5'), image('i8', 'p6'), image('i9', 'nrs-garanti-live-3try')],
     product_variants: [
       { id: 'v2', product_id: 'p1', sku: 'SKU-B', is_active: true, stock_quantity: 2 },
       { id: 'v1', product_id: 'p1', sku: 'SKU-A', is_active: true, stock_quantity: 0 },
@@ -36,6 +36,7 @@ function fixture(rowCap = 2) {
     ],
   };
   tables.products[0].in_stock = false;
+  tables.products[6].payment_test_only = true;
   tables.products[4].status = 'draft';
   tables.products[5].status = 'archived';
   const calls = [];
@@ -100,6 +101,7 @@ test('Meta feed paginates below requested row cap, excludes draft/archive/local 
   assert.ok(!result.csv.includes('PRIVATE-DATA'));
   assert.ok(f.calls.filter(call => call.table === 'products').length >= 3);
   assert.ok(f.calls.filter(call => call.table === 'products').every(call => call.filters.some(filter => filter[0] === 'eq' && filter[1] === 'status' && filter[2] === 'active')));
+  assert.ok(f.calls.filter(call => call.table === 'products').every(call => call.filters.some(filter => filter[0] === 'eq' && filter[1] === 'payment_test_only' && filter[2] === false)));
   assert.ok(f.calls.filter(call => call.table === 'product_variants').every(call => call.filters.some(filter => filter[1] === 'is_active' && filter[2] === true)));
 });
 

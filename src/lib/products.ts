@@ -12,9 +12,9 @@ import { getHomeCategoryCover } from '@/lib/storage/category-covers'
 export type StorefrontCategory = Pick<CategoryRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'> & { imageUrl?: string }
 export type StorefrontCollection = Pick<CollectionRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'>
 
-type CatalogProductRow = Pick<ProductRow, 'id' | 'slug' | 'name' | 'category_id' | 'description' | 'price_amount' | 'currency' | 'compare_at_price' | 'in_stock' | 'fabric' | 'care'>
+type CatalogProductRow = Pick<ProductRow, 'id' | 'slug' | 'name' | 'category_id' | 'description' | 'price_amount' | 'currency' | 'compare_at_price' | 'in_stock' | 'fabric' | 'care' | 'payment_test_only'>
 type CatalogVariantRow = Pick<ProductVariantRow, 'id' | 'product_id' | 'size' | 'stock_quantity' | 'is_active'>
-const PRODUCT_COLUMNS = 'id,slug,name,category_id,description,price_amount,currency,compare_at_price,in_stock,fabric,care'
+const PRODUCT_COLUMNS = 'id,slug,name,category_id,description,price_amount,currency,compare_at_price,in_stock,fabric,care,payment_test_only'
 const CATEGORY_COLUMNS = 'id,name,slug,description,sort_order'
 const COLLECTION_COLUMNS = 'id,name,slug,description,sort_order'
 const HOME_CATEGORY: StorefrontCategory = {
@@ -130,6 +130,9 @@ async function mapProductRows(
   rows: CatalogProductRow[],
   knownCategories?: StorefrontCategory[],
 ) {
+  // Enforce privacy in application code as well as in the database's public
+  // policy. A test-only product must never enter a public product surface.
+  rows = rows.filter((row) => row.payment_test_only !== true)
   if (rows.length === 0) return [] as Product[]
   const productIds = rows.map((row) => row.id)
   const [imagesResult, variantsResult, relationResult, categoriesResult] = await Promise.all([
@@ -184,6 +187,7 @@ export const getStorefrontProducts = cache(async function getStorefrontProducts(
       .from('products')
       .select(PRODUCT_COLUMNS)
       .eq('status', 'active')
+      .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return PRODUCTS.map(toFallbackProduct)
     return mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[])
@@ -200,6 +204,7 @@ export const getStorefrontProduct = cache(async function getStorefrontProduct(sl
       .select(PRODUCT_COLUMNS)
       .eq('slug', slugOrId)
       .eq('status', 'active')
+      .eq('payment_test_only', false)
       .maybeSingle()
     if (!error && !data) {
       const result = await supabase
@@ -207,12 +212,13 @@ export const getStorefrontProduct = cache(async function getStorefrontProduct(sl
         .select(PRODUCT_COLUMNS)
         .eq('id', slugOrId)
         .eq('status', 'active')
+        .eq('payment_test_only', false)
         .maybeSingle()
       data = result.data
       error = result.error
     }
     if (error) return fallbackById(slugOrId)
-    if (!data) return null
+    if (!data || data.payment_test_only === true) return null
     const [product] = await mapProductRows(supabase, [data as unknown as CatalogProductRow])
     return product ?? null
   } catch {
@@ -289,6 +295,7 @@ export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: 
       .select(PRODUCT_COLUMNS)
       .eq('category_id', category.id)
       .eq('status', 'active')
+      .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return { category, products: [] as Product[] }
     const products = await mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], [category])
@@ -343,6 +350,7 @@ export const getCollectionCatalog = cache(async function getCollectionCatalog(sl
       .select(PRODUCT_COLUMNS)
       .in('id', productIds)
       .eq('status', 'active')
+      .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return { collection, products: [] as Product[] }
     const products = await mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[])

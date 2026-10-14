@@ -78,7 +78,7 @@ test('only local and allowlisted public image sources use the optimizer', () => 
 
 function catalogFixture() {
   const tables = {
-    products: [{ id: 'p1', slug: 'dress', name: 'Dress', category_id: 'c1', description: 'Description', price_amount: '125.50', currency: 'TRY', compare_at_price: '150', in_stock: false, fabric: 'Cotton', care: 'Wash', status: 'active', created_at: '2026-01-01' }],
+    products: [{ id: 'p1', slug: 'dress', name: 'Dress', category_id: 'c1', description: 'Description', price_amount: '125.50', currency: 'TRY', compare_at_price: '150', in_stock: false, fabric: 'Cotton', care: 'Wash', status: 'active', payment_test_only: false, created_at: '2026-01-01' }],
     categories: [{ id: 'c1', name: 'Elbiseler', slug: 'elbiseler', description: null, sort_order: 1, is_active: true }],
     collections: [{ id: 'c2', name: 'Gece', slug: 'gece', description: null, sort_order: 1, is_active: true }],
     product_images: [
@@ -165,4 +165,18 @@ test('metadata/page reads coalesce within a render and categories are reused by 
   const nextRequest = catalogFixture();
   nextRequest.tables.products[0].price_amount = '99';
   assert.equal((await nextRequest.api.getStorefrontProduct('dress')).priceAmount, 99);
+});
+
+test('payment-test products are excluded from public catalog, category, search source, collection, and direct product reads', async () => {
+  const { api, tables, calls } = catalogFixture();
+  const privateTrial = { ...tables.products[0], id: 'nrs-garanti-live-3try', slug: 'controlled-payment-observation-3try', name: 'Private trial', payment_test_only: true };
+  tables.products.push(privateTrial);
+  tables.product_collections.push({ product_id: privateTrial.id, collection_id: 'c2' });
+
+  assert.deepEqual((await api.getStorefrontProducts()).map(product => product.id), ['p1']);
+  assert.deepEqual((await api.getCategoryCatalog('elbiseler')).products.map(product => product.id), ['p1']);
+  assert.deepEqual((await api.getCollectionCatalog('gece')).products.map(product => product.id), ['p1']);
+  assert.equal(await api.getStorefrontProduct(privateTrial.slug), null);
+  assert.equal(await api.getStorefrontProduct(privateTrial.id), null);
+  assert.ok(calls.filter(call => call.table === 'products').every(call => call.columns.includes('payment_test_only')));
 });

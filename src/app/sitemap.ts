@@ -29,11 +29,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const rows: SitemapRow[] = []
     // Paginate to avoid silently truncating the catalog at the API row limit.
     for (let offset = 0; ; offset += PAGE_SIZE) {
-      const query = supabase.from(table).select('slug,updated_at')
-      const { data, error } = await (table === 'products'
-        ? query.eq('status', 'active')
-        : query.eq('is_active', true))
-        .order('slug').range(offset, offset + PAGE_SIZE - 1)
+      const { data, error } = table === 'products'
+        ? await supabase.from('products').select('slug,updated_at').eq('status', 'active')
+          .eq('payment_test_only', false).order('slug').range(offset, offset + PAGE_SIZE - 1)
+        : await supabase.from(table).select('slug,updated_at').eq('is_active', true)
+          .order('slug').range(offset, offset + PAGE_SIZE - 1)
       // Throw rather than cache a partial sitemap; ISR retains the last good result.
       if (error) throw new Error(`Sitemap could not load public ${table}.`)
       rows.push(...(data ?? []) as SitemapRow[])
