@@ -39,6 +39,16 @@ export type SuccessfulLiveReturnEvidence = {
   query_result_codes_match: true; query_status: 'APPROVED'; query_charge_type: 'S'
   auth_date_format: 'missing' | 'yyyymmdd' | 'timestamp'; auth_code_match: true; bank_reference_present: true
 }
+export type LiveReconciliationEvidence = {
+  order_id: string; http: number | null; decision: 'verified_success' | 'verified_failure' | 'pending'
+  reason: string; order_match: boolean | null; terminal_match: boolean | null; mode_match: boolean | null
+  amount_match: boolean | null; outer_response_code: string | null; outer_reason_code: string | null
+  result_code: string | null; result_reason_code: string | null; status: string | null; charge_type: string | null
+  auth_amount_state: 'missing' | 'zero' | 'matching' | 'other' | null
+  auth_code_present: boolean | null; bank_reference_present: boolean | null
+  history_http?: number | null; history_transaction_code?: string | null; history_transaction_reason_code?: string | null
+  history_result_state?: string | null; history_record_count?: number | null; history_identity_match?: boolean | null
+}
 type SuccessfulLiveQueryEvidence = Pick<SuccessfulLiveReturnEvidence,
   'query_http' | 'query_order_match' | 'query_identity_match' | 'query_amount_match' | 'query_result_codes_match'
   | 'query_status' | 'query_charge_type' | 'auth_date_format' | 'auth_code_match' | 'bank_reference_present'>
@@ -53,6 +63,7 @@ export class GarantiProvider implements PaymentProvider {
   private successfulTestReturnEvidence: SuccessfulTestReturnEvidence | null = null
   private lastSuccessfulLiveQueryEvidence: SuccessfulLiveQueryEvidence | null = null
   private successfulLiveReturnEvidence: SuccessfulLiveReturnEvidence | null = null
+  private lastLiveReconciliationEvidence: LiveReconciliationEvidence | null = null
   private liveReturnVerification: Record<string, unknown> | null = null
   private verificationStage: 'callback_parse' | 'callback_signature' | 'order_lookup' | 'callback_match'
     | 'orderinq_request' | 'orderinq_response' | 'orderinq_identity' | 'orderinq_status' | 'orderinq_result'
@@ -177,7 +188,12 @@ export class GarantiProvider implements PaymentProvider {
     this.successfulLiveReturnEvidence = null
     return evidence
   }
-  private async inquire(order: PaymentOrder, ip: string) {
+  takeLiveReconciliationEvidence() {
+    const evidence = this.lastLiveReconciliationEvidence
+    this.lastLiveReconciliationEvidence = null
+    return evidence
+  }
+  private async inquire(order: PaymentOrder, ip: string, queryType: 'orderinq' | 'orderhistoryinq' = 'orderinq') {
     if (isIP(ip) !== 4) throw new GarantiPending(order.id)
     const c = this.config
     const endpoint = c.mode === 'TEST' ? 'https://sanalposprovtest.garantibbva.com.tr/VPServlet' : 'https://sanalposprov.garanti.com.tr/VPServlet'
@@ -186,7 +202,7 @@ export class GarantiProvider implements PaymentProvider {
     try {
       response = await this.transport(c.queryUrl, { method: 'POST', redirect: 'error', cache: 'no-store',
         headers: { 'Content-Type': 'text/xml; charset=iso-8859-9' },
-        body: new Uint8Array(isoBytes(queryXml(c, order, ip))), signal: AbortSignal.timeout(10000) })
+        body: new Uint8Array(isoBytes(queryXml(c, order, ip, queryType))), signal: AbortSignal.timeout(10000) })
     } catch { throw new GarantiPending(order.id) }
     if (!response.ok || !response.body) throw new GarantiPending(order.id)
     const reader = response.body.getReader(); let length = 0; const chunks: Uint8Array[] = []
@@ -264,6 +280,112 @@ export class GarantiProvider implements PaymentProvider {
     }
     console.info(JSON.stringify({ event: 'garanti_live_read_only_orderinq', ...evidence }))
     return evidence
+  }
+  async readOnlyOrderHistoryInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string) {
+    const c = this.config
+    if (!c.liveObservationOnly || c.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)
+      || order.userId !== userId || order.state !== 'pending') throw new Error('Live read-only history inquiry is not authorized.')
+    if (c.queryUser !== 'PROVAUT' || c.queryAgentUserId !== 'PROVAUT' || !order.redirectUrl) throw new Error('Live query identity configuration mismatch.')
+    const redirect = new URL(order.redirectUrl)
+    const token = redirect.searchParams.get('token')
+    if (redirect.origin !== c.siteOrigin || redirect.pathname !== '/api/payment/garanti/handoff'
+      || redirect.searchParams.get('used') !== '1' || !token) throw new Error('Submitted handoff is required.')
+    const handoff = this.handoff(token, true)
+    if (handoff.id !== order.id) throw new Error('Handoff order mismatch.')
+    const { http, q } = await this.inquire(order, handoff.ip, 'orderhistoryinq')
+    const safeCode = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : null
+    const safeAmount = (value: unknown) => typeof value === 'string' && /^\d{1,17}$/.test(value) ? value : null
+    const safeDate = (value: unknown) => typeof value === 'string' && /^[0-9 .:-]{0,32}$/.test(value) ? value : null
+    const response = q.Transaction?.Response
+    const result = q.Order?.OrderHistInqResult
+    const rawRows = result?.OrderTxnList?.OrderTxn
+    const rows: unknown[] = rawRows === undefined ? [] : Array.isArray(rawRows) ? rawRows : [rawRows]
+    const records = rows.map((value, index) => {
+      const row = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+      const reference = row.RetrefNum
+      return { index: index + 1, type: safeCode(row.Type), status: safeCode(row.Status),
+        auth_amount_minor: safeAmount(row.AuthAmount), void_date: safeDate(row.VoidDate),
+        return_code: safeCode(row.ReturnCode), transaction_reference_present: typeof reference === 'string' && reference.length > 0,
+        currency_code: safeCode(row.CurrencyCode) }
+    })
+    const mode = safeCode(q.Mode)
+    const echo = q.Terminal
+    const resultState = result === undefined ? 'missing' : result.OrderTxnList === undefined ? 'missing_list'
+      : rows.length === 0 ? 'empty' : rows.some(row => !row || typeof row !== 'object' || Array.isArray(row)) ? 'invalid_rows' : 'present'
+    return { order_id: order.id, http, request_type: 'orderhistoryinq', request_mode: 'PROD',
+      request_amount_minor: order.amountMinor, request_currency_code: '949', order_currency_match: order.currency === 'TRY',
+      request_terminal_matches_config: true, request_prov_user_matches_expected: c.queryUser === 'PROVAUT',
+      request_agent_user_matches_expected: c.queryAgentUserId === 'PROVAUT',
+      response_mode_match: mode === null ? null : mode === 'PROD',
+      response_prov_user_match: typeof echo?.ProvUserID === 'string' ? echo.ProvUserID === c.queryUser : null,
+      response_agent_user_match: typeof echo?.UserID === 'string' ? echo.UserID === c.queryAgentUserId : null,
+      response_terminal_match: typeof echo?.ID === 'string' ? echo.ID === c.terminalId : null,
+      response_merchant_match: typeof echo?.MerchantID === 'string' ? echo.MerchantID === c.merchantId : null,
+      response_order_match: typeof q.Order?.OrderID === 'string' ? q.Order.OrderID === order.merchantReference : null,
+      transaction_code: safeCode(response?.Code), transaction_reason_code: safeCode(response?.ReasonCode),
+      result_state: resultState, record_count: records.length, records,
+      database_changed: false, sale_started: false, cancel_started: false, refund_started: false, finalize_called: false }
+  }
+  async reconcileOwnedPendingOrder(orderId: string, userId: string): Promise<VerifiedPayment> {
+    if (!this.config.liveObservationOnly || this.config.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)) {
+      throw new Error('Owned reconciliation is not authorized.')
+    }
+    const stored = await this.loadOrder(orderId) as PaymentOrder & { userId?: string; redirectUrl?: string | null }
+    if (stored.userId !== userId || stored.state !== 'pending' || stored.currency !== 'TRY' || !stored.redirectUrl
+      || (this.config.initiationMaxAmountMinor !== null && stored.amountMinor > this.config.initiationMaxAmountMinor)) {
+      throw new Error('Owned pending order unavailable.')
+    }
+    const redirect = new URL(stored.redirectUrl)
+    const token = redirect.searchParams.get('token')
+    if (redirect.origin !== this.config.siteOrigin || redirect.pathname !== '/api/payment/garanti/handoff'
+      || redirect.searchParams.get('used') !== '1' || !token) throw new Error('Submitted handoff is required.')
+    const handoff = this.handoff(token, true)
+    if (handoff.id !== stored.id) throw new Error('Handoff order mismatch.')
+    const settlementProvider = new GarantiProvider({ ...this.config, liveObservationOnly: false,
+      capturedStatus: 'APPROVED', capturedResultCode: '00', saleChargeType: 'S', failedStatuses: this.config.failedStatuses },
+      this.loadOrder, this.transport)
+    try {
+      const payment = await settlementProvider.query(stored, handoff.ip)
+      this.lastLiveReconciliationEvidence = settlementProvider.takeLiveReconciliationEvidence()
+      const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string; redirectUrl: string | null }, userId)
+      const historyIdentityMatch = history.response_terminal_match === true && history.response_merchant_match === true
+        && history.response_order_match === true && history.order_currency_match === true
+        && history.request_terminal_matches_config === true && history.request_prov_user_matches_expected === true
+        && history.request_agent_user_matches_expected === true
+        && history.response_mode_match !== false && history.response_prov_user_match !== false
+        && history.response_agent_user_match !== false
+      const historyCompleteEmpty = history.http === 200 && history.transaction_code === '00'
+        && (!history.transaction_reason_code || history.transaction_reason_code === '00')
+        && history.result_state === 'empty' && history.record_count === 0 && historyIdentityMatch
+      if (this.lastLiveReconciliationEvidence) this.lastLiveReconciliationEvidence = {
+        ...this.lastLiveReconciliationEvidence,
+        history_http: history.http,
+        history_transaction_code: history.transaction_code,
+        history_transaction_reason_code: history.transaction_reason_code,
+        history_result_state: history.result_state,
+        history_record_count: history.record_count,
+        history_identity_match: historyIdentityMatch,
+      }
+      if (payment.status === 'failed' && !historyCompleteEmpty) {
+        if (this.lastLiveReconciliationEvidence) this.lastLiveReconciliationEvidence = {
+          ...this.lastLiveReconciliationEvidence, decision: 'pending',
+          reason: 'GARANTI_ORDERHISTORYINQ_INCOMPLETE_OR_RECORDS_PRESENT',
+        }
+        throw new GarantiPending(orderId)
+      }
+      if (payment.status === 'paid') {
+        if (this.lastLiveReconciliationEvidence) this.lastLiveReconciliationEvidence = {
+          ...this.lastLiveReconciliationEvidence, decision: 'pending',
+          reason: 'GARANTI_SIGNED_SUCCESS_RETURN_REQUIRED',
+        }
+        throw new GarantiPending(orderId)
+      }
+      return payment
+    } catch (error) {
+      const evidence = settlementProvider.takeLiveReconciliationEvidence()
+      if (evidence && !this.lastLiveReconciliationEvidence) this.lastLiveReconciliationEvidence = evidence
+      throw error
+    }
   }
   // One existing, operator-authorized Production order can be reconciled once
   // its order-bound signed callback has been verified from protected runtime
@@ -346,6 +468,26 @@ export class GarantiProvider implements PaymentProvider {
     }
     this.verificationStage = 'orderinq_request'
     const { http, q } = await this.inquire(order, ip)
+    const r = q.Order?.OrderInqResult
+    const response = q.Transaction?.Response
+    const safeField = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : null
+    const authAmount = r?.AuthAmount === undefined ? '' : typeof r.AuthAmount === 'string' ? r.AuthAmount : '__invalid__'
+    const modeValue = q.Mode === undefined ? '' : typeof q.Mode === 'string' ? q.Mode : '__invalid__'
+    const queryEvidence: LiveReconciliationEvidence = {
+      order_id: order.id, http, decision: 'pending', reason: 'GARANTI_ORDERINQ_UNCLASSIFIED',
+      order_match: q.Order?.OrderID === order.merchantReference,
+      terminal_match: q.Terminal?.ID === c.terminalId && q.Terminal?.MerchantID === c.merchantId,
+      mode_match: modeValue === '' ? null : modeValue === c.mode,
+      amount_match: authAmount === '' || authAmount === '__invalid__' ? null : authAmount === String(order.amountMinor),
+      outer_response_code: safeField(response?.Code), outer_reason_code: safeField(response?.ReasonCode),
+      result_code: safeField(r?.Code), result_reason_code: safeField(r?.ReasonCode),
+      status: safeField(r?.Status), charge_type: safeField(r?.ChargeType),
+      auth_amount_state: authAmount === '' ? 'missing' : ['0', '0.00'].includes(authAmount) ? 'zero'
+        : authAmount === String(order.amountMinor) ? 'matching' : 'other',
+      auth_code_present: typeof r?.AuthCode === 'string' && r.AuthCode.length > 0,
+      bank_reference_present: typeof r?.RetrefNum === 'string' && r.RetrefNum.length > 0,
+    }
+    this.lastLiveReconciliationEvidence = queryEvidence
     this.verificationStage = 'orderinq_identity'
     const echoedMode = q.Mode === undefined ? '' : scalar(q.Mode)
     // Garanti's response schema lists Mode but doesn't mark the echo mandatory.
@@ -353,38 +495,72 @@ export class GarantiProvider implements PaymentProvider {
     if ((echoedMode !== '' && echoedMode !== c.mode) || scalar(q.Terminal?.ID) !== c.terminalId
       || scalar(q.Terminal?.MerchantID) !== c.merchantId || scalar(q.Order?.OrderID) !== order.merchantReference
       || (q.Terminal?.ProvUserID !== undefined && scalar(q.Terminal.ProvUserID) !== c.queryUser)
-      || (q.Terminal?.UserID !== undefined && scalar(q.Terminal.UserID) !== c.queryAgentUserId)) throw new Error('Bank query identity mismatch.')
+      || (q.Terminal?.UserID !== undefined && scalar(q.Terminal.UserID) !== c.queryAgentUserId)) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_IDENTITY_MISMATCH' }
+      throw new Error('Bank query identity mismatch.')
+    }
     // A display-only TEST journey never returns a settlement DTO, even if
     // mappings are later populated or the bank reports a successful capture.
     if (c.observationOnly) throw new GarantiPending(order.id)
-    const r = q.Order?.OrderInqResult
     // Query response does not document a currency field. Fixed TRY is bound in
     // the original bank hash and authenticated query; do not invent a response tag.
     // Transaction.Response is the outer order-query response. Sale result
     // codes are nested under Order.OrderInqResult per Garanti's mail example.
     // Explicit outer errors remain fatal, but their optional ReasonCode is not
     // confused with the sale's result ReasonCode.
-    const response = q.Transaction?.Response
     this.verificationStage = 'orderinq_status'
     for (const code of [response?.Code, response?.ReasonCode]) {
-      if (code !== undefined && scalar(code) !== '' && scalar(code) !== '00') throw new GarantiPending(order.id)
+      if (code !== undefined && scalar(code) !== '' && scalar(code) !== '00') {
+        this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_RESPONSE_ERROR' }
+        throw new GarantiPending(order.id)
+      }
     }
     const status = scalar(r.Status)
     const captured = status === c.capturedStatus && scalar(r.ChargeType) === c.saleChargeType
-    const failed = c.failedStatuses.includes(status)
-    if (!captured && !failed) throw new GarantiPending(order.id)
     const resultCode = r.Code === undefined ? '' : scalar(r.Code)
     const resultReasonCode = r.ReasonCode === undefined ? '' : scalar(r.ReasonCode)
+    const failed = c.mode === 'PROD'
+      ? scalar(r.ChargeType) === c.saleChargeType
+        && (c.failedResultMappings || []).some(mapping => mapping.status === status && mapping.code === resultCode && mapping.reasonCode === resultReasonCode)
+      : c.failedStatuses.includes(status)
+    if (!captured && !failed) {
+      const hasConfiguredFailureStatus = (c.failedResultMappings || []).some(mapping => mapping.status === status)
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: status === '' ? 'GARANTI_ORDERINQ_STATUS_MISSING'
+        : hasConfiguredFailureStatus ? 'GARANTI_ORDERINQ_FAILURE_MAPPING_MISMATCH' : 'GARANTI_ORDERINQ_STATUS_UNMAPPED' }
+      throw new GarantiPending(order.id)
+    }
     this.verificationStage = 'orderinq_result'
-    if (captured && (resultCode !== c.capturedResultCode || resultReasonCode !== '00')) throw new GarantiPending(order.id)
+    if (captured && (resultCode !== c.capturedResultCode || resultReasonCode !== '00')) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_SUCCESS_CODES_MISMATCH' }
+      throw new GarantiPending(order.id)
+    }
     const authDateShape = authDateFormat(r.AuthDate === undefined ? undefined : scalar(r.AuthDate))
     const authDateValid = ['missing', 'yyyymmdd', 'timestamp'].includes(authDateShape)
     this.verificationStage = 'orderinq_capture'
     if (captured && (scalar(r.AuthAmount) !== String(order.amountMinor) || !authDateValid
-      || !scalar(r.AuthCode) || !scalar(r.RetrefNum) || !['', '0'].includes(scalar(r.InstallmentCnt)))) throw new Error('Bank capture mismatch.')
+      || !scalar(r.AuthCode) || !scalar(r.RetrefNum) || !['', '0'].includes(scalar(r.InstallmentCnt)))) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_CAPTURE_MISMATCH' }
+      throw new Error('Bank capture mismatch.')
+    }
     this.verificationStage = 'orderinq_auth_code'
-    if (captured && authCode !== undefined && scalar(r.AuthCode) !== authCode) throw new Error('Bank authorization mismatch.')
-    if (failed && !['', '0'].includes(scalar(r.AuthAmount))) throw new GarantiPending(order.id)
+    if (captured && authCode !== undefined && scalar(r.AuthCode) !== authCode) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_AUTH_CODE_MISMATCH' }
+      throw new Error('Bank authorization mismatch.')
+    }
+    if (failed && !['0', '0.00'].includes(authAmount)) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence,
+        reason: authAmount === '' ? 'GARANTI_ORDERINQ_FAILURE_AMOUNT_MISSING' : 'GARANTI_ORDERINQ_FAILURE_AMOUNT_CONFLICT' }
+      throw new GarantiPending(order.id)
+    }
+    if (failed && c.mode === 'PROD' && (!resultCode || !resultReasonCode || (resultCode === '00' && resultReasonCode === '00'))) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_FAILURE_CODES_UNCONFIRMED' }
+      throw new GarantiPending(order.id)
+    }
+    if (failed && c.mode === 'PROD' && (scalar(response?.Code) !== '00'
+      || (response?.ReasonCode !== undefined && scalar(response.ReasonCode) !== '' && scalar(response.ReasonCode) !== '00'))) {
+      this.lastLiveReconciliationEvidence = { ...queryEvidence, reason: 'GARANTI_ORDERINQ_RESPONSE_UNCONFIRMED' }
+      throw new GarantiPending(order.id)
+    }
     // Stable reference across pending/failure/paid avoids synthetic transaction
     // IDs changing between retries. Terminal + bank order uniquely identify it.
     const transactionId = `${c.terminalId}:${order.merchantReference}`
@@ -395,6 +571,9 @@ export class GarantiProvider implements PaymentProvider {
         auth_code_match: true, bank_reference_present: true }
     }
     if (c.mode === 'TEST' && c.singleFinalizeTest) this.lastTestQueryEvidence = testQueryEvidence(c, order, q, http, authCode)
+    this.lastLiveReconciliationEvidence = { ...queryEvidence,
+      decision: captured ? 'verified_success' : 'verified_failure',
+      reason: captured ? 'GARANTI_ORDERINQ_APPROVED_S_00' : 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS' }
     return { merchantId: c.merchantId, merchantReference: order.merchantReference, transactionId,
       eventId: `${transactionId}:${captured ? 'paid' : 'failed'}`, amountMinor: order.amountMinor,
       currency: 'TRY', status: captured ? 'paid' : 'failed', threeDS: 'failed' }

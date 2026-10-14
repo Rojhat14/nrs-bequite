@@ -44,7 +44,7 @@ test('Customer result screen uses neutral pending copy for unverified TEST retur
  const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-12T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>({outcome,association:outcome==='unverified_failure'?'claimed':'verified',signature_verified:true,mdstatus:'0',response:'declined',procreturncode:'05',mderrormessage:'',errmsg:''})},
  '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
- const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes(outcome==='verified_failure'?'Ödeme tamamlanamadı':'Ödeme durumu kontrol ediliyor'));assert.equal(html.includes('Ödeme doğrulandı'),false);assert.equal(html.includes('/api/payment/garanti/renew'),false);assert.doesNotMatch(html,/mdstatus|GARANTI_[A-Z0-9_]+|RPC|hashparams|imza doğrulaması/);
+ const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme durumu kontrol ediliyor'));assert.ok(html.includes('Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'));assert.equal(html.includes('Ödeme doğrulandı'),false);assert.equal(html.includes('/api/payment/garanti/renew'),false);assert.doesNotMatch(html,/mdstatus|GARANTI_[A-Z0-9_]+|RPC|hashparams|imza doğrulaması|gözlem modu/);
  }
 });
 test('TEST-only diagnostic table denies browser access and cannot store a verified failure without proofs',async()=>{
@@ -114,7 +114,7 @@ test('Result screen shows observation policy separately from query errors or mis
   const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
    '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>stage?{outcome:'verification_pending',association:'verified',signature_verified:true,query_stage:stage}:null},
    '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
-  const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme durumu kontrol ediliyor'));assert.ok(html.includes('TEST akışıdır'));assert.equal(html.includes('Sonuç doğrulanamadı'),false);assert.equal(html.includes('Ödeme doğrulandı'),false);assert.doesNotMatch(html,/query_stage|signature_verified|mdstatus/);
+  const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme durumu kontrol ediliyor'));assert.ok(html.includes('Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'));assert.equal(html.includes('Sonuç doğrulanamadı'),false);assert.equal(html.includes('Ödeme doğrulandı'),false);assert.doesNotMatch(html,/query_stage|signature_verified|mdstatus|gözlem modu|GARANTI_[A-Z0-9_]+/);
  }
 });
 
@@ -141,7 +141,7 @@ test('Production success screen trusts the database paid state ahead of observat
  assert.equal(html.includes('Canlı deneme — incelemede'),false);assert.equal(html.includes('gözlem siparişi otomatik olarak paid yapmaz'),false);
 });
 
-test('Production result shows only an order-bound verified failure and suppresses another-payment link while pending',async()=>{
+test('Production result does not treat callback text as final and suppresses another-payment link while pending',async()=>{
  const {renderToStaticMarkup}=require('react-dom/server');
  const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>false,garantiLiveObservationOnly:()=>true},
   '@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
@@ -151,12 +151,11 @@ test('Production result shows only an order-bound verified failure and suppresse
   '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},
   '@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const html=renderToStaticMarkup(await view({orderId:id}));
- assert.ok(html.includes('Ödeme tamamlanamadı'));
- assert.ok(html.includes('kesin tahsilat ya da iptal durumunu doğrulamadı'));
- assert.ok(html.includes('beklemede'));
+ assert.ok(html.includes('Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'));
  assert.doesNotMatch(html,/GARANTI_ORDERINQ_PENDING|orderinq_status|mdstatus|geçmiş imza/);
  assert.equal(html.includes('href="/checkout"'),false);
  assert.equal(html.includes('paid olarak'),false);
+ assert.doesNotMatch(html,/GARANTI_[A-Z0-9_]+|imza doğrulaması|hash/);
 });
 
 test('Cancellation result is shown only when the accessible database order is cancelled',async()=>{
@@ -168,6 +167,8 @@ test('Cancellation result is shown only when the accessible database order is ca
  assert.match(cancelled,/Siparişiniz iptal edildi/);assert.match(cancelled,/href="\/collections"/);
  const pending=renderToStaticMarkup(await makeView('pending')({orderId:id,failure:true}));
  assert.match(pending,/Ödeme durumu kontrol ediliyor/);assert.doesNotMatch(pending,/Siparişiniz iptal edildi/);assert.equal(pending.includes('href="/checkout"'),false);
+ const failed=renderToStaticMarkup(await makeView('payment_failed')({orderId:id,failure:true}));
+ assert.match(failed,/Ödeme alınamadı\. Lütfen tekrar deneyin\./);assert.match(failed,/href="\/collections"/);
 });
 
 test('Unassociated receipts retain separate timestamps instead of deduping a new parse failure into an old probe',async()=>{

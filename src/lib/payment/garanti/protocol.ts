@@ -152,11 +152,11 @@ export function verifyReturnHash(c: GarantiConfig, f: Record<string, string>) {
   if (result !== 'verified') throw new ReturnSignatureError(result)
   // Never verify from hashparamsval or the initiation secure3dhash.
 }
-export function queryXml(c: GarantiConfig, order: PaymentOrder, ip: string) {
+export function queryXml(c: GarantiConfig, order: PaymentOrder, ip: string, queryType: 'orderinq' | 'orderhistoryinq' = 'orderinq') {
   const password = bankHash('sha1', c.queryPassword + c.terminalId.padStart(9, '0'))
   const hash = bankHash('sha512', order.merchantReference + c.terminalId + order.amountMinor + '949' + password)
   const e = escapeMarkup
-  return `<?xml version="1.0" encoding="iso-8859-9"?><GVPSRequest><Mode>${c.mode}</Mode><Version>512</Version><Terminal><ProvUserID>${e(c.queryUser)}</ProvUserID><HashData>${hash}</HashData><UserID>${e(c.queryAgentUserId || c.userId)}</UserID><ID>${c.terminalId}</ID><MerchantID>${c.merchantId}</MerchantID></Terminal><Customer><IPAddress>${e(ip)}</IPAddress><EmailAddress>${e(order.legal.order_summary.buyer.email)}</EmailAddress></Customer><Order><OrderID>${order.merchantReference}</OrderID><GroupID/></Order><Transaction><Type>orderinq</Type><ListPageNum>0</ListPageNum><Amount>${order.amountMinor}</Amount><CurrencyCode>949</CurrencyCode><CardholderPresentCode>13</CardholderPresentCode><MotoInd>N</MotoInd></Transaction></GVPSRequest>`
+  return `<?xml version="1.0" encoding="iso-8859-9"?><GVPSRequest><Mode>${c.mode}</Mode><Version>512</Version><Terminal><ProvUserID>${e(c.queryUser)}</ProvUserID><HashData>${hash}</HashData><UserID>${e(c.queryAgentUserId || c.userId)}</UserID><ID>${c.terminalId}</ID><MerchantID>${c.merchantId}</MerchantID></Terminal><Customer><IPAddress>${e(ip)}</IPAddress><EmailAddress>${e(order.legal.order_summary.buyer.email)}</EmailAddress></Customer><Order><OrderID>${order.merchantReference}</OrderID><GroupID/></Order><Transaction><Type>${queryType}</Type><ListPageNum>0</ListPageNum><Amount>${order.amountMinor}</Amount><CurrencyCode>949</CurrencyCode><CardholderPresentCode>13</CardholderPresentCode><MotoInd>N</MotoInd></Transaction></GVPSRequest>`
 }
 export function parseQuery(xml: string) {
   if (xml.length > 65536 || /<!DOCTYPE|<!ENTITY/i.test(xml) || XMLValidator.validate(xml) !== true) throw new Error('Invalid bank XML.')

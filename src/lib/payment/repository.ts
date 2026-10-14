@@ -44,6 +44,25 @@ export async function saveGarantiLiveSingleFinalizeFailure(orderId: string, sour
   })
   if (error) throw new Error('Controlled live failure diagnostic could not be stored.')
 }
+export async function saveGarantiPaymentReturnDiagnostic(orderId: string, source: 'success' | 'failure',
+  stage: string, safeCode: string, diagnostic: Record<string, unknown>) {
+  const { error } = await paymentDatabase().rpc('nrs_record_garanti_payment_return_diagnostic', {
+    p_order_id: orderId, p_source: source, p_failure_stage: stage, p_safe_code: safeCode, p_diagnostic: diagnostic,
+  })
+  if (error) throw new Error('Safe Garanti callback diagnostic could not be stored.')
+}
+export async function saveGarantiOrderinqReconciliation(orderId: string,
+  decision: 'verified_success' | 'verified_failure' | 'pending', reason: string, evidence: Record<string, unknown>) {
+  const { error } = await paymentDatabase().rpc('nrs_record_garanti_orderinq_reconciliation', {
+    p_order_id: orderId, p_decision: decision, p_reason: reason, p_evidence: evidence,
+  })
+  if (error) throw new Error('Garanti reconciliation evidence could not be stored.')
+}
+export async function readGarantiOrderinqReconciliation(orderId: string) {
+  const { data, error } = await paymentDatabase().from('garanti_orderinq_reconciliations')
+    .select('decision,reason,evidence,updated_at').eq('order_id', orderId).maybeSingle()
+  return error ? null : data
+}
 export async function readGarantiLiveSingleFinalizeFailure(orderId: string) {
   if (!garantiLiveObservationOnly() || !UUID.test(orderId)) return null
   const { data, error } = await paymentDatabase().from('garanti_live_single_finalize_failures')

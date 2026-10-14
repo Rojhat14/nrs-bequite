@@ -4,21 +4,17 @@ import Link from 'next/link';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { Package, Clock, CheckCircle2 } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 import OrderLegalDocuments from '@/components/legal/OrderLegalDocuments';
-import { useRouter } from 'next/navigation';
 
 type Order = { id: string; created_at: string; status: string; total_amount: number | string };
 
 export default function OrderHistory() {
   const { user } = useAuth();
-  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [busyOrder, setBusyOrder] = useState<string | null>(null);
-  const [orderMessages, setOrderMessages] = useState<Record<string, string>>({});
 
   const fetchOrders = useCallback(async () => {
       setLoading(true);
@@ -43,32 +39,9 @@ export default function OrderHistory() {
 
   useEffect(() => { void fetchOrders(); }, [fetchOrders]);
 
-  async function cancelOrder(order: Order) {
-    if (busyOrder || !window.confirm('Bu siparişin tamamını iptal etmek istiyor musunuz?')) return;
-    setBusyOrder(order.id);
-    setOrderMessages(current => ({ ...current, [order.id]: '' }));
-    try {
-      const response = await fetch(`/api/orders/${encodeURIComponent(order.id)}/cancel`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      });
-      const result = await response.json();
-      setOrderMessages(current => ({ ...current, [order.id]: result.message || 'Sipariş durumu kontrol edilemedi.' }));
-      if (result.orderStatus === 'cancelled') {
-        setOrders(current => current.map(item => item.id === order.id ? { ...item, status: 'cancelled' } : item));
-        // Refresh customer-owned data while leaving the customer's separate cart intact.
-        await fetchOrders();
-        router.refresh();
-      } else if (result.orderStatus === 'paid') {
-        await fetchOrders();
-      }
-    } catch {
-      setOrderMessages(current => ({ ...current, [order.id]: 'İptal durumu doğrulanamadı. Sipariş listenizi yenileyin.' }));
-    } finally { setBusyOrder(null); }
-  }
-
   const statusLabel: Record<string, string> = {
     pending: 'Bekliyor', payment_pending: 'Ödeme bekleniyor', paid: 'Ödendi', processing: 'Hazırlanıyor',
-    shipped: 'Kargoya verildi', delivered: 'Teslim edildi', cancelled: 'İptal edildi', refunded: 'İade edildi',
+    payment_failed: 'Ödeme alınamadı', failed: 'Ödeme alınamadı', shipped: 'Kargoya verildi', delivered: 'Teslim edildi', cancelled: 'İptal edildi', refunded: 'İade edildi',
   };
 
   return (
@@ -119,13 +92,6 @@ export default function OrderHistory() {
                   ₺{Number(order.total_amount).toLocaleString('tr-TR')}
                 </span>
               </div>
-              {(order.status === 'pending' || order.status === 'payment_pending') && (
-                <button type="button" onClick={() => void cancelOrder(order)} disabled={busyOrder !== null}
-                  className="mt-3 inline-flex min-h-11 items-center border border-nrs-ink/25 px-4 text-xs text-nrs-ink hover:border-nrs-ink disabled:opacity-50">
-                  {busyOrder === order.id ? 'İşleniyor…' : 'Siparişi İptal Et'}
-                </button>
-              )}
-              {orderMessages[order.id] && <p role="status" className="mt-2 text-sm text-nrs-ink/75">{orderMessages[order.id]}</p>}
               <Link href={`/checkout/verify?orderId=${encodeURIComponent(order.id)}`} className="mt-3 inline-flex min-h-11 items-center text-xs underline text-nrs-ink/65">Ödeme durumu ve sipariş özeti</Link>
               <OrderLegalDocuments orderId={order.id} />
             </motion.div>

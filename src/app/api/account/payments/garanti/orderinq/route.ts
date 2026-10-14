@@ -15,6 +15,7 @@ const allowedOrders = new Set([
   '90dc5d66-397f-4b91-8f70-fb4634cfdc94',
   // Added only after the authenticated account's DB-owned order was verified.
   '0a682ace-0eaa-43d7-bc4b-7efab1f7ee5f',
+  '32ec756b-8fe2-4c9b-aae2-e34a49248ba9',
 ])
 const json = (status: number, body: Record<string, unknown>) => NextResponse.json(body, {
   status,
@@ -32,7 +33,10 @@ export async function POST(request: Request) {
   let body: unknown
   try { body = await boundedJson(request) } catch { return json(400, { error: 'INVALID_REQUEST' }) }
   if (!body || typeof body !== 'object' || Array.isArray(body)
-    || Object.keys(body).length !== 1 || typeof (body as { orderId?: unknown }).orderId !== 'string') {
+    || Object.keys(body).some(key => !['orderId', 'queryType'].includes(key))
+    || typeof (body as { orderId?: unknown }).orderId !== 'string'
+    || ((body as { queryType?: unknown }).queryType !== undefined
+      && !['orderinq', 'orderhistoryinq'].includes(String((body as { queryType?: unknown }).queryType)))) {
     return json(400, { error: 'INVALID_REQUEST' })
   }
   const orderId = (body as { orderId: string }).orderId
@@ -43,7 +47,10 @@ export async function POST(request: Request) {
     if (!(provider instanceof GarantiProvider) || !provider.config.liveObservationOnly) return json(503, { error: 'LIVE_OBSERVATION_UNAVAILABLE' })
     const order = await loadGarantiOrder(orderId)
     if (order.userId !== user.id) return json(404, { error: 'NOT_FOUND' })
-    const evidence = await provider.readOnlyOrderInquiry(order, user.id)
+    const queryType = (body as { queryType?: 'orderinq' | 'orderhistoryinq' }).queryType || 'orderinq'
+    const evidence = queryType === 'orderhistoryinq'
+      ? await provider.readOnlyOrderHistoryInquiry(order, user.id)
+      : await provider.readOnlyOrderInquiry(order, user.id)
     return json(200, evidence)
   } catch {
     // Never return XML, passwords, hashes, cards, buyer data or exception text.

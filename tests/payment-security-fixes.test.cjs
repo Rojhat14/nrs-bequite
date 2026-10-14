@@ -4,7 +4,7 @@ const {PGlite}=require('@electric-sql/pglite');
 const f=require('./payment-security-fixture.cjs');
 const {loader}=require('./source-loader.cjs');
 let db;
-test.beforeEach(async()=>{db=new PGlite();await f.setup(db)});
+test.beforeEach(async()=>{db=new PGlite();await f.setup(db);await db.exec(f.read('supabase/migrations/20261014120000_garanti_failure_reconciliation.sql'))});
 test.afterEach(async()=>{await db?.close()});
 
 for(const paymentState of ['initiating','pending']) test(`PostgreSQL: admin cannot cancel ${paymentState}; delayed paid settles and replays once`,async()=>{
@@ -13,21 +13,60 @@ for(const paymentState of ['initiating','pending']) test(`PostgreSQL: admin cann
  const before=await f.state(db);
  await assert.rejects(f.admin(db),/Unresolved online payment/);
  assert.deepEqual(await f.state(db),before);
- await f.finalize(db); await f.finalize(db); await f.finalize(db,{eventId:'second-paid'});
- assert.deepEqual(await f.state(db),{status:'paid',state:'paid',stock_quantity:0,events:2,released:0});
+ await f.finalize(db); await f.finalize(db);
+ await assert.rejects(f.finalize(db,{eventId:'second-paid'}),/terminal payment already finalized/);
+ assert.deepEqual(await f.state(db),{status:'paid',state:'paid',stock_quantity:0,events:1,released:0});
  await assert.rejects(f.admin(db),/payment state cannot/);
 });
 
-test('PostgreSQL: verified failed releases reservation exactly once; contradiction rolls back',async()=>{
+test('PostgreSQL: verified failed marks failure, invalidates handoff, releases once; replay and contradiction are safe',async()=>{
  await f.create(db);
  await assert.rejects(f.admin(db),/Unresolved/);
  await f.finalize(db,{status:'failed',threeDS:'failed'});
  await f.finalize(db,{status:'failed',threeDS:'failed'});
- await f.finalize(db,{status:'failed',threeDS:'failed',eventId:'failed-again'});
  const settled=await f.state(db);
- assert.deepEqual(settled,{status:'cancelled',state:'failed',stock_quantity:1,events:2,released:1});
- await assert.rejects(f.finalize(db,{eventId:'contradictory-paid'}),/terminal state conflict/);
+ assert.deepEqual(settled,{status:'payment_failed',state:'failed',stock_quantity:1,events:1,released:1});
+ assert.equal((await db.query('select redirect_url from public.payment_orders where order_id=$1',[f.orderId])).rows[0].redirect_url,null);
+ await assert.rejects(f.finalize(db,{status:'failed',threeDS:'failed',eventId:'failed-again'}),/terminal payment already finalized/);
+ await assert.rejects(f.finalize(db,{eventId:'contradictory-paid'}),/terminal payment already finalized/);
  assert.deepEqual(await f.state(db),settled);
+});
+
+test('PostgreSQL: concurrent paid and verified failure cannot create mixed inventory or duplicate events',async()=>{
+ await f.create(db);
+ const failed=f.finalize(db,{eventId:'failed-event',status:'failed',threeDS:'failed'});
+ const paid=f.finalize(db,{eventId:'paid-event'});
+ const outcomes=await Promise.allSettled([failed,paid]);
+ assert.equal(outcomes.filter(result=>result.status==='fulfilled').length,1);
+ const state=await f.state(db);
+ assert.equal(state.events,1);
+ if(state.state==='paid') assert.deepEqual(state,{status:'paid',state:'paid',stock_quantity:0,events:1,released:0});
+ else assert.deepEqual(state,{status:'payment_failed',state:'failed',stock_quantity:1,events:1,released:1});
+});
+
+test('PostgreSQL: a verified failed order no longer blocks a fresh idempotent checkout',async()=>{
+ await f.create(db);
+ await f.finalize(db,{status:'failed',threeDS:'failed'});
+ const next='55555555-5555-4555-8555-555555555555';
+ await db.query('select public.nrs_create_payment_order($1::uuid,$2::uuid,null,$1::uuid,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7)',
+  [next,f.userId,'b'.repeat(64),JSON.stringify(f.items),JSON.stringify(f.customer),JSON.stringify(f.historicalRecord(next,f.summary)),'test-bank']);
+ assert.equal((await db.query('select state from public.payment_orders where order_id=$1::uuid',[next])).rows[0].state,'initiating');
+ assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,0);
+});
+
+test('PostgreSQL: safe live diagnostics are service-only, allowlisted, and order-bound',async()=>{
+ await f.create(db);await db.query("update public.payment_orders set amount_minor=300,provider='garanti-oos',state='pending' where order_id=$1::uuid",[f.orderId]);
+ const diagnostic={signature_verified:false,signature_result:'hash_mismatch',order_match:true,amount_match:true,currency_match:true,
+  terminal_match:true,request_match:true,mdstatus:'0',response:'declined',procreturncode:'05',mderrormessage_present:false,
+  errmsg_present:false,error_text_signed:false,error_category:'invalid_card',verification_basis:'callback_runtime'};
+ await db.exec('SET ROLE authenticated');
+ await assert.rejects(db.exec('select * from public.garanti_payment_return_diagnostics'),/permission denied/);
+ await assert.rejects(db.query("select public.nrs_record_garanti_payment_return_diagnostic($1,'failure','callback_signature','GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH',$2::jsonb)",[f.orderId,JSON.stringify(diagnostic)]),/permission denied/);
+ await db.exec('RESET ROLE');
+ await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+ await db.query("select public.nrs_record_garanti_payment_return_diagnostic($1,'failure','callback_signature','GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH',$2::jsonb)",[f.orderId,JSON.stringify(diagnostic)]);
+ assert.equal((await db.query('select count(*)::int n from public.garanti_payment_return_diagnostics where order_id=$1',[f.orderId])).rows[0].n,1);
+ await assert.rejects(db.query("select public.nrs_record_garanti_payment_return_diagnostic($1,'failure','callback_signature','GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH',$2::jsonb)",[f.orderId,JSON.stringify({...diagnostic,raw:'card data'})]),/invalid safe Garanti callback diagnostic/);
 });
 
 test('PostgreSQL: provider-authenticated reconciliation resolves uncertain initiation as paid',async()=>{

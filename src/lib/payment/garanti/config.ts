@@ -8,6 +8,7 @@ export interface GarantiConfig {
   storeKey: string; handoffSecret: string; siteOrigin: string; formUrl: string; queryUrl: string
   successUrl: string; errorUrl: string; installment: '' | '0'
   capturedStatus: string; capturedResultCode: string; saleChargeType: string; failedStatuses: readonly string[]
+  failedResultMappings: readonly { status: string; code: string; reasonCode: string }[]
   initiationMaxAmountMinor: number | null
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -114,8 +115,25 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
   if (installment !== '' && installment !== '0') throw new Error('Confirm bank single installment convention.')
   const capturedStatus = env.GARANTI_CAPTURED_STATUS || '', saleChargeType = env.GARANTI_SALE_CHARGE_TYPE || ''
   const capturedResultCode = env.GARANTI_CAPTURED_RESULT_CODE || ''
-  const failedStatuses = (env.GARANTI_FINAL_FAILED_STATUSES || '').split(',').filter(Boolean)
-  if (!observationOnly && !liveObservationOnly && (!capturedStatus || !capturedResultCode || !saleChargeType || failedStatuses.includes(capturedStatus)
+  const configuredFailedStatuses = (env.GARANTI_FINAL_FAILED_STATUSES || '').split(',').filter(Boolean)
+  const rawFailedMappings = env.GARANTI_LIVE_FAILED_RESULT_MAPPINGS || ''
+  const failedResultMappings = rawFailedMappings ? rawFailedMappings.split(',').map(entry => {
+    const [status, code, reasonCode, ...extra] = entry.split('|')
+    if (extra.length || !status || !code || !reasonCode
+      || ![status, code, reasonCode].every(value => /^[A-Za-z0-9_-]{1,32}$/.test(value))
+      || (code === '00' && reasonCode === '00')) throw new Error('Confirm bank query failure mappings.')
+    return { status, code, reasonCode }
+  }) : []
+  if (!test && rawFailedMappings && env.GARANTI_LIVE_FAILED_RESULTS_CONFIRMED !== 'true') {
+    throw new Error('Confirm bank query failure mappings.')
+  }
+  const failedStatuses = test ? configuredFailedStatuses : failedResultMappings.map(mapping => mapping.status)
+  if (configuredFailedStatuses.some(v => !/^[A-Za-z0-9_-]{1,32}$/.test(v))
+    || new Set(failedResultMappings.map(mapping => `${mapping.status}|${mapping.code}|${mapping.reasonCode}`)).size !== failedResultMappings.length) {
+    throw new Error('Confirm bank query status meanings.')
+  }
+  if (!observationOnly && !liveObservationOnly && (!capturedStatus || !capturedResultCode || !saleChargeType
+    || configuredFailedStatuses.includes(capturedStatus) || failedStatuses.includes(capturedStatus)
     || ![capturedStatus, capturedResultCode, saleChargeType, ...failedStatuses].every(v => /^[A-Za-z0-9_-]{1,32}$/.test(v)))) throw new Error('Confirm bank query status meanings.')
   const handoffSecret = env.GARANTI_HANDOFF_SECRET || ''
   if (!/^[0-9a-f]{64}$/.test(handoffSecret)) throw new Error('Garanti handoff secret missing.')
@@ -129,5 +147,5 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
     formUrl: endpoint('FORM_URL', '/servlet/gt3dengine'), queryUrl: endpoint('QUERY_URL', '/VPServlet'),
     successUrl: url('GARANTI_SUCCESS_URL', '/api/payment/garanti/success'),
     errorUrl: url('GARANTI_ERROR_URL', '/api/payment/garanti/failure'), installment,
-    capturedStatus, capturedResultCode, saleChargeType, failedStatuses, initiationMaxAmountMinor }
+    capturedStatus, capturedResultCode, saleChargeType, failedStatuses, failedResultMappings, initiationMaxAmountMinor }
 }

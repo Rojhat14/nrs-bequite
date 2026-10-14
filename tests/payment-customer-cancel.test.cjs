@@ -101,7 +101,8 @@ test('Customer API binds cancellation to the authenticated owner and reconciles 
  assert.match(route,/finalizeAtomic\(verified, provider\.name\)/);
  assert.doesNotMatch(route,/\.initiate\(/);
  const ui=fs.readFileSync('src/app/profile/components/OrderHistory.tsx','utf8');
- for(const marker of ['Bu siparişin tamamını iptal etmek istiyor musunuz?','İşleniyor…','Siparişi İptal Et','payment_pending','İptal edildi']) assert.ok(ui.includes(marker),marker);
+ for(const marker of ['payment_pending','İptal edildi']) assert.ok(ui.includes(marker),marker);
+ assert.doesNotMatch(ui,/Siparişi İptal Et|cancelOrder\(/);
  const handoff=fs.readFileSync('src/app/api/payment/garanti/handoff/route.ts','utf8');
  assert.match(handoff,/Referrer-Policy': 'strict-origin'/);
  assert.match(handoff,/claimGarantiHandoff\(order, redirect\)/);

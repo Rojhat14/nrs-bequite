@@ -2,13 +2,15 @@ import 'server-only'
 import { NextResponse } from 'next/server'
 import { paymentAvailable, getPaymentProvider } from '@/lib/payment/provider'
 import { boundedText, unavailable } from '@/lib/payment/http'
-import { createPaymentRepository, finalizeGarantiLiveSinglePayment, saveGarantiLiveSingleFinalizeEvidence, saveGarantiLiveSingleFinalizeFailure } from '@/lib/payment/repository'
+import { createPaymentRepository, finalizeGarantiLiveSinglePayment, saveGarantiLiveSingleFinalizeEvidence, saveGarantiLiveSingleFinalizeFailure,
+  saveGarantiOrderinqReconciliation, saveGarantiPaymentReturnDiagnostic } from '@/lib/payment/repository'
 import { validateVerifiedPayment } from '@/lib/payment/service'
 import { GarantiProvider, GarantiPending } from './adapter'
 import { diagnoseLiveReturn, diagnoseTestReturn, saveTestDiagnostic } from './diagnostics'
 import { GarantiReturnParseError, parseReturn, ReturnSignatureError } from './protocol'
 import { UUID } from '@/lib/payment/request'
 import { loadGarantiOrder, isGarantiLiveSingleFinalizeOrder, isGarantiSingleFinalizeOrder } from './order'
+import { controlledLiveAccountAllowed } from './config'
 
 export async function garantiReturn(request: Request) {
   if (!paymentAvailable()) return unavailable()
@@ -170,9 +172,9 @@ export async function garantiReturn(request: Request) {
       } catch {
         console.warn(JSON.stringify({ event: 'garanti_live_return_diagnostic_unavailable', source, code }))
       }
-      // Failure callbacks for the explicitly claimed one-order account used to
-      // stop at the log-only observation handler. Persist only safe verification
-      // metadata, after checking the parsed order is the live allowance owner.
+      // Keep a safe, order-bound trace for a failure callback, then use an
+      // independent authenticated bank query to decide whether it is final.
+      // The callback itself never releases stock or overrides a pending query.
       let failureOrderId: string | null = null
       if (source === 'failure') {
         try {
@@ -181,12 +183,12 @@ export async function garantiReturn(request: Request) {
         } catch { /* Unparseable inputs cannot be attached to a payment order. */ }
       }
       if (failureOrderId && diagnostic) {
-        let activeOrder: Awaited<ReturnType<typeof loadGarantiOrder>> | null = null
+        let ownedOrder: Awaited<ReturnType<typeof loadGarantiOrder>> | null = null
         try {
           const candidate = await loadGarantiOrder(failureOrderId)
-          if (await isGarantiLiveSingleFinalizeOrder(candidate)) activeOrder = candidate
+          if (controlledLiveAccountAllowed(candidate.userId)) ownedOrder = candidate
         } catch { /* Unassociated or unavailable order: do not write a diagnostic row. */ }
-        if (activeOrder) {
+        if (ownedOrder) {
           const captured = provider.takeLiveReturnVerification() || {}
           const signatureResult = ['verified','hashparams_invalid','hash_format_invalid','encoding_rejected','hash_mismatch','field_duplicate_field','not_evaluated','parse_rejected']
             .includes(String(diagnostic.signature_result)) ? diagnostic.signature_result : 'not_evaluated'
@@ -208,14 +210,38 @@ export async function garantiReturn(request: Request) {
             verification_basis: 'callback_runtime',
           }
           try {
-            const stage = provider.lastVerificationStage
-            await saveGarantiLiveSingleFinalizeFailure(activeOrder.id, 'failure', stage, code, verification)
+            const stage = provider.lastVerificationStage || 'callback_signature'
+            await saveGarantiPaymentReturnDiagnostic(ownedOrder.id, 'failure', stage, code, verification)
           } catch {
-            console.warn(JSON.stringify({ event: 'garanti_live_single_finalize_diagnostic_unavailable',
-              order_id: activeOrder.id, stage: provider.lastVerificationStage, code: 'GARANTI_DIAGNOSTIC_STORE_FAILED' }))
+            console.warn(JSON.stringify({ event: 'garanti_live_return_diagnostic_unavailable',
+              order_id: ownedOrder.id, stage: provider.lastVerificationStage, code: 'GARANTI_DIAGNOSTIC_STORE_FAILED' }))
             return destination(`/checkout/failure?code=GARANTI_FAILURE_DIAGNOSTIC_STORE_FAILED`)
           }
-          return destination(`/checkout/verify?orderId=${encodeURIComponent(activeOrder.id)}`)
+          if (ownedOrder.state === 'pending') {
+            try {
+              const reconciled = await provider.reconcileOwnedPendingOrder(ownedOrder.id, ownedOrder.userId)
+              const evidence = provider.takeLiveReconciliationEvidence()
+              if (reconciled.status === 'failed' && evidence?.decision === 'verified_failure') {
+                await saveGarantiOrderinqReconciliation(ownedOrder.id, 'verified_failure', evidence.reason, evidence)
+                await createPaymentRepository().finalizeAtomic(reconciled, provider.name)
+              } else if (evidence) {
+                const reason = 'GARANTI_SIGNED_SUCCESS_RETURN_REQUIRED'
+                await saveGarantiOrderinqReconciliation(ownedOrder.id, 'pending', reason, { ...evidence, decision: 'pending', reason })
+              }
+            } catch (reconciliationError) {
+              const evidence = provider.takeLiveReconciliationEvidence()
+              if (evidence) {
+                const reason = reconciliationError instanceof GarantiPending ? evidence.reason : 'GARANTI_RECONCILIATION_UNAVAILABLE'
+                try { await saveGarantiOrderinqReconciliation(ownedOrder.id, 'pending', reason, { ...evidence, decision: 'pending', reason }) }
+                catch { console.warn(JSON.stringify({ event: 'garanti_reconciliation_evidence_store_failed', order_id: ownedOrder.id })) }
+              }
+            }
+          }
+          if (await isGarantiLiveSingleFinalizeOrder(ownedOrder)) {
+            try { await saveGarantiLiveSingleFinalizeFailure(ownedOrder.id, 'failure', provider.lastVerificationStage, code, verification) }
+            catch { /* The generic safe diagnostic above remains authoritative. */ }
+          }
+          return destination(`/checkout/verify?orderId=${encodeURIComponent(ownedOrder.id)}`)
         }
       }
     }
