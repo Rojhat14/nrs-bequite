@@ -4,6 +4,7 @@ import { isoBytes } from './garanti/protocol'
 import { UUID, parsePaymentRequest } from './request'
 import type { PaymentProvider, PaymentRepository, VerifiedPayment } from './types'
 import { PaymentStartError, startStage } from './start-error'
+import { saveGarantiVerifiedPaymentEvidence } from './repository'
 
 export async function initiatePayment(body: unknown, userId: string | null, guestHash: string | null,
   repository: PaymentRepository, provider: PaymentProvider, context?: { customerIp: string }) {
@@ -27,7 +28,7 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
     return { orderId: existing.id, ...redirect }
   }
   // All prices and stock come from DB; request prices/totals are discarded.
-  const quote = await startStage('quote', () => repository.quote(request.items, request.customer))
+  const quote = await startStage('quote', () => repository.quote(request.items, request.customer, userId))
   if (quote.hash !== request.quoteHash) throw new PaymentStartError('START_FAILED', 'quote', 'Sipariş bilgileri değişti. Özeti yeniden inceleyip onaylayın.')
   if (provider.initiationMaxAmountMinor != null) {
     const totalMinor = Math.round(quote.summary.total * 100)
@@ -65,6 +66,12 @@ export function validateVerifiedPayment(payment: VerifiedPayment, provider: Paym
 export async function processPaymentCallback(rawBody: string, headers: Headers, repository: PaymentRepository, provider: PaymentProvider) {
   const verified = await provider.verifyCallback(rawBody, headers)
   validateVerifiedPayment(verified, provider)
+  if (provider.name === 'garanti-oos' && verified.status === 'paid' && verified.verificationMode === 'PROD') {
+    const evidenceProvider = provider as PaymentProvider & { takeSuccessfulLiveReturnEvidence?: () => Record<string, unknown> | null }
+    const evidence = evidenceProvider.takeSuccessfulLiveReturnEvidence?.()
+    if (!evidence || evidence.order_id !== verified.merchantReference) throw new Error('Verified live evidence missing.')
+    await saveGarantiVerifiedPaymentEvidence(verified, evidence)
+  }
   // Transaction also verifies merchant reference, amount, currency, unique event
   // and transaction IDs against stored order. Only then can status become paid.
   await repository.finalizeAtomic(verified, provider.name)

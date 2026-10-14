@@ -14,6 +14,7 @@ export interface VerifiedPayment {
   eventId: string; merchantId: string; merchantReference: string; transactionId: string
   amountMinor: number; currency: string; status: 'pending' | 'paid' | 'failed'
   threeDS: 'authenticated' | 'not_required' | 'failed'
+  verificationMode?: 'TEST' | 'PROD'
 }
 export interface PaymentProvider {
   readonly settlementDisabled?: boolean
@@ -33,7 +34,7 @@ export interface PaymentProvider {
 export interface PaymentRepository {
   resumeUnsubmittedTest?(orderId: string, userId: string, provider: PaymentProvider, context?: { customerIp: string }): Promise<PaymentRedirect>
   findExisting(request: CheckoutRequest, userId: string | null, guestHash: string | null): Promise<PaymentOrder | null>
-  quote(items: CheckoutItem[], customer: Buyer): Promise<Quote>
+  quote(items: CheckoutItem[], customer: Buyer, userId?: string | null): Promise<Quote>
   createAtomic(request: CheckoutRequest, userId: string | null, guestHash: string | null, quote: Quote): Promise<{ order: PaymentOrder; created: boolean }>
   storeRedirect(orderId: string, redirect: PaymentRedirect): Promise<void>
   getRedirect(orderId: string): Promise<PaymentRedirect | null>

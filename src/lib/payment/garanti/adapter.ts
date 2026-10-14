@@ -179,7 +179,7 @@ export class GarantiProvider implements PaymentProvider {
     }
     // Strict fully authenticated 3DS only; half/attempted authentication is not
     // silently accepted. Query, not browser response, decides captured status.
-    return { ...result, threeDS: result.status === 'paid' ? 'authenticated' : 'failed' }
+    return { ...result, verificationMode: c.mode, threeDS: result.status === 'paid' ? 'authenticated' : 'failed' }
   }
   takeSuccessfulTestReturnEvidence() {
     const evidence = this.successfulTestReturnEvidence
@@ -241,7 +241,8 @@ export class GarantiProvider implements PaymentProvider {
   // but never create a sale, write the order, or call the finalize RPC.
   async readOnlyOrderInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string, expectedBankReference?: string) {
     const c = this.config
-    if (!c.liveObservationOnly || c.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)
+    const ownerMayInspect = c.generalLivePayments === true || (c.liveObservationOnly === true && controlledLiveAccountAllowed(userId))
+    if (!ownerMayInspect || c.mode !== 'PROD'
       || order.userId !== userId || order.state !== 'pending') throw new Error('Live read-only inquiry is not authorized.')
     if (c.queryUser !== 'PROVAUT' || c.queryAgentUserId !== 'PROVAUT') throw new Error('Live query identity configuration mismatch.')
     if (!order.redirectUrl) throw new Error('Submitted handoff is required.')
@@ -297,7 +298,8 @@ export class GarantiProvider implements PaymentProvider {
   }
   async readOnlyOrderHistoryInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string) {
     const c = this.config
-    if (!c.liveObservationOnly || c.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)
+    const ownerMayInspect = c.generalLivePayments === true || (c.liveObservationOnly === true && controlledLiveAccountAllowed(userId))
+    if (!ownerMayInspect || c.mode !== 'PROD'
       || order.userId !== userId || order.state !== 'pending') throw new Error('Live read-only history inquiry is not authorized.')
     if (c.queryUser !== 'PROVAUT' || c.queryAgentUserId !== 'PROVAUT' || !order.redirectUrl) throw new Error('Live query identity configuration mismatch.')
     const redirect = new URL(order.redirectUrl)
@@ -343,7 +345,9 @@ export class GarantiProvider implements PaymentProvider {
   async reconcileOwnedPendingOrder(orderId: string, userId: string, paymentProof: {
     payment_event_count: number; signed_callback_evidence_count: number; live_finalize_evidence_count: number
   }): Promise<VerifiedPayment> {
-    if (!this.config.liveObservationOnly || this.config.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)) {
+    const ownerMayReconcile = this.config.generalLivePayments === true
+      || (this.config.liveObservationOnly === true && controlledLiveAccountAllowed(userId))
+    if (!ownerMayReconcile || this.config.mode !== 'PROD') {
       throw new Error('Owned reconciliation is not authorized.')
     }
     const stored = await this.loadOrder(orderId) as PaymentOrder & { userId?: string; redirectUrl?: string | null }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { paymentAvailable, getPaymentProvider } from '@/lib/payment/provider'
 import { boundedText, unavailable } from '@/lib/payment/http'
 import { validateVerifiedPayment } from '@/lib/payment/service'
-import { createPaymentRepository } from '@/lib/payment/repository'
+import { createPaymentRepository, saveGarantiVerifiedPaymentEvidence } from '@/lib/payment/repository'
 import { UUID } from '@/lib/payment/request'
 export async function POST(request: Request) {
   if (!paymentAvailable()) return unavailable()
@@ -11,6 +11,12 @@ export async function POST(request: Request) {
     const payment = await provider.verifyReturn(await boundedText(request), request.headers)
     validateVerifiedPayment(payment, provider)
     if (!UUID.test(payment.merchantReference)) throw new Error('Invalid order reference.')
+    if (payment.status === 'paid' && payment.verificationMode === 'PROD') {
+      const evidence = provider instanceof (await import('@/lib/payment/garanti/adapter')).GarantiProvider
+        ? provider.takeSuccessfulLiveReturnEvidence() : null
+      if (!evidence || evidence.order_id !== payment.merchantReference) throw new Error('Verified live evidence missing.')
+      await saveGarantiVerifiedPaymentEvidence(payment, evidence)
+    }
     await createPaymentRepository().finalizeAtomic(payment, provider.name)
     return NextResponse.redirect(new URL(`/checkout/verify?orderId=${encodeURIComponent(payment.merchantReference)}`, request.url), 303)
   } catch { return NextResponse.redirect(new URL('/checkout/failure', request.url), 303) }

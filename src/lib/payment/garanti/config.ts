@@ -2,7 +2,7 @@ import 'server-only'
 import { isoBytes } from './protocol'
 
 export interface GarantiConfig {
-  observationOnly?: boolean; liveObservationOnly?: boolean; liveDiagnostics?: boolean; singleFinalizeTest?: boolean
+  observationOnly?: boolean; liveObservationOnly?: boolean; liveDiagnostics?: boolean; generalLivePayments?: boolean; singleFinalizeTest?: boolean
   mode: 'TEST' | 'PROD'; merchantId: string; terminalId: string; userId: string; queryAgentUserId: string
   provisionUser: string; provisionPassword: string; queryUser: string; queryPassword: string
   storeKey: string; handoffSecret: string; siteOrigin: string; formUrl: string; queryUrl: string
@@ -24,6 +24,12 @@ export function controlledLiveAmountAllowed(amountMinor: number, env: NodeJS.Pro
   const cap = /^\d{1,5}$/.test(rawCap) ? Number(rawCap) : Number.NaN
   return env.GARANTI_MODE === 'PROD' && Number.isSafeInteger(amountMinor) && amountMinor > 0
     && Number.isSafeInteger(cap) && cap > 0 && cap <= 50000 && amountMinor <= cap
+}
+export function garantiLiveGeneralPaymentsEnabled(env: NodeJS.ProcessEnv = process.env) {
+  return env.GARANTI_LIVE_GENERAL_PAYMENTS_ENABLED === 'true' && env.GARANTI_MODE === 'PROD'
+    && env.VERCEL_ENV === 'production' && env.GARANTI_LIVE_CONTROLLED_ONLY === 'false'
+    && env.GARANTI_LIVE_OBSERVATION_ONLY !== 'true'
+    && env.NEXT_PUBLIC_SUPABASE_URL === 'https://moiynemxthkmgpgnfajd.supabase.co'
 }
 export function garantiObservationOnly(env: NodeJS.ProcessEnv = process.env) {
   return env.GARANTI_TEST_OBSERVATION_ONLY === 'true' && env.GARANTI_MODE === 'TEST'
@@ -53,16 +59,21 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
   const test = env.GARANTI_MODE === 'TEST'
   const observationOnly = garantiObservationOnly(env)
   const liveObservationOnly = garantiLiveObservationOnly(env)
+  const generalLivePayments = garantiLiveGeneralPaymentsEnabled(env)
   const singleFinalizeTest = garantiSingleFinalizeTest(env)
+  if (env.GARANTI_LIVE_GENERAL_PAYMENTS_ENABLED === 'true' && !generalLivePayments) {
+    throw new Error('General live payments require the explicit Production-wide configuration.')
+  }
   if (env.GARANTI_TEST_SINGLE_FINALIZE_ONLY === 'true' && !singleFinalizeTest) throw new Error('Single-order finalization is restricted to the isolated TEST Preview.')
   if (env.GARANTI_TEST_OBSERVATION_ONLY === 'true' && !observationOnly) throw new Error('Observation is restricted to the isolated TEST Preview.')
   if (env.GARANTI_LIVE_OBSERVATION_ONLY === 'true' && !liveObservationOnly) throw new Error('Live observation is restricted to the one-account Production environment.')
   if (!test && env.GARANTI_MODE !== 'PROD') throw new Error('Garanti mode missing.')
   if (test && env.VERCEL_ENV === 'production') throw new Error('Sandbox forbidden in Production.')
-  if (!test && (env.VERCEL_ENV !== 'production' || env.GARANTI_LIVE_CONTROLLED_ONLY !== 'true'
-    || !UUID.test(env.GARANTI_LIVE_ALLOWED_USER_ID || '')
+  if (!test && (env.VERCEL_ENV !== 'production'
+    || (generalLivePayments ? env.GARANTI_LIVE_CONTROLLED_ONLY !== 'false'
+      : env.GARANTI_LIVE_CONTROLLED_ONLY !== 'true' || !UUID.test(env.GARANTI_LIVE_ALLOWED_USER_ID || ''))
     || env.NEXT_PUBLIC_SUPABASE_URL !== 'https://moiynemxthkmgpgnfajd.supabase.co')) {
-    throw new Error('Live payments require the controlled Production account and Production database.')
+    throw new Error('Live payments require an explicitly scoped Production configuration and Production database.')
   }
   if (test && (env.GARANTI_TEST_DATABASE_ISOLATED !== 'true' || !env.GARANTI_TEST_SUPABASE_URL
     || env.GARANTI_TEST_SUPABASE_URL !== env.NEXT_PUBLIC_SUPABASE_URL)) throw new Error('Separate sandbox database required.')
@@ -137,11 +148,11 @@ export function garantiConfig(env: NodeJS.ProcessEnv = process.env): GarantiConf
     || ![capturedStatus, capturedResultCode, saleChargeType, ...failedStatuses].every(v => /^[A-Za-z0-9_-]{1,32}$/.test(v)))) throw new Error('Confirm bank query status meanings.')
   const handoffSecret = env.GARANTI_HANDOFF_SECRET || ''
   if (!/^[0-9a-f]{64}$/.test(handoffSecret)) throw new Error('Garanti handoff secret missing.')
-  const initiationMaxAmountMinor = test ? null : Number(env.GARANTI_LIVE_MAX_AMOUNT_MINOR)
-  if (!test && !controlledLiveAmountAllowed(Number(initiationMaxAmountMinor), env)) {
+  const initiationMaxAmountMinor = test || generalLivePayments ? null : Number(env.GARANTI_LIVE_MAX_AMOUNT_MINOR)
+  if (!test && !generalLivePayments && !controlledLiveAmountAllowed(Number(initiationMaxAmountMinor), env)) {
     throw new Error('A small controlled live amount ceiling is required.')
   }
-  return { observationOnly, liveObservationOnly, singleFinalizeTest, mode: test ? 'TEST' : 'PROD', merchantId, terminalId, userId, queryAgentUserId, provisionUser,
+  return { observationOnly, liveObservationOnly, generalLivePayments, singleFinalizeTest, mode: test ? 'TEST' : 'PROD', merchantId, terminalId, userId, queryAgentUserId, provisionUser,
     provisionPassword: field('PROVISION_PASSWORD'), queryUser, queryPassword: field('QUERY_PASSWORD'),
     storeKey: field('STORE_KEY'), handoffSecret, siteOrigin: site.origin,
     formUrl: endpoint('FORM_URL', '/servlet/gt3dengine'), queryUrl: endpoint('QUERY_URL', '/VPServlet'),

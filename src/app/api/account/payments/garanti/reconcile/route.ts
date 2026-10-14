@@ -11,32 +11,33 @@ import { UUID } from '@/lib/payment/request'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const targetOrderId = '32ec756b-8fe2-4c9b-aae2-e34a49248ba9'
 const json = (status: number, body: Record<string, unknown>) => NextResponse.json(body, {
   status, headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' },
 })
 
-// One-account, exact-order reconciliation. This endpoint can only issue read-only
-// orderinq/orderhistoryinq queries; it never creates a sale, cancellation or refund.
+// Owner-scoped reconciliation can only issue read-only orderinq/orderhistoryinq
+// queries; it never creates a sale, cancellation or refund.
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return json(403, { state: 'unavailable' })
   const auth = await createSupabaseServerClient()
   const { data: { user } } = await auth.auth.getUser()
-  if (!user || !controlledLiveAccountAllowed(user.id)) return json(404, { state: 'unavailable' })
+  if (!user) return json(404, { state: 'unavailable' })
   let body: unknown
   try { body = await boundedJson(request) } catch { return json(400, { state: 'unavailable' }) }
   if (!body || typeof body !== 'object' || Array.isArray(body)
     || Object.keys(body).length !== 1 || typeof (body as { orderId?: unknown }).orderId !== 'string'
-    || !UUID.test((body as { orderId: string }).orderId)
-    || (body as { orderId: string }).orderId !== targetOrderId) return json(404, { state: 'unavailable' })
+    || !UUID.test((body as { orderId: string }).orderId)) return json(404, { state: 'unavailable' })
+  const orderId = (body as { orderId: string }).orderId
 
   let provider: GarantiProvider | null = null
   try {
     const selected = getPaymentProvider()
-    if (!(selected instanceof GarantiProvider) || !selected.config.liveObservationOnly) return json(503, { state: 'pending' })
+    if (!(selected instanceof GarantiProvider)
+      || (!selected.config.liveObservationOnly && !selected.config.generalLivePayments)) return json(503, { state: 'pending' })
     provider = selected
-    const order = await loadGarantiOrder(targetOrderId)
-    if (order.userId !== user.id || order.state !== 'pending' || order.amountMinor !== 300 || order.currency !== 'TRY') {
+    const order = await loadGarantiOrder(orderId)
+    if (order.userId !== user.id || order.state !== 'pending' || order.currency !== 'TRY'
+      || (provider.config.liveObservationOnly && !controlledLiveAccountAllowed(user.id))) {
       return json(404, { state: 'unavailable' })
     }
     const proof = await readGarantiSettlementEvidence(order.id)
@@ -53,19 +54,19 @@ export async function POST(request: Request) {
   } catch (error) {
     if (provider) {
       const evidence = provider.takeLiveReconciliationEvidence()
-      if (evidence && evidence.order_id === targetOrderId) {
+      if (evidence && evidence.order_id === orderId) {
         const reason = error instanceof GarantiPending ? evidence.reason : 'GARANTI_RECONCILIATION_UNAVAILABLE'
         try {
-          await saveGarantiOrderinqReconciliation(targetOrderId, 'pending', reason, { ...evidence, decision: 'pending', reason })
+          await saveGarantiOrderinqReconciliation(orderId, 'pending', reason, { ...evidence, decision: 'pending', reason })
           if (error instanceof GarantiPending && reason === 'GARANTI_BANK_RECORD_NOT_FOUND') {
-            const handoff = await provider.expiredSubmittedHandoff(targetOrderId, user.id)
+            const handoff = await provider.expiredSubmittedHandoff(orderId, user.id)
             if (handoff?.expired) {
-              const result = await closeExpiredGarantiNoRecordOrder(targetOrderId, handoff.expiresAt)
+              const result = await closeExpiredGarantiNoRecordOrder(orderId, handoff.expiresAt)
               return json(200, { state: result.closed || result.idempotent ? 'unverified_closed' : 'pending' })
             }
           }
         }
-        catch { console.warn(JSON.stringify({ event: 'garanti_reconciliation_evidence_store_failed', order_id: targetOrderId })) }
+        catch { console.warn(JSON.stringify({ event: 'garanti_reconciliation_evidence_store_failed', order_id: orderId })) }
       }
     }
     return json(202, { state: 'pending' })

@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server'
 import { paymentAvailable, getPaymentProvider } from '@/lib/payment/provider'
 import { boundedText, unavailable } from '@/lib/payment/http'
 import { createPaymentRepository, finalizeGarantiLiveSinglePayment, saveGarantiLiveSingleFinalizeEvidence, saveGarantiLiveSingleFinalizeFailure,
-  readGarantiSettlementEvidence, saveGarantiOrderinqReconciliation, saveGarantiPaymentReturnDiagnostic } from '@/lib/payment/repository'
+  readGarantiSettlementEvidence, saveGarantiOrderinqReconciliation, saveGarantiPaymentReturnDiagnostic,
+  saveGarantiVerifiedPaymentEvidence } from '@/lib/payment/repository'
 import { validateVerifiedPayment } from '@/lib/payment/service'
 import { GarantiProvider, GarantiPending } from './adapter'
 import { diagnoseLiveReturn, diagnoseTestReturn, saveTestDiagnostic } from './diagnostics'
@@ -177,6 +178,11 @@ export async function garantiReturn(request: Request) {
     if (!raw) raw = await boundedText(request)
     const verified = await provider.verifyReturn(raw, request.headers)
     validateVerifiedPayment(verified, provider)
+    if (verified.status === 'paid' && verified.verificationMode === 'PROD') {
+      const evidence = provider.takeSuccessfulLiveReturnEvidence()
+      if (!evidence || evidence.order_id !== verified.merchantReference) throw new Error('Verified live evidence missing.')
+      await saveGarantiVerifiedPaymentEvidence(verified, evidence)
+    }
     await createPaymentRepository().finalizeAtomic(verified, provider.name, true)
     return destination(`/checkout/verify?orderId=${encodeURIComponent(verified.merchantReference)}`)
   } catch (error) {

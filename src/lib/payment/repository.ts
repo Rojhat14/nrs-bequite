@@ -16,7 +16,7 @@ import { cookies } from 'next/headers'
 import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
-import { isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
+import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
@@ -50,6 +50,21 @@ export async function saveGarantiPaymentReturnDiagnostic(orderId: string, source
     p_order_id: orderId, p_source: source, p_failure_stage: stage, p_safe_code: safeCode, p_diagnostic: diagnostic,
   })
   if (error) throw new Error('Safe Garanti callback diagnostic could not be stored.')
+}
+export async function saveGarantiVerifiedPaymentEvidence(payment: VerifiedPayment, evidence: Record<string, unknown>) {
+  if (payment.verificationMode !== 'PROD' || payment.status !== 'paid'
+    || evidence.order_id !== payment.merchantReference || evidence.signature_verified !== true) {
+    throw new Error('Verified Garanti payment evidence is incomplete.')
+  }
+  const boundEvidence = {
+    ...evidence, order_id: payment.merchantReference, event_id: payment.eventId,
+    transaction_id: payment.transactionId, merchant_id: payment.merchantId,
+    amount_minor: payment.amountMinor, currency: payment.currency, verification_mode: payment.verificationMode,
+  }
+  const { error } = await paymentDatabase().rpc('nrs_store_garanti_verified_payment_evidence', {
+    p_order_id: payment.merchantReference, p_evidence: boundEvidence,
+  })
+  if (error) throw new Error('Verified Garanti payment evidence could not be stored.')
 }
 const GARANTI_ORDERINQ_EVIDENCE_KEYS = new Set([
   'order_id', 'decision', 'reason', 'order_match', 'terminal_match', 'mode_match', 'amount_match',
@@ -171,10 +186,10 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       void context
       return { redirectUrl: stored.redirectUrl }
     },
-    async quote(items: CheckoutItem[], customer: Buyer): Promise<Quote> {
+    async quote(items: CheckoutItem[], customer: Buyer, userId?: string | null): Promise<Quote> {
       const sorted = canonicalCheckoutItems(items)
       const [products, variants] = await Promise.all([
-        db.from('products').select('id,name,description,price_amount,compare_at_price,currency,status,in_stock,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
+        db.from('products').select('id,name,description,price_amount,compare_at_price,currency,status,in_stock,payment_test_only,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
         db.from('product_variants').select('id,product_id,size,stock_quantity,is_active').in('id', sorted.map(i => i.variantId)),
       ])
       if (products.error || variants.error) throw new PaymentStartError('START_FAILED', 'quote', 'Ürün bilgileri doğrulanamadı.', (products.error || variants.error)?.code)
@@ -205,6 +220,14 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         total: (saleMinor + shippingMinor) / 100, currency: 'TRY', paymentMethod: manual ? 'Havale / EFT — ödeme henüz doğrulanmadı' : 'Online kartla ödeme',
         deliveryTerms: DELIVERY_TERMS, orderedAt: new Date().toISOString() }
       if (![subtotalMinor, saleMinor, shippingMinor, saleMinor + shippingMinor].every(Number.isSafeInteger)) throw new Error('Sipariş tutarı doğrulanamadı.')
+      const privateTrial = products.data.some(product => isLiveObservationProduct(product))
+      const trialAllowed = privateTrial && !!userId && !manual && process.env.PAYMENT_PROVIDER === 'garanti-oos'
+        && isLiveSingleFinalizeCheckout(sorted, saleMinor + shippingMinor)
+        && garantiLiveSingleFinalizeArmed(userId, saleMinor + shippingMinor)
+      if (privateTrial && !trialAllowed) throw new Error('Private trial product is not available for this checkout.')
+      if (!privateTrial && products.data.some(product => product.payment_test_only === true)) {
+        throw new Error('Test-only product is not available for this checkout.')
+      }
       assertFinalLegalOrderSummary(summary)
       return { summary, hash: quoteHash(summary) }
     },
