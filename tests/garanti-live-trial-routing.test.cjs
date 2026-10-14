@@ -14,7 +14,7 @@ const request = productId => ({
   customer: { firstName: 'Test', lastName: 'Buyer', email: 'test@example.com', phone: '905551234567', address: 'Test', city: 'Ankara', district: 'Test', postalCode: '06000' },
 })
 
-test('single-finalize allowance is bound to the private 3 TRY product, never a same-price catalog product', async () => {
+test('single-finalize allowance accepts only the private trial or exact public deneme product', async () => {
   const calls = []
   const db = { rpc: async (name, args) => { calls.push({ name, args }); return { data: { created: true, order: { id: orderId, state: 'initiating' } }, error: null } } }
   const load = loader({
@@ -36,7 +36,7 @@ test('single-finalize allowance is bound to the private 3 TRY product, never a s
   const repo = load('src/lib/payment/repository.ts').createPaymentRepository()
   const ordinary = request('catalog-3-try')
   await assert.rejects(repo.createAtomic(ordinary, 'allowed-user', null, { summary: { total: 3 }, hash: ordinary.quoteHash }),
-    error => error.code === 'CONTROLLED_ITEM_REQUIRED' && /özel deneme ürünü/.test(error.message))
+    error => error.code === 'CONTROLLED_ITEM_REQUIRED' && /ürün veya sepet/.test(error.message))
   assert.equal(calls.length, 0, 'a same-price catalog item must not reach any order RPC')
 
   const privateTrial = request('nrs-garanti-live-3try')
@@ -51,6 +51,14 @@ test('single-finalize allowance is bound to the private 3 TRY product, never a s
   assert.equal(calls[0].args.p_items[0].productId, 'nrs-garanti-live-3try')
   assert.equal(calls[0].args.p_items[0].quantity, 1)
   assert.equal(calls[0].args.p_authorized_user_id, 'allowed-user')
+
+  const publicDeneme = request('deneme')
+  await repo.createAtomic(publicDeneme, 'allowed-user', null, { summary: { total: 3 }, hash: publicDeneme.quoteHash })
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].name, 'nrs_create_garanti_live_single_finalize_order')
+  assert.equal(calls[1].args.p_items[0].productId, 'deneme')
+  assert.equal(calls[1].args.p_items[0].quantity, 1)
+  assert.equal(calls[1].args.p_authorized_user_id, 'allowed-user')
 })
 
 test('checkout returns a safe explanation when a same-price catalog item cannot use the private allowance', async () => {
@@ -73,6 +81,6 @@ test('checkout returns a safe explanation when a same-price catalog item cannot 
   const body = await response.json()
   assert.equal(response.status, 409)
   assert.equal(body.code, 'CONTROLLED_ITEM_REQUIRED')
-  assert.match(body.error, /yalnızca özel 3 TL deneme ürünü/)
+  assert.match(body.error, /tek kullanımlık canlı ödeme izni kapsamında değil/)
   assert.doesNotMatch(body.error, /internal detail/)
 })

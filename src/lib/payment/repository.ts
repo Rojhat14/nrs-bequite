@@ -155,7 +155,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         && garantiLiveSingleFinalizeArmed(userId, amountMinor)
       const liveSingleFinalizeItem = isLiveSingleFinalizeCheckout(request.items, amountMinor)
       if (liveSingleFinalizeArmed && !liveSingleFinalizeItem) {
-        throw new PaymentStartError('CONTROLLED_ITEM_REQUIRED', 'quote', 'Tek kullanımlık canlı izin yalnızca özel deneme ürününde kullanılabilir.')
+        throw new PaymentStartError('CONTROLLED_ITEM_REQUIRED', 'quote', 'Tek kullanımlık canlı izin bu ürün veya sepet için kullanılamaz.')
       }
       const liveSingleFinalize = liveSingleFinalizeArmed && liveSingleFinalizeItem
       const rpcName = !manual && garantiObservationOnly() ? 'nrs_create_garanti_test_observation_order'

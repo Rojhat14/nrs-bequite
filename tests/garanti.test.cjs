@@ -3,7 +3,7 @@ const {loader}=require('./source-loader.cjs');
 const load=loader();
 const {GarantiProvider,GarantiPending}=load('src/lib/payment/garanti/adapter.ts');
 const {garantiConfig,controlledLiveAccountAllowed,controlledLiveAmountAllowed,garantiLiveSingleFinalizeArmed}=load('src/lib/payment/garanti/config.ts');
-const {isLiveObservationProduct,LIVE_OBSERVATION_PRODUCT_ID}=load('src/lib/payment/garanti/live-observation-product.ts');
+const {isLiveObservationProduct,LIVE_OBSERVATION_PRODUCT_ID,LIVE_CONTROLLED_CATALOG_PRODUCT_ID,isLiveSingleFinalizeCheckout}=load('src/lib/payment/garanti/live-observation-product.ts');
 const protocol=load('src/lib/payment/garanti/protocol.ts');
 const id='11111111-1111-4111-8111-111111111111';
 // Synthetic credentials and bank responses only; no customer/bank access data.
@@ -77,6 +77,16 @@ test('Live observation product is fixed to the hidden 3 TRY catalog row',()=>{
  for(const changes of [{id:'other'},{price_amount:'3.01'},{currency:'USD'},{payment_test_only:false},{status:'draft'},{in_stock:false}])
   assert.equal(isLiveObservationProduct({...valid,...changes}),false);
  assert.equal(isLiveObservationProduct(null),false);
+});
+test('single-finalize checkout accepts only the private trial or exact public deneme SKU at 3 TRY',()=>{
+ for(const productId of [LIVE_OBSERVATION_PRODUCT_ID,LIVE_CONTROLLED_CATALOG_PRODUCT_ID])
+  assert.equal(isLiveSingleFinalizeCheckout([{productId,quantity:1}],300),true);
+ for(const invalid of [
+  {items:[{productId:'other',quantity:1}],amount:300},
+  {items:[{productId:LIVE_CONTROLLED_CATALOG_PRODUCT_ID,quantity:2}],amount:300},
+  {items:[{productId:LIVE_CONTROLLED_CATALOG_PRODUCT_ID,quantity:1},{productId:LIVE_OBSERVATION_PRODUCT_ID,quantity:1}],amount:300},
+  {items:[{productId:LIVE_CONTROLLED_CATALOG_PRODUCT_ID,quantity:1}],amount:299},
+ ]) assert.equal(isLiveSingleFinalizeCheckout(invalid.items,invalid.amount),false);
 });
 test('Common-payment and orderinq agent UserID values are independently configured',()=>{
  const common=protocol.bankFields(c,order,'127.0.0.1');

@@ -1,8 +1,9 @@
 export const LIVE_OBSERVATION_PRODUCT_ID = 'nrs-garanti-live-3try'
+export const LIVE_CONTROLLED_CATALOG_PRODUCT_ID = 'deneme'
 
 export function isLiveSingleFinalizeCheckout(items: readonly { productId: string; quantity: number }[], amountMinor: number) {
   return amountMinor === 300 && items.length === 1
-    && items[0]?.productId === LIVE_OBSERVATION_PRODUCT_ID
+    && [LIVE_OBSERVATION_PRODUCT_ID, LIVE_CONTROLLED_CATALOG_PRODUCT_ID].includes(items[0]?.productId || '')
     && items[0]?.quantity === 1
 }
 
