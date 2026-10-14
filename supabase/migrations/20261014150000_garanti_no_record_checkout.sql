@@ -27,6 +27,8 @@ $migration$;
 ALTER TABLE public.garanti_orderinq_reconciliations
   DROP CONSTRAINT IF EXISTS garanti_orderinq_reconciliations_evidence_check;
 ALTER TABLE public.garanti_orderinq_reconciliations
+  DROP CONSTRAINT IF EXISTS garanti_orderinq_reconciliations_evidence_check1;
+ALTER TABLE public.garanti_orderinq_reconciliations
   ADD CONSTRAINT garanti_orderinq_reconciliations_evidence_check CHECK (
     evidence - ARRAY[
       'order_id','decision','reason','order_match','terminal_match','mode_match','order_currency_match','prov_user_match','agent_user_match',

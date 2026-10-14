@@ -51,10 +51,24 @@ export async function saveGarantiPaymentReturnDiagnostic(orderId: string, source
   })
   if (error) throw new Error('Safe Garanti callback diagnostic could not be stored.')
 }
+const GARANTI_ORDERINQ_EVIDENCE_KEYS = new Set([
+  'order_id', 'decision', 'reason', 'order_match', 'terminal_match', 'mode_match', 'amount_match',
+  'outer_response_code', 'outer_reason_code', 'result_code', 'result_reason_code', 'status', 'charge_type',
+  'auth_amount_state', 'auth_code_present', 'bank_reference_present', 'history_http',
+  'history_transaction_code', 'history_transaction_reason_code', 'history_result_state', 'history_record_count',
+  'history_identity_match', 'callback_signature_verified', 'signature_evidence_present', 'order_currency_match',
+  'prov_user_match', 'agent_user_match', 'order_result_present', 'payment_event_count',
+  'signed_callback_evidence_count', 'live_finalize_evidence_count',
+])
 export async function saveGarantiOrderinqReconciliation(orderId: string,
   decision: 'verified_success' | 'verified_failure' | 'pending', reason: string, evidence: Record<string, unknown>) {
+  // The RPC intentionally accepts only its reviewed safe schema. The live
+  // query object also carries transport metadata such as `http`; project it
+  // onto the RPC schema so optional diagnostics cannot silently block writes.
+  const safeEvidence = Object.fromEntries(Object.entries(evidence)
+    .filter(([key]) => GARANTI_ORDERINQ_EVIDENCE_KEYS.has(key)))
   const { error } = await paymentDatabase().rpc('nrs_record_garanti_orderinq_reconciliation', {
-    p_order_id: orderId, p_decision: decision, p_reason: reason, p_evidence: evidence,
+    p_order_id: orderId, p_decision: decision, p_reason: reason, p_evidence: safeEvidence,
   })
   if (error) throw new Error('Garanti reconciliation evidence could not be stored.')
 }
