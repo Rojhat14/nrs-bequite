@@ -1,7 +1,10 @@
 import Link from 'next/link'
 import { CheckCircle2, Clock3, MessageCircle, XCircle } from 'lucide-react'
 import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
+import GarantiReconcileAction from '@/components/payment/GarantiReconcileAction'
 import { readAccessiblePaymentOrder } from '@/lib/payment/repository'
+
+const reconciliationOrderId = '32ec756b-8fe2-4c9b-aae2-e34a49248ba9'
 
 export default async function PaymentResult({ orderId, failure = false }: { orderId?: string; failure?: boolean; failureCode?: string }) {
   let order: Awaited<ReturnType<typeof readAccessiblePaymentOrder>> = null
@@ -45,6 +48,8 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
           <p className="mt-1 break-all font-mono text-sm">{order.id}</p>
         </div>}
       </section>
+
+      {order?.id === reconciliationOrderId && order.status === 'pending' && <GarantiReconcileAction />}
 
       {order?.legal?.order_summary && <details className="mt-4 rounded-sm border border-nrs-ink/10 bg-nrs-warm-white px-4 py-2">
         <summary className="flex min-h-11 cursor-pointer items-center font-serif text-lg">Sipariş ayrıntıları</summary>
