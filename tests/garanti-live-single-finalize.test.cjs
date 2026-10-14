@@ -371,6 +371,13 @@ test('live single-finalize records active-order invalid signatures and failed or
 
 test('signed live failure callback stores safe order-bound verification and first orderinq stage without finalizing', async () => {
   const f = makeLiveFixture(), { GarantiProvider: BaseGarantiProvider, GarantiPending } = load('src/lib/payment/garanti/adapter.ts')
+  const previousEnv = { GARANTI_MODE: process.env.GARANTI_MODE, VERCEL_ENV: process.env.VERCEL_ENV,
+    GARANTI_LIVE_CONTROLLED_ONLY: process.env.GARANTI_LIVE_CONTROLLED_ONLY,
+    GARANTI_LIVE_ALLOWED_USER_ID: process.env.GARANTI_LIVE_ALLOWED_USER_ID,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL }
+  Object.assign(process.env, { GARANTI_MODE: 'PROD', VERCEL_ENV: 'production', GARANTI_LIVE_CONTROLLED_ONLY: 'true',
+    GARANTI_LIVE_ALLOWED_USER_ID: liveId, NEXT_PUBLIC_SUPABASE_URL: 'https://moiynemxthkmgpgnfajd.supabase.co' })
+  f.order.userId = liveId
   const protocol = load('src/lib/payment/garanti/protocol.ts')
   const fields = Object.fromEntries(new URLSearchParams(f.body))
   fields.mdstatus = '2'; fields.response = 'Declined'; fields.procreturncode = '92'
@@ -383,6 +390,9 @@ test('signed live failure callback stores safe order-bound verification and firs
   class GarantiProvider extends BaseGarantiProvider { constructor(config) { super(config, async () => f.order) } }
   const provider = new GarantiProvider(f.config)
   const stored = {
+    saveGarantiPaymentReturnDiagnostic: async () => {},
+    readGarantiSettlementEvidence: async () => ({ payment_event_count: 0, signed_callback_evidence_count: 0, live_finalize_evidence_count: 0 }),
+    saveGarantiOrderinqReconciliation: async () => {},
     saveGarantiLiveSingleFinalizeFailure: async (orderId, source, stage, safeCode, diagnostic) => failures.push({ orderId, source, stage, safeCode, diagnostic }),
     saveGarantiLiveSingleFinalizeEvidence: async () => { evidenceWrites++ },
     finalizeGarantiLiveSinglePayment: async () => { finalizeCalls++ },
@@ -421,7 +431,10 @@ test('signed live failure callback stores safe order-bound verification and firs
     })
     const saved = JSON.stringify(failures)
     for (const secret of ['synthetic-store', 'synthetic-provision', 'synthetic-query', 'safe-synthetic', fieldsSecret(f.body)]) assert.equal(saved.includes(secret), false)
-  } finally { global.fetch = originalFetch }
+  } finally {
+    global.fetch = originalFetch
+    for (const [key, value] of Object.entries(previousEnv)) value === undefined ? delete process.env[key] : process.env[key] = value
+  }
 })
 
 test('private account permission status reports only armed/unused state and denies other identities', async () => {

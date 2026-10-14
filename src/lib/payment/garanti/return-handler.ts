@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { paymentAvailable, getPaymentProvider } from '@/lib/payment/provider'
 import { boundedText, unavailable } from '@/lib/payment/http'
 import { createPaymentRepository, finalizeGarantiLiveSinglePayment, saveGarantiLiveSingleFinalizeEvidence, saveGarantiLiveSingleFinalizeFailure,
-  saveGarantiOrderinqReconciliation, saveGarantiPaymentReturnDiagnostic } from '@/lib/payment/repository'
+  readGarantiSettlementEvidence, saveGarantiOrderinqReconciliation, saveGarantiPaymentReturnDiagnostic } from '@/lib/payment/repository'
 import { validateVerifiedPayment } from '@/lib/payment/service'
 import { GarantiProvider, GarantiPending } from './adapter'
 import { diagnoseLiveReturn, diagnoseTestReturn, saveTestDiagnostic } from './diagnostics'
@@ -219,7 +219,8 @@ export async function garantiReturn(request: Request) {
           }
           if (ownedOrder.state === 'pending') {
             try {
-              const reconciled = await provider.reconcileOwnedPendingOrder(ownedOrder.id, ownedOrder.userId)
+              const proof = await readGarantiSettlementEvidence(ownedOrder.id)
+              const reconciled = await provider.reconcileOwnedPendingOrder(ownedOrder.id, ownedOrder.userId, proof)
               const evidence = provider.takeLiveReconciliationEvidence()
               if (reconciled.status === 'failed' && evidence?.decision === 'verified_failure') {
                 await saveGarantiOrderinqReconciliation(ownedOrder.id, 'verified_failure', evidence.reason, evidence)

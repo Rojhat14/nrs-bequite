@@ -81,6 +81,12 @@ $$;
  await db.exec(fs.readFileSync('supabase/migrations/20261009130000_payment_transaction_hardening.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261009140000_final_security_review_fixes.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261013120000_customer_payment_cancellation.sql','utf8'));
+ await db.exec("CREATE TABLE public.garanti_orderinq_reconciliations(order_id uuid PRIMARY KEY,evidence jsonb NOT NULL,CONSTRAINT garanti_orderinq_reconciliations_evidence_check CHECK(evidence='{}'::jsonb))");
+ await db.exec(`CREATE FUNCTION public.nrs_record_garanti_orderinq_reconciliation(p_order_id uuid,p_decision text,p_reason text,p_evidence jsonb)
+  RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$ BEGIN
+  IF (p_evidence - ARRAY['order_id','decision','reason','order_match','terminal_match','mode_match','amount_match','outer_response_code','outer_reason_code','result_code','result_reason_code','status','charge_type','auth_amount_state','auth_code_present','bank_reference_present','history_http','history_transaction_code','history_transaction_reason_code','history_result_state','history_record_count','history_identity_match','callback_signature_verified','signature_evidence_present']::text[]) <> '{}'::jsonb THEN RAISE EXCEPTION 'invalid evidence'; END IF;
+  END $$`);
+ await db.exec(fs.readFileSync('supabase/migrations/20261014150000_garanti_no_record_checkout.sql','utf8'));
 });
 test.after(async()=>{ await db.close() });
 test('Local PostgreSQL: atomic creation saves one order, items, legal snapshot and stock reservation',async()=>{
@@ -92,6 +98,30 @@ test('Local PostgreSQL: duplicate creation does not create another order or decr
  const result=await create(); assert.equal(result.rows[0].result.created,false);
  assert.equal((await db.query('select count(*)::integer as n from public.orders')).rows[0].n,1);
  await assert.rejects(create(orderId,orderId,otherId),/ownership/);
+});
+test('Local PostgreSQL: unresolved payment does not block a separately keyed, independently stocked order',async()=>{
+ const definition=(await db.query("select pg_get_functiondef('public.nrs_create_payment_order(uuid,uuid,text,uuid,text,jsonb,jsonb,jsonb,text)'::regprocedure) definition")).rows[0].definition;
+ assert.doesNotMatch(definition,/Unresolved payment exists; reconcile before a new attempt/);
+ await db.exec('BEGIN');
+ try {
+  await db.exec("insert into public.products(id,name,description,price_amount,compare_at_price,currency,status,in_stock) values('other-product','Other Test','Fiber',100,120,'TRY','active',true)");
+  const otherVariant='77777777-7777-4777-8777-777777777777';
+  await db.query("insert into public.product_variants(id,product_id,size,stock_quantity,is_active) values($1,'other-product','M',1,true)",[otherVariant]);
+  const newId='88888888-8888-4888-8888-888888888888';
+  const otherSummary={...summary,items:[{productId:'other-product',name:'Other Test',description:'Fiber',size:'M',quantity:1,unitPrice:100}],orderedAt:new Date().toISOString()};
+  const result=await db.query('select public.nrs_create_payment_order($1::uuid,$2::uuid,null,$3::uuid,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8) result',
+   [newId,userId,'99999999-9999-4999-8999-999999999999','b'.repeat(64),JSON.stringify([{productId:'other-product',variantId:otherVariant,quantity:1}]),JSON.stringify(customer),JSON.stringify(historicalRecord(newId,otherSummary)),'test-bank']);
+  assert.equal(result.rows[0].result.created,true);
+  assert.equal(result.rows[0].result.order.state,'initiating');
+  assert.equal((await db.query('select state from public.payment_orders where order_id=$1::uuid',[orderId])).rows[0].state,'initiating');
+  assert.equal((await db.query('select stock_quantity from public.product_variants where id=$1::uuid',[otherVariant])).rows[0].stock_quantity,0);
+  assert.equal((await db.query('select stock_quantity from public.product_variants where id=$1::uuid',[variantId])).rows[0].stock_quantity,0);
+ } finally { await db.exec('ROLLBACK'); }
+});
+test('Local PostgreSQL: reconciliation RPC accepts only the expanded safe no-record evidence allowlist',async()=>{
+ const definition=(await db.query("select pg_get_functiondef('public.nrs_record_garanti_orderinq_reconciliation(uuid,text,text,jsonb)'::regprocedure) definition")).rows[0].definition;
+ for(const key of ['order_currency_match','prov_user_match','agent_user_match','order_result_present','payment_event_count','signed_callback_evidence_count','live_finalize_evidence_count']) assert.ok(definition.includes(`'${key}'`));
+ await db.query("select public.nrs_record_garanti_orderinq_reconciliation($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify({order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND',order_currency_match:true,prov_user_match:true,agent_user_match:true,order_result_present:false,payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0})]);
 });
 test('Local PostgreSQL: second buyer cannot consume reserved last stock; transaction leaves no partial order',async()=>{
  await assert.rejects(create(otherId,otherId,otherId),/stock unavailable/);

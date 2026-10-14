@@ -42,12 +42,15 @@ export type SuccessfulLiveReturnEvidence = {
 export type LiveReconciliationEvidence = {
   order_id: string; http: number | null; decision: 'verified_success' | 'verified_failure' | 'pending'
   reason: string; order_match: boolean | null; terminal_match: boolean | null; mode_match: boolean | null
+  order_currency_match?: boolean | null
+  prov_user_match: boolean | null; agent_user_match: boolean | null; order_result_present: boolean | null
   amount_match: boolean | null; outer_response_code: string | null; outer_reason_code: string | null
   result_code: string | null; result_reason_code: string | null; status: string | null; charge_type: string | null
   auth_amount_state: 'missing' | 'zero' | 'matching' | 'other' | null
   auth_code_present: boolean | null; bank_reference_present: boolean | null
   history_http?: number | null; history_transaction_code?: string | null; history_transaction_reason_code?: string | null
   history_result_state?: string | null; history_record_count?: number | null; history_identity_match?: boolean | null
+  payment_event_count?: number; signed_callback_evidence_count?: number; live_finalize_evidence_count?: number
 }
 type SuccessfulLiveQueryEvidence = Pick<SuccessfulLiveReturnEvidence,
   'query_http' | 'query_order_match' | 'query_identity_match' | 'query_amount_match' | 'query_result_codes_match'
@@ -326,7 +329,9 @@ export class GarantiProvider implements PaymentProvider {
       result_state: resultState, record_count: records.length, records,
       database_changed: false, sale_started: false, cancel_started: false, refund_started: false, finalize_called: false }
   }
-  async reconcileOwnedPendingOrder(orderId: string, userId: string): Promise<VerifiedPayment> {
+  async reconcileOwnedPendingOrder(orderId: string, userId: string, paymentProof: {
+    payment_event_count: number; signed_callback_evidence_count: number; live_finalize_evidence_count: number
+  }): Promise<VerifiedPayment> {
     if (!this.config.liveObservationOnly || this.config.mode !== 'PROD' || !controlledLiveAccountAllowed(userId)) {
       throw new Error('Owned reconciliation is not authorized.')
     }
@@ -344,9 +349,68 @@ export class GarantiProvider implements PaymentProvider {
     const settlementProvider = new GarantiProvider({ ...this.config, liveObservationOnly: false,
       capturedStatus: 'APPROVED', capturedResultCode: '00', saleChargeType: 'S', failedStatuses: this.config.failedStatuses },
       this.loadOrder, this.transport)
+    let payment: VerifiedPayment | null = null
+    let orderinqFailure: unknown = null
     try {
-      const payment = await settlementProvider.query(stored, handoff.ip)
+      payment = await settlementProvider.query(stored, handoff.ip)
       this.lastLiveReconciliationEvidence = settlementProvider.takeLiveReconciliationEvidence()
+    } catch (error) {
+      orderinqFailure = error
+      this.lastLiveReconciliationEvidence = settlementProvider.takeLiveReconciliationEvidence()
+      const isOrderRecordMissing = this.lastLiveReconciliationEvidence?.http === 200
+        && this.lastLiveReconciliationEvidence.outer_response_code === '92'
+        && this.lastLiveReconciliationEvidence.outer_reason_code === '0110'
+      if (!isOrderRecordMissing) throw error
+    }
+
+    const isOrderRecordMissing = !payment && this.lastLiveReconciliationEvidence?.http === 200
+      && this.lastLiveReconciliationEvidence.outer_response_code === '92'
+      && this.lastLiveReconciliationEvidence.outer_reason_code === '0110'
+    if (isOrderRecordMissing) {
+      const orderinq = this.lastLiveReconciliationEvidence!
+      const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string; redirectUrl: string | null }, userId)
+      const orderinqIdentityMatch = orderinq.order_match === true && orderinq.terminal_match === true
+        && orderinq.order_currency_match === true
+        && orderinq.prov_user_match === true && orderinq.agent_user_match === true && orderinq.mode_match !== false
+      const historyIdentityMatch = history.response_terminal_match === true && history.response_merchant_match === true
+        && history.response_order_match === true && history.order_currency_match === true
+        && history.request_terminal_matches_config === true && history.request_prov_user_matches_expected === true
+        && history.request_agent_user_matches_expected === true && history.response_mode_match !== false
+        && history.response_prov_user_match === true && history.response_agent_user_match === true
+      const pairedNoRecord = history.http === 200 && history.transaction_code === '92'
+        && history.transaction_reason_code === '0108' && history.result_state === 'empty'
+        && history.record_count === 0 && orderinqIdentityMatch && historyIdentityMatch
+        && orderinq.order_result_present === false && orderinq.auth_amount_state === 'missing'
+        && orderinq.auth_code_present === false && orderinq.bank_reference_present === false
+      const noPaymentProof = paymentProof.payment_event_count === 0
+        && paymentProof.signed_callback_evidence_count === 0 && paymentProof.live_finalize_evidence_count === 0
+      this.lastLiveReconciliationEvidence = {
+        ...orderinq,
+        decision: 'pending',
+        reason: pairedNoRecord && noPaymentProof ? 'GARANTI_BANK_RECORD_NOT_FOUND'
+          : pairedNoRecord ? 'GARANTI_BANK_RECORD_NOT_FOUND_CONFLICTING_PAYMENT_EVIDENCE'
+            : 'GARANTI_BANK_RECORD_NOT_FOUND_PAIR_UNCONFIRMED',
+        history_http: history.http,
+        history_transaction_code: history.transaction_code,
+        history_transaction_reason_code: history.transaction_reason_code,
+        history_result_state: history.result_state,
+        history_record_count: history.record_count,
+        history_identity_match: historyIdentityMatch,
+        payment_event_count: paymentProof.payment_event_count,
+        signed_callback_evidence_count: paymentProof.signed_callback_evidence_count,
+        live_finalize_evidence_count: paymentProof.live_finalize_evidence_count,
+      }
+      // The pair documents a missing bank record, not a terminal decline. Keep
+      // this payment pending and its reservation intact; a new idempotency key
+      // may create a separately stock-checked order for this account.
+      throw new GarantiPending(orderId)
+    }
+
+    if (!payment) {
+      if (orderinqFailure) throw orderinqFailure
+      throw new GarantiPending(orderId)
+    }
+    try {
       const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string; redirectUrl: string | null }, userId)
       const historyIdentityMatch = history.response_terminal_match === true && history.response_merchant_match === true
         && history.response_order_match === true && history.order_currency_match === true
@@ -475,9 +539,13 @@ export class GarantiProvider implements PaymentProvider {
     const modeValue = q.Mode === undefined ? '' : typeof q.Mode === 'string' ? q.Mode : '__invalid__'
     const queryEvidence: LiveReconciliationEvidence = {
       order_id: order.id, http, decision: 'pending', reason: 'GARANTI_ORDERINQ_UNCLASSIFIED',
+      order_currency_match: order.currency === 'TRY',
       order_match: q.Order?.OrderID === order.merchantReference,
       terminal_match: q.Terminal?.ID === c.terminalId && q.Terminal?.MerchantID === c.merchantId,
       mode_match: modeValue === '' ? null : modeValue === c.mode,
+      prov_user_match: q.Terminal?.ProvUserID === undefined ? null : scalar(q.Terminal.ProvUserID) === c.queryUser,
+      agent_user_match: q.Terminal?.UserID === undefined ? null : scalar(q.Terminal.UserID) === c.queryAgentUserId,
+      order_result_present: r !== undefined,
       amount_match: authAmount === '' || authAmount === '__invalid__' ? null : authAmount === String(order.amountMinor),
       outer_response_code: safeField(response?.Code), outer_reason_code: safeField(response?.ReasonCode),
       result_code: safeField(r?.Code), result_reason_code: safeField(r?.ReasonCode),

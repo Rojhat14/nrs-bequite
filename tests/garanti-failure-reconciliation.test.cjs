@@ -17,21 +17,22 @@ const env={GARANTI_MODE:'PROD',VERCEL_ENV:'production',NEXT_PUBLIC_SUPABASE_URL:
  GARANTI_CAPTURED_RESULT_CODE:'',GARANTI_SALE_CHARGE_TYPE:'',GARANTI_FINAL_FAILED_STATUSES:''};
 const order={id,merchantReference:id,amountMinor:300,currency:'TRY',state:'pending',userId:owner,
  legal:{order_summary:{buyer:{email:'synthetic@example.com'}}},redirectUrl:null};
-function response({status='DECLINED',code='05',reason='00',authAmount='0',outer='00',historyRows='',isHistory=false}={}){
- return `<GVPSResponse><Mode>PROD</Mode><Terminal><ProvUserID>PROVAUT</ProvUserID><UserID>PROVAUT</UserID><ID>12345678</ID><MerchantID>1000001</MerchantID></Terminal><Order><OrderID>${id}</OrderID><${isHistory?'OrderHistInqResult':'OrderInqResult'}>${isHistory?`<OrderTxnList>${historyRows}</OrderTxnList>`:`<Status>${status}</Status><ChargeType>S</ChargeType><Code>${code}</Code><ReasonCode>${reason}</ReasonCode><AuthAmount>${authAmount}</AuthAmount><AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum><InstallmentCnt>0</InstallmentCnt>`}</${isHistory?'OrderHistInqResult':'OrderInqResult'}></Order><Transaction><Response><Code>${isHistory?'00':outer}</Code><ReasonCode>00</ReasonCode></Response></Transaction></GVPSResponse>`;
+function response({status='DECLINED',code='05',reason='00',authAmount='0',outer='00',outerReason='00',historyCode='00',historyReason='00',historyRows='',isHistory=false,noRecord=false}={}){
+ const inner=isHistory?`<OrderHistInqResult><OrderTxnList>${historyRows}</OrderTxnList></OrderHistInqResult>`:noRecord?'':`<OrderInqResult><Status>${status}</Status><ChargeType>S</ChargeType><Code>${code}</Code><ReasonCode>${reason}</ReasonCode><AuthAmount>${authAmount}</AuthAmount><AuthCode>123456</AuthCode><RetrefNum>987654</RetrefNum><InstallmentCnt>0</InstallmentCnt></OrderInqResult>`;
+ return `<GVPSResponse><Mode>PROD</Mode><Terminal><ProvUserID>PROVAUT</ProvUserID><UserID>PROVAUT</UserID><ID>12345678</ID><MerchantID>1000001</MerchantID></Terminal><Order><OrderID>${id}</OrderID>${inner}</Order><Transaction><Response><Code>${isHistory?historyCode:outer}</Code><ReasonCode>${isHistory?historyReason:outerReason}</ReasonCode></Response></Transaction></GVPSResponse>`;
 }
-async function run({mapping='DECLINED|05|00',confirm='true',queryOptions={},historyRows=''}={}){
+async function run({mapping='DECLINED|05|00',confirm='true',queryOptions={},historyRows='',historyCode,historyReason,paymentProof={payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0}}={}){
  const config=garantiConfig({...env,GARANTI_LIVE_FAILED_RESULT_MAPPINGS:mapping,GARANTI_LIVE_FAILED_RESULTS_CONFIRMED:confirm});
  let calls=0;const provider=new GarantiProvider(config,async()=>order,async(_url,options)=>{
   calls++;const xml=Buffer.from(options.body).toString('latin1');
   const isHistory=xml.includes('<Type>orderhistoryinq</Type>');
-  const body=isHistory?response({historyRows,isHistory:true}):response(queryOptions);
+  const body=isHistory?response({historyRows,isHistory:true,historyCode:historyCode??(queryOptions.noRecord?'92':'00'),historyReason:historyReason??(queryOptions.noRecord?'0108':'00')}):response(queryOptions.noRecord?{outer:'92',outerReason:'0110',...queryOptions}:queryOptions);
   return new Response(body,{status:200,headers:{'content-type':'text/xml;charset=utf-8'}});
  });
  const handoffUrl=new URL((await provider.initiate({...order,state:'initiating'},id,{customerIp:'127.0.0.1'})).redirectUrl);
  order.redirectUrl=handoffUrl.toString()+'&used=1';
  let payment=null,error=null;
- try{payment=await provider.reconcileOwnedPendingOrder(id,owner)}catch(e){error=e}
+ try{payment=await provider.reconcileOwnedPendingOrder(id,owner,paymentProof)}catch(e){error=e}
  return{provider,calls,payment,error,evidence:provider.takeLiveReconciliationEvidence()};
 }
 
@@ -39,6 +40,29 @@ test('Production failure mappings require explicit confirmed exact Status/Code/R
  assert.throws(()=>garantiConfig({...env,GARANTI_LIVE_FAILED_RESULT_MAPPINGS:'DECLINED|05|00'}),/Confirm bank query failure mappings/);
  assert.throws(()=>garantiConfig({...env,GARANTI_LIVE_FAILED_RESULT_MAPPINGS:'APPROVED|00|00',GARANTI_LIVE_FAILED_RESULTS_CONFIRMED:'true'}),/Confirm bank query failure mappings/);
  assert.throws(()=>garantiConfig({...env,GARANTI_LIVE_FAILED_RESULT_MAPPINGS:'DECLINED|05|00,DECLINED|05|00',GARANTI_LIVE_FAILED_RESULTS_CONFIRMED:'true'}),/Confirm bank query status meanings/);
+});
+
+test('Paired orderinq 92/0110 and orderhistoryinq 92/0108 with no payment proof is recorded as no-record pending, not failed',async()=>{
+ const old={...process.env};Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:owner,NEXT_PUBLIC_SUPABASE_URL:db});
+ try{
+  const result=await run({mapping:'',queryOptions:{noRecord:true}});
+  assert.equal(result.calls,2);assert.ok(result.error instanceof GarantiPending);assert.equal(result.payment,null);
+  assert.equal(result.evidence.decision,'pending');assert.equal(result.evidence.reason,'GARANTI_BANK_RECORD_NOT_FOUND');
+  assert.equal(result.evidence.status,null);assert.equal(result.evidence.auth_amount_state,'missing');
+  assert.equal(result.evidence.history_transaction_reason_code,'0108');assert.equal(result.evidence.history_result_state,'empty');
+  assert.equal(result.evidence.payment_event_count,0);assert.equal(result.evidence.signed_callback_evidence_count,0);
+ }finally{for(const key of Object.keys(process.env))if(!(key in old))delete process.env[key];Object.assign(process.env,old)}
+});
+
+test('No-record pair remains pending when payment proof exists or either bank identity/result conflicts',async()=>{
+ const old={...process.env};Object.assign(process.env,{GARANTI_MODE:'PROD',VERCEL_ENV:'production',GARANTI_LIVE_CONTROLLED_ONLY:'true',GARANTI_LIVE_ALLOWED_USER_ID:owner,NEXT_PUBLIC_SUPABASE_URL:db});
+ try{
+  const proof=await run({mapping:'',queryOptions:{noRecord:true},paymentProof:{payment_event_count:1,signed_callback_evidence_count:0,live_finalize_evidence_count:0}});
+  const historyMismatch=await run({mapping:'',queryOptions:{noRecord:true},historyReason:'00'});
+  for(const result of [proof,historyMismatch]){assert.equal(result.calls,2);assert.ok(result.error instanceof GarantiPending);assert.equal(result.payment,null)}
+  assert.equal(proof.evidence.reason,'GARANTI_BANK_RECORD_NOT_FOUND_CONFLICTING_PAYMENT_EVIDENCE');
+  assert.equal(historyMismatch.evidence.reason,'GARANTI_BANK_RECORD_NOT_FOUND_PAIR_UNCONFIRMED');
+ }finally{for(const key of Object.keys(process.env))if(!(key in old))delete process.env[key];Object.assign(process.env,old)}
 });
 
 test('Only an exact mapped failure with zero authorized amount and complete empty history finalizes as failed',async()=>{

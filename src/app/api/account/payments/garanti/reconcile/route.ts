@@ -4,7 +4,7 @@ import { getPaymentProvider } from '@/lib/payment/provider'
 import { controlledLiveAccountAllowed } from '@/lib/payment/garanti/config'
 import { GarantiPending, GarantiProvider } from '@/lib/payment/garanti/adapter'
 import { loadGarantiOrder } from '@/lib/payment/garanti/order'
-import { createPaymentRepository, saveGarantiOrderinqReconciliation } from '@/lib/payment/repository'
+import { createPaymentRepository, readGarantiSettlementEvidence, saveGarantiOrderinqReconciliation } from '@/lib/payment/repository'
 import { sameOrigin, boundedJson } from '@/lib/payment/http'
 import { UUID } from '@/lib/payment/request'
 
@@ -39,7 +39,8 @@ export async function POST(request: Request) {
     if (order.userId !== user.id || order.state !== 'pending' || order.amountMinor !== 300 || order.currency !== 'TRY') {
       return json(404, { state: 'unavailable' })
     }
-    const payment = await provider.reconcileOwnedPendingOrder(order.id, user.id)
+    const proof = await readGarantiSettlementEvidence(order.id)
+    const payment = await provider.reconcileOwnedPendingOrder(order.id, user.id, proof)
     const evidence = provider.takeLiveReconciliationEvidence()
     if (payment.status === 'failed' && evidence?.decision === 'verified_failure') {
       await saveGarantiOrderinqReconciliation(order.id, 'verified_failure', evidence.reason, evidence)

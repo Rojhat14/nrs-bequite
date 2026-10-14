@@ -63,6 +63,28 @@ export async function readGarantiOrderinqReconciliation(orderId: string) {
     .select('decision,reason,evidence,updated_at').eq('order_id', orderId).maybeSingle()
   return error ? null : data
 }
+// Read only coarse, order-bound proof signals before interpreting a bank
+// "record not found" response. Never return transaction IDs or callback values.
+export async function readGarantiSettlementEvidence(orderId: string) {
+  if (!UUID.test(orderId)) throw new Error('Invalid payment reference.')
+  const db = paymentDatabase()
+  const [events, returns, liveEvidence, liveFailures] = await Promise.all([
+    db.from('payment_events').select('event_id,state').eq('order_id', orderId),
+    db.from('garanti_payment_return_diagnostics').select('diagnostic').eq('order_id', orderId),
+    db.from('garanti_live_single_finalize_evidence').select('signature_verified').eq('order_id', orderId),
+    db.from('garanti_live_single_finalize_failures').select('callback_signature_verified').eq('order_id', orderId),
+  ])
+  const error = events.error || returns.error || liveEvidence.error || liveFailures.error
+  if (error) throw new Error('Order-bound payment evidence unavailable.')
+  const verifiedReturnCount = (returns.data || []).filter(row => row.diagnostic?.signature_verified === true).length
+  const liveEvidenceCount = (liveEvidence.data || []).filter(row => row.signature_verified === true).length
+  const failureEvidenceCount = (liveFailures.data || []).filter(row => row.callback_signature_verified === true).length
+  return {
+    payment_event_count: (events.data || []).length,
+    signed_callback_evidence_count: verifiedReturnCount + failureEvidenceCount,
+    live_finalize_evidence_count: liveEvidenceCount,
+  }
+}
 export async function readGarantiLiveSingleFinalizeFailure(orderId: string) {
   if (!garantiLiveObservationOnly() || !UUID.test(orderId)) return null
   const { data, error } = await paymentDatabase().from('garanti_live_single_finalize_failures')
