@@ -82,9 +82,10 @@ $$;
  await db.exec(fs.readFileSync('supabase/migrations/20261009140000_final_security_review_fixes.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261013120000_customer_payment_cancellation.sql','utf8'));
  await db.exec("CREATE TABLE public.garanti_orderinq_reconciliations(order_id uuid PRIMARY KEY,evidence jsonb NOT NULL,CONSTRAINT garanti_orderinq_reconciliations_evidence_check CHECK(evidence='{}'::jsonb))");
+ await db.exec(`CREATE FUNCTION public.nrs_garanti_service_role_request() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('request.jwt.claim.role',true),'')='service_role' $$`);
  await db.exec(`CREATE FUNCTION public.nrs_record_garanti_orderinq_reconciliation(p_order_id uuid,p_decision text,p_reason text,p_evidence jsonb)
   RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$ BEGIN
-  IF (p_evidence - ARRAY['order_id','decision','reason','order_match','terminal_match','mode_match','amount_match','outer_response_code','outer_reason_code','result_code','result_reason_code','status','charge_type','auth_amount_state','auth_code_present','bank_reference_present','history_http','history_transaction_code','history_transaction_reason_code','history_result_state','history_record_count','history_identity_match','callback_signature_verified','signature_evidence_present']::text[]) <> '{}'::jsonb THEN RAISE EXCEPTION 'invalid evidence'; END IF;
+  IF coalesce(current_setting('request.jwt.claim.role',true),'') <> 'service_role' OR (p_evidence - ARRAY['order_id','decision','reason','order_match','terminal_match','mode_match','amount_match','outer_response_code','outer_reason_code','result_code','result_reason_code','status','charge_type','auth_amount_state','auth_code_present','bank_reference_present','history_http','history_transaction_code','history_transaction_reason_code','history_result_state','history_record_count','history_identity_match','callback_signature_verified','signature_evidence_present']::text[]) <> '{}'::jsonb THEN RAISE EXCEPTION 'invalid evidence'; END IF;
   END $$`);
  await db.exec(fs.readFileSync('supabase/migrations/20261014150000_garanti_no_record_checkout.sql','utf8'));
 });
@@ -121,6 +122,8 @@ test('Local PostgreSQL: unresolved payment does not block a separately keyed, in
 test('Local PostgreSQL: reconciliation RPC accepts only the expanded safe no-record evidence allowlist',async()=>{
  const definition=(await db.query("select pg_get_functiondef('public.nrs_record_garanti_orderinq_reconciliation(uuid,text,text,jsonb)'::regprocedure) definition")).rows[0].definition;
  for(const key of ['order_currency_match','prov_user_match','agent_user_match','order_result_present','payment_event_count','signed_callback_evidence_count','live_finalize_evidence_count']) assert.ok(definition.includes(`'${key}'`));
+ assert.ok(definition.includes('public.nrs_garanti_service_role_request()'));
+ await db.query("select set_config('request.jwt.claim.role','service_role',false)");
  await db.query("select public.nrs_record_garanti_orderinq_reconciliation($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify({order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND',order_currency_match:true,prov_user_match:true,agent_user_match:true,order_result_present:false,payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0})]);
 });
 test('Local PostgreSQL: second buyer cannot consume reserved last stock; transaction leaves no partial order',async()=>{

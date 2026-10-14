@@ -50,21 +50,35 @@ ALTER TABLE public.garanti_orderinq_reconciliations
 DO $migration$
 DECLARE
   definition text;
+  old_role_guard text := 'coalesce(current_setting(''request.jwt.claim.role'',true),'''') <> ''service_role''';
+  new_role_guard text := 'NOT public.nrs_garanti_service_role_request()';
   old_keys text := '''history_result_state'',''history_record_count'',''history_identity_match'',''callback_signature_verified'',''signature_evidence_present''';
   new_keys text := old_keys || ',''order_currency_match'',''prov_user_match'',''agent_user_match'',''order_result_present'',''payment_event_count'',''signed_callback_evidence_count'',''live_finalize_evidence_count''';
 BEGIN
   SELECT pg_get_functiondef('public.nrs_record_garanti_orderinq_reconciliation(uuid,text,text,jsonb)'::regprocedure)
     INTO definition;
   IF definition IS NULL THEN RAISE EXCEPTION 'Garanti reconciliation RPC is missing'; END IF;
+  IF to_regprocedure('public.nrs_garanti_service_role_request()') IS NULL THEN
+    RAISE EXCEPTION 'Garanti service-role compatibility helper is missing';
+  END IF;
   IF position('payment_event_count' IN definition) > 0
     AND position('signed_callback_evidence_count' IN definition) > 0
-    AND position('live_finalize_evidence_count' IN definition) > 0 THEN
+    AND position('live_finalize_evidence_count' IN definition) > 0
+    AND position(new_role_guard IN definition) > 0 THEN
     RETURN;
   END IF;
-  IF position(old_keys IN definition) = 0 THEN
+  IF position(old_keys IN definition) > 0 THEN
+    definition := replace(definition, old_keys, new_keys);
+  ELSIF position('payment_event_count' IN definition) = 0
+    OR position('signed_callback_evidence_count' IN definition) = 0
+    OR position('live_finalize_evidence_count' IN definition) = 0 THEN
     RAISE EXCEPTION 'Garanti reconciliation RPC allowlist differs from the reviewed schema';
   END IF;
-  definition := replace(definition, old_keys, new_keys);
+  IF position(old_role_guard IN definition) > 0 THEN
+    definition := replace(definition, old_role_guard, new_role_guard);
+  ELSIF position(new_role_guard IN definition) = 0 THEN
+    RAISE EXCEPTION 'Garanti reconciliation RPC role guard differs from the reviewed schema';
+  END IF;
   EXECUTE definition;
 END
 $migration$;
