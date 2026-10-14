@@ -380,8 +380,16 @@ export class GarantiProvider implements PaymentProvider {
       const pairedNoRecord = history.http === 200 && history.transaction_code === '92'
         && history.transaction_reason_code === '0108' && history.result_state === 'empty'
         && history.record_count === 0 && orderinqIdentityMatch && historyIdentityMatch
-        && orderinq.order_result_present === false && orderinq.auth_amount_state === 'missing'
-        && orderinq.auth_code_present === false && orderinq.bank_reference_present === false
+        // Garanti can return an OrderInqResult envelope with only AuthAmount=0
+        // even when the outer response says no order record exists. Treat that
+        // as an empty result shell, never as proof of zero capture. Non-empty
+        // sale status/codes, a nonzero amount, or transaction references make
+        // the pair conflicting and keep it unconfirmed.
+        && (orderinq.order_result_present === false || (
+          !orderinq.status && !orderinq.result_code && !orderinq.result_reason_code
+          && ['missing', 'zero'].includes(orderinq.auth_amount_state || '')
+          && orderinq.auth_code_present === false && orderinq.bank_reference_present === false
+        ))
       const noPaymentProof = paymentProof.payment_event_count === 0
         && paymentProof.signed_callback_evidence_count === 0 && paymentProof.live_finalize_evidence_count === 0
       this.lastLiveReconciliationEvidence = {
