@@ -16,6 +16,7 @@ import { cookies } from 'next/headers'
 import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
+import { isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
@@ -150,8 +151,13 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       const id = randomUUID()
       const record = prepareOrderLegalRecord(id, request, quote.summary)
       const amountMinor = Math.round(quote.summary.total * 100)
-      const liveSingleFinalize = !manual && process.env.PAYMENT_PROVIDER === 'garanti-oos'
+      const liveSingleFinalizeArmed = !manual && process.env.PAYMENT_PROVIDER === 'garanti-oos'
         && garantiLiveSingleFinalizeArmed(userId, amountMinor)
+      const liveSingleFinalizeItem = isLiveSingleFinalizeCheckout(request.items, amountMinor)
+      if (liveSingleFinalizeArmed && !liveSingleFinalizeItem) {
+        throw new PaymentStartError('CONTROLLED_ITEM_REQUIRED', 'quote', 'Tek kullanımlık canlı izin yalnızca özel deneme ürününde kullanılabilir.')
+      }
+      const liveSingleFinalize = liveSingleFinalizeArmed && liveSingleFinalizeItem
       const rpcName = !manual && garantiObservationOnly() ? 'nrs_create_garanti_test_observation_order'
         : liveSingleFinalize ? 'nrs_create_garanti_live_single_finalize_order' : 'nrs_create_payment_order'
       const rpcArgs = {

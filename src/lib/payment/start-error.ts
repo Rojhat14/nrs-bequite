@@ -2,7 +2,7 @@
 export type StartStage = 'request' | 'lookup' | 'quote' | 'create_rpc' | 'handoff' | 'store_redirect'
 export class PaymentStartError extends Error {
   readonly databaseCode?: string
-  constructor(readonly code: 'UNRESOLVED_PAYMENT' | 'TEST_HANDOFF_SUBMITTED' | 'START_FAILED',
+  constructor(readonly code: 'UNRESOLVED_PAYMENT' | 'TEST_HANDOFF_SUBMITTED' | 'CONTROLLED_ITEM_REQUIRED' | 'START_FAILED',
     readonly stage: StartStage, message: string, databaseCode?: string, readonly resumeOrderId?: string) {
     super(message)
     if (databaseCode && /^(?:[A-Z0-9]{5}|PGRST\d{3})$/.test(databaseCode)) this.databaseCode = databaseCode

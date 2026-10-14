@@ -1,5 +1,11 @@
 export const LIVE_OBSERVATION_PRODUCT_ID = 'nrs-garanti-live-3try'
 
+export function isLiveSingleFinalizeCheckout(items: readonly { productId: string; quantity: number }[], amountMinor: number) {
+  return amountMinor === 300 && items.length === 1
+    && items[0]?.productId === LIVE_OBSERVATION_PRODUCT_ID
+    && items[0]?.quantity === 1
+}
+
 export interface LiveObservationProductRow {
   id: string
   name: string

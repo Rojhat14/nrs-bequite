@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       ? `/checkout/verify?orderId=${diagnostic.resumeOrderId}` : undefined
     const message = code === 'UNRESOLVED_PAYMENT' ? 'Bekleyen bir siparişiniz var. Yeni sipariş oluşturulmadı; önce mevcut siparişinize devam edin.'
       : code === 'TEST_HANDOFF_SUBMITTED' ? 'Bu test siparişi bankaya gönderilmiş. Sonuç doğrulanmadan tekrar ödeme başlatılmadı.'
+      : code === 'CONTROLLED_ITEM_REQUIRED' ? 'Bu tek kullanımlık canlı deneme izni yalnızca özel 3 TL deneme ürünü için geçerlidir. Ödeme başlatılmadı.'
       : 'Ödeme başlatılamadı. Özeti kontrol edin; işleminiz bankaya iletildiyse yeniden ödeme yapmadan bizimle iletişime geçin.'
     return NextResponse.json({ error: message, code, stage, ...(diagnostic?.databaseCode ? { databaseCode: diagnostic.databaseCode } : {}), ...(resumeUrl ? { resumeUrl } : {}) }, { status: 409, headers: { 'Cache-Control': 'no-store' } })
   }

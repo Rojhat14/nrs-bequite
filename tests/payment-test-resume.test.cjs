@@ -11,7 +11,7 @@ function fixture(observation=true, sameKey=false){
  handoff(token){if(token!=='old')throw new Error('expired');return{id}}
  async initiate(o){signs++;assert.equal(o.state,'initiating');return {redirectUrl:origin+'/api/payment/garanti/handoff?token=fresh'}}}
  const db={from(){return{select(){return this},eq(){return this},in(){return this},async maybeSingle(){return{data:sameKey?{order_id:id,user_id:order.userId,guest_hash:null,request_hash:digest,merchant_reference:id,amount_minor:100,currency:'TRY',state:order.state,provider:'garanti-oos'}:null,error:null}},async limit(){return{data:[{order_id:id,user_id:'owner',guest_hash:null,request_hash:digest,merchant_reference:id,amount_minor:100,currency:'TRY',state:order.state,provider:'garanti-oos'}],error:null}}}}};
- const load=loader({'@supabase/supabase-js':{createClient:()=>db},'./config':{requirePaymentDeployment(){}},'./garanti/config':{garantiObservationOnly:()=>observation},'./garanti/adapter':{GarantiProvider},
+ const load=loader({'@supabase/supabase-js':{createClient:()=>db},'./config':{requirePaymentDeployment(){}},'./garanti/config':{garantiObservationOnly:()=>observation,garantiLiveObservationOnly:()=>false,garantiLiveSingleFinalizeArmed:()=>false},'./garanti/adapter':{GarantiProvider},
  './garanti/order':{loadGarantiOrder:async()=>order,renewUnsubmittedGarantiHandoff:async(o,next)=>{assert.equal(o.userId,'owner');writes++;order={...order,redirectUrl:next}}}});
  process.env.PAYMENT_DATABASE_VERIFIED='true';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic';process.env.PAYMENT_PROVIDER='garanti-oos';
  const repo=load('src/lib/payment/repository.ts').createPaymentRepository();repo.createAtomic=async()=>{creates++;throw new Error('Must not create duplicate')};repo.quote=async()=>{throw new Error('Must not reserve again')};
@@ -72,7 +72,7 @@ test('Same-key changed content is still rejected before any new attempt',async()
 
 test('Only exact observation mode routes creation to the test-only RPC',async()=>{
  for(const observation of [true,false]){let rpcName;const db={rpc:async(name)=>{rpcName=name;return{data:{order:{id},created:true},error:null}}};
- const load=loader({'@supabase/supabase-js':{createClient:()=>db},'./config':{requirePaymentDeployment(){}},'./garanti/config':{garantiObservationOnly:()=>observation},'@/lib/legal/payment-preflight':{prepareOrderLegalRecord:()=>({})}});
+ const load=loader({'@supabase/supabase-js':{createClient:()=>db},'./config':{requirePaymentDeployment(){}},'./garanti/config':{garantiObservationOnly:()=>observation,garantiLiveObservationOnly:()=>false,garantiLiveSingleFinalizeArmed:()=>false},'@/lib/legal/payment-preflight':{prepareOrderLegalRecord:()=>({})}});
  process.env.PAYMENT_DATABASE_VERIFIED='true';process.env.SUPABASE_SERVICE_ROLE_KEY='synthetic';process.env.PAYMENT_PROVIDER='garanti-oos';
  const result=await load('src/lib/payment/repository.ts').createPaymentRepository().createAtomic(input,'owner',null,{summary:{},hash:input.quoteHash});
  assert.equal(rpcName,observation?'nrs_create_garanti_test_observation_order':'nrs_create_payment_order');assert.equal(result.created,true);
@@ -83,7 +83,7 @@ test('Claimed single-finalize TEST account can create a distinct observation-onl
   async rpc(name,args){calls.push(['rpc',name,args]);return{data:{created:true,order:{id:nextId,state:'initiating'}},error:null}}
  };
  const load=loader({'@supabase/supabase-js':{createClient:()=>db},'./config':{requirePaymentDeployment(){}},
-  './garanti/config':{garantiObservationOnly:()=>true},'@/lib/legal/payment-preflight':{prepareOrderLegalRecord:()=>({})}});
+  './garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false,garantiLiveSingleFinalizeArmed:()=>false},'@/lib/legal/payment-preflight':{prepareOrderLegalRecord:()=>({})}});
  Object.assign(process.env,{PAYMENT_DATABASE_VERIFIED:'true',SUPABASE_SERVICE_ROLE_KEY:'synthetic',NEXT_PUBLIC_SUPABASE_URL:'https://dzuxhwtbuojnhibzfxqy.supabase.co',PAYMENT_PROVIDER:'garanti-oos'});
  const repo=load('src/lib/payment/repository.ts').createPaymentRepository();
  const result=await repo.createAtomic(input,'owner',null,{summary:{},hash:input.quoteHash});
