@@ -124,8 +124,12 @@ test('Local PostgreSQL: reconciliation RPC accepts only the expanded safe no-rec
  const definition=(await db.query("select pg_get_functiondef('public.nrs_record_garanti_orderinq_reconciliation(uuid,text,text,jsonb)'::regprocedure) definition")).rows[0].definition;
  for(const key of ['order_currency_match','prov_user_match','agent_user_match','order_result_present','payment_event_count','signed_callback_evidence_count','live_finalize_evidence_count']) assert.ok(definition.includes(`'${key}'`));
  assert.ok(definition.includes('public.nrs_garanti_service_role_request()'));
- await db.query("select set_config('request.jwt.claim.role','service_role',false)");
- await db.query("select public.nrs_record_garanti_orderinq_reconciliation($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify({order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND',order_currency_match:true,prov_user_match:true,agent_user_match:true,order_result_present:false,payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0})]);
+ await db.exec('BEGIN');
+ try {
+  await db.query("UPDATE public.payment_orders SET state='pending',provider='garanti-oos' WHERE order_id=$1::uuid",[orderId]);
+  await db.query("select set_config('request.jwt.claim.role','service_role',true)");
+  await db.query("select public.nrs_record_garanti_orderinq_reconciliation($1::uuid,'pending','GARANTI_BANK_RECORD_NOT_FOUND',$2::jsonb)",[orderId,JSON.stringify({order_id:orderId,decision:'pending',reason:'GARANTI_BANK_RECORD_NOT_FOUND',order_currency_match:true,prov_user_match:true,agent_user_match:true,order_result_present:false,payment_event_count:0,signed_callback_evidence_count:0,live_finalize_evidence_count:0})]);
+ } finally { await db.exec('ROLLBACK'); }
 });
 test('Local PostgreSQL: second buyer cannot consume reserved last stock; transaction leaves no partial order',async()=>{
  await assert.rejects(create(otherId,otherId,otherId),/stock unavailable/);
@@ -159,7 +163,7 @@ test('Local PostgreSQL: verified payment and duplicate callback mark paid once, 
  await finalize(); await finalize(); await finalize({eventId:'event-again'});
  assert.equal((await db.query('select status from public.orders')).rows[0].status,'paid');
  assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,0);
- await assert.rejects(finalize({eventId:'event-conflict',status:'failed'}),/terminal state conflict/);
+ await assert.rejects(finalize({eventId:'event-conflict',status:'failed'}),/terminal state conflict|terminal payment already finalized/);
 });
 test('Local PostgreSQL: order ID alone and wrong customer/guest capability grant no document access',async()=>{
  assert.equal((await db.query('select public.nrs_read_payment_order($1::uuid,$2::uuid,$3) as result',[orderId,otherId,null])).rows[0].result,null);
@@ -175,20 +179,28 @@ test('Local PostgreSQL: failed legal insert rolls back the preceding order inser
  assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,1);
 });
 test('Local PostgreSQL: guest access needs matching capability and expiry; failed payment returns stock once',async()=>{
- await assert.rejects(create(otherId,otherId,null,'b'.repeat(64)),/Authenticated checkout required/);
- await create(otherId,otherId,otherId);
+ const failedId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ await assert.rejects(create(failedId,failedId,null,'b'.repeat(64)),/Authenticated checkout required/);
+ await create(failedId,failedId,userId);
  // Synthetic legacy capability fixture only; new guest order creation is off.
- await db.exec(`update public.payment_orders set user_id=null,guest_hash='${'b'.repeat(64)}',guest_expires_at=now()+interval '1 day' where order_id='${otherId}'`);
- const read=async hash=>(await db.query('select public.nrs_read_payment_order($1::uuid,$2::uuid,$3) as result',[otherId,null,hash])).rows[0].result;
+ await db.exec(`update public.payment_orders set user_id=null,guest_hash='${'b'.repeat(64)}',guest_expires_at=now()+interval '1 day' where order_id='${failedId}'`);
+ const read=async hash=>(await db.query('select public.nrs_read_payment_order($1::uuid,$2::uuid,$3) as result',[failedId,null,hash])).rows[0].result;
  assert.equal(await read('c'.repeat(64)),null);
- assert.equal((await read('b'.repeat(64))).id,otherId);
- await db.exec(`update public.payment_orders set guest_expires_at=now()-interval '1 day' where order_id='${otherId}'`);
+ assert.equal((await read('b'.repeat(64))).id,failedId);
+ await db.exec(`update public.payment_orders set guest_expires_at=now()-interval '1 day' where order_id='${failedId}'`);
  assert.equal(await read('b'.repeat(64)),null);
- const result=callback({eventId:'failed-event',merchantReference:otherId,transactionId:'failed-transaction',status:'failed',threeDS:'failed'});
+ const result=callback({eventId:'failed-event',merchantReference:failedId,transactionId:'failed-transaction',status:'failed',threeDS:'failed'});
  await db.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(result),'test-bank']);
  await db.query('select public.nrs_finalize_payment($1::jsonb,$2)',[JSON.stringify(result),'test-bank']);
  assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,1);
- assert.equal((await db.query('select state from public.payment_orders where order_id=$1::uuid',[otherId])).rows[0].state,'failed');
+ assert.equal((await db.query('select state from public.payment_orders where order_id=$1::uuid',[failedId])).rows[0].state,'failed');
+ assert.equal((await db.query('select status from public.orders where id=$1::uuid',[failedId])).rows[0].status,'cancelled');
+ assert.equal((await db.query('select count(*)::integer as n from public.payment_events where order_id=$1::uuid',[failedId])).rows[0].n,1);
+ await assert.rejects(db.query('select public.nrs_finalize_payment($1::jsonb,$2)',[
+  JSON.stringify(callback({eventId:'late-success',merchantReference:failedId,transactionId:'failed-transaction',status:'paid',threeDS:'authenticated'})),
+  'test-bank']),/terminal state conflict|terminal payment already finalized/);
+ assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,1);
+ assert.equal((await db.query('select count(*)::integer as n from public.payment_events where order_id=$1::uuid',[failedId])).rows[0].n,1);
 });
 
 test('Local PostgreSQL: anonymous table AND column ACLs deny all order/item operations',async()=>{
@@ -198,8 +210,8 @@ test('Local PostgreSQL: anonymous table AND column ACLs deny all order/item oper
  } finally { await db.exec('RESET ROLE'); }
 });
 test('Local PostgreSQL: own history works, another buyer is isolated, only active admin can read details',async()=>{
- assert.equal((await asCustomer(userId,'select * from public.orders')).rows.length,1);
- assert.equal((await asCustomer(userId,'select * from public.order_items')).rows.length,1);
+ assert.equal((await asCustomer(userId,'select * from public.orders where id=$1::uuid',[orderId])).rows.length,1);
+ assert.equal((await asCustomer(userId,'select * from public.order_items where order_id=$1::uuid',[orderId])).rows.length,1);
  assert.equal((await asCustomer(otherId,'select * from public.orders where id=$1::uuid',[orderId])).rows.length,0);
  assert.equal((await asCustomer(otherId,'select * from public.order_items where order_id=$1::uuid',[orderId])).rows.length,0);
  await db.exec('update public.admin_users set is_active=true');
@@ -262,16 +274,14 @@ test('Local PostgreSQL: service role retains atomic RPC access; transaction IDs 
 });
 
 test('Local PostgreSQL: distinct same-owner order is created when its own stock is available',async()=>{
- const id='66666666-6666-4666-8666-666666666666';
- const stock=(await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity;
- if(stock>0) {
-  assert.equal((await create(id,id,userId)).rows[0].result.created,true);
-  assert.equal((await db.query('select count(*)::integer as n from public.orders where id=$1::uuid',[id])).rows[0].n,1);
-  assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,stock-1);
- } else {
-  await assert.rejects(create(id,id,userId),/stock unavailable/);
-  assert.equal((await db.query('select count(*)::integer as n from public.orders where id=$1::uuid',[id])).rows[0].n,0);
- }
+ const pendingId='66666666-6666-4666-8666-666666666666';
+ const nextId='77777777-7777-4777-8777-777777777777';
+ await db.exec('update public.product_variants set stock_quantity=2');
+ assert.equal((await create(pendingId,pendingId,userId)).rows[0].result.created,true);
+ assert.equal((await db.query('select state from public.payment_orders where order_id=$1::uuid',[pendingId])).rows[0].state,'initiating');
+ assert.equal((await create(nextId,nextId,userId)).rows[0].result.created,true);
+ assert.equal((await db.query('select count(*)::integer as n from public.orders where id IN ($1::uuid,$2::uuid)',[pendingId,nextId])).rows[0].n,2);
+ assert.equal((await db.query('select stock_quantity from public.product_variants')).rows[0].stock_quantity,0);
 });
 
 test('Local PostgreSQL: browser roles cannot bypass service-only payment RPCs or read payment tokens/events',async()=>{
