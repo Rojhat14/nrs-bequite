@@ -4,8 +4,6 @@ import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
 import GarantiReconcileAction from '@/components/payment/GarantiReconcileAction'
 import { readAccessiblePaymentOrder } from '@/lib/payment/repository'
 
-const reconciliationOrderId = '32ec756b-8fe2-4c9b-aae2-e34a49248ba9'
-
 export default async function PaymentResult({ orderId, failure = false }: { orderId?: string; failure?: boolean; failureCode?: string }) {
   let order: Awaited<ReturnType<typeof readAccessiblePaymentOrder>> = null
   try { if (orderId) order = await readAccessiblePaymentOrder(orderId) } catch { /* unavailable DB grants no access */ }
@@ -18,18 +16,17 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
 
   const title = !order
     ? orderId ? 'Sipariş bilgisi görüntülenemiyor' : 'Ödeme durumu kontrol ediliyor'
-    : paid ? 'Ödemeniz alındı'
+    : paid ? 'Ödemeniz alındı.'
       : cancelled ? 'Siparişiniz iptal edildi'
         : verifiedFailure ? 'Ödeme tamamlanamadı'
-          : unverifiedClosed ? 'Ödeme doğrulanamadı'
-          : 'Ödeme durumu kontrol ediliyor'
+          : unverifiedClosed ? 'Ödeme sonucu'
+          : 'Ödeme sonucu'
   const description = !order
     ? 'Sipariş bilgilerine erişim doğrulanamadı. Hesabınızdaki siparişler bölümünden kontrol edebilir veya bize ulaşabilirsiniz.'
     : paid ? 'Ödemeniz doğrulandı. Siparişinizin ayrıntılarına hesabınızdan ulaşabilirsiniz.'
       : cancelled ? 'Siparişiniz uygulamada iptal edildi olarak doğrulandı. Yeni bir alışverişe başlayabilirsiniz.'
-        : verifiedFailure ? 'Ödeme alınamadı. Siparişiniz tamamlanmadı. Lütfen tekrar deneyin.'
-          : unverifiedClosed ? 'Ödeme doğrulanamadı. Sipariş tamamlanmadı.'
-          : 'Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'
+      : verifiedFailure ? 'Siparişiniz alınmadı. Lütfen tekrar deneyin.'
+          : 'Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.'
 
   const Icon = paid ? CheckCircle2 : verifiedFailure || cancelled ? XCircle : Clock3
   const tone = paid ? 'border-emerald-900/15 bg-emerald-900/[0.035] text-emerald-950'
@@ -49,7 +46,7 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
         </div>}
       </section>
 
-      {order?.id === reconciliationOrderId && order.status === 'pending' && <GarantiReconcileAction />}
+      {order?.status === 'pending' && <GarantiReconcileAction orderId={order.id} />}
 
       {order?.legal?.order_summary && <details className="mt-4 rounded-sm border border-nrs-ink/10 bg-nrs-warm-white px-4 py-2">
         <summary className="flex min-h-11 cursor-pointer items-center font-serif text-lg">Sipariş ayrıntıları</summary>

@@ -43,8 +43,8 @@ test('Customer result screen uses neutral pending copy for unverified TEST retur
  for(const outcome of ['verified_failure','unverified_failure','verification_pending','unverified']){
  const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-12T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>({outcome,association:outcome==='unverified_failure'?'claimed':'verified',signature_verified:true,mdstatus:'0',response:'declined',procreturncode:'05',mderrormessage:'',errmsg:''})},
- '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
- const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme durumu kontrol ediliyor'));assert.ok(html.includes('Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'));assert.equal(html.includes('Ödeme doğrulandı'),false);assert.equal(html.includes('/api/payment/garanti/renew'),false);assert.doesNotMatch(html,/mdstatus|GARANTI_[A-Z0-9_]+|RPC|hashparams|imza doğrulaması|gözlem modu/);
+ '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
+ const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme sonucu'));assert.ok(html.includes('Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.'));assert.equal(html.includes('Ödeme doğrulandı'),false);assert.equal(html.includes('/api/payment/garanti/renew'),false);assert.doesNotMatch(html,/mdstatus|GARANTI_[A-Z0-9_]+|RPC|hashparams|imza doğrulaması|gözlem modu/);
  }
 });
 test('TEST-only diagnostic table denies browser access and cannot store a verified failure without proofs',async()=>{
@@ -113,15 +113,15 @@ test('Result screen shows observation policy separately from query errors or mis
  for(const [stage] of [['matched'],['mismatch'],['unavailable'],[null]]){
   const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'pending',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
    '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>stage?{outcome:'verification_pending',association:'verified',signature_verified:true,query_stage:stage}:null},
-   '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
-  const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme durumu kontrol ediliyor'));assert.ok(html.includes('Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'));assert.equal(html.includes('Sonuç doğrulanamadı'),false);assert.equal(html.includes('Ödeme doğrulandı'),false);assert.doesNotMatch(html,/query_stage|signature_verified|mdstatus|gözlem modu|GARANTI_[A-Z0-9_]+/);
+   '@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
+  const html=renderToStaticMarkup(await view({orderId:id}));assert.ok(html.includes('Ödeme sonucu'));assert.ok(html.includes('Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.'));assert.equal(html.includes('Sonuç doğrulanamadı'),false);assert.equal(html.includes('Ödeme doğrulandı'),false);assert.doesNotMatch(html,/query_stage|signature_verified|mdstatus|gözlem modu|GARANTI_[A-Z0-9_]+/);
  }
 });
 
 test('Paid TEST order result takes precedence over observation copy and discloses absent return diagnostics',async()=>{
  const {renderToStaticMarkup}=require('react-dom/server');
  const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'paid',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
-  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
+  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},'@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const html=renderToStaticMarkup(await view({orderId:id}));
  assert.ok(html.includes('Ödemeniz alındı'));
  assert.ok(html.includes('Ödemeniz doğrulandı'));
@@ -135,7 +135,7 @@ test('Production success screen trusts the database paid state ahead of observat
   '@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status:'paid',legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
   '@/lib/payment/garanti/live-diagnostics':{readGarantiLiveSingleFinalizeFailure:async()=>null},
   '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},
-  '@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
+  '@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const html=renderToStaticMarkup(await view({orderId:id}));
  assert.ok(html.includes('Ödemeniz alındı'));assert.ok(html.includes('Ödemeniz doğrulandı'));
  assert.equal(html.includes('Canlı deneme — incelemede'),false);assert.equal(html.includes('gözlem siparişi otomatik olarak paid yapmaz'),false);
@@ -149,9 +149,9 @@ test('Production result does not treat callback text as final and suppresses ano
     callback_signature_verified:true,order_match:true,amount_match:true,currency_match:true,
     terminal_match:true,request_match:true,callback_response:'declined',callback_procreturncode:'92'})},
   '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>false},
-  '@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
+  '@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const html=renderToStaticMarkup(await view({orderId:id}));
- assert.ok(html.includes('Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'));
+ assert.ok(html.includes('Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.'));
  assert.doesNotMatch(html,/GARANTI_ORDERINQ_PENDING|orderinq_status|mdstatus|geçmiş imza/);
  assert.equal(html.includes('href="/checkout"'),false);
  assert.equal(html.includes('paid olarak'),false);
@@ -162,16 +162,41 @@ test('Cancellation result is shown only when the accessible database order is ca
  const {renderToStaticMarkup}=require('react-dom/server');
  const makeView=status=>loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>false,garantiLiveObservationOnly:()=>false},
   '@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status,legal:{order_summary:{},accepted_at:'2026-10-13T00:00:00Z',contract_version:'unknown',pre_information_version:'unknown'}})},
-  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/components/legal/LegalOrderSummary':()=>null})('src/components/payment/PaymentResult.tsx').default;
+  '@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>null},'@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const cancelled=renderToStaticMarkup(await makeView('cancelled')({orderId:id,failure:true}));
  assert.match(cancelled,/Siparişiniz iptal edildi/);assert.match(cancelled,/href="\/collections"/);
  const pending=renderToStaticMarkup(await makeView('pending')({orderId:id,failure:true}));
- assert.match(pending,/Ödeme durumu kontrol ediliyor/);assert.doesNotMatch(pending,/Siparişiniz iptal edildi/);assert.equal(pending.includes('href="/checkout"'),false);
+ assert.match(pending,/Ödeme sonucu/);assert.doesNotMatch(pending,/Siparişiniz iptal edildi/);assert.equal(pending.includes('href="/checkout"'),false);
  const failed=renderToStaticMarkup(await makeView('payment_failed')({orderId:id,failure:true}));
- assert.match(failed,/Ödeme alınamadı\. Siparişiniz tamamlanmadı\. Lütfen tekrar deneyin\./);assert.match(failed,/href="\/collections"/);
+ assert.match(failed,/Siparişiniz alınmadı\. Lütfen tekrar deneyin\./);assert.match(failed,/href="\/collections"/);
  const unverified=renderToStaticMarkup(await makeView('payment_unverified')({orderId:id,failure:true}));
- assert.match(unverified,/Ödeme doğrulanamadı\. Sipariş tamamlanmadı\./);
+ assert.match(unverified,/Ödeme sonucu henüz netleşmedi\. Lütfen daha sonra tekrar kontrol edin\./);
  assert.doesNotMatch(unverified,/href="\/collections"|yeniden ödeme/i);
+});
+
+test('Result copy is exact for verified outcomes and pending order exposes its current-order check',async()=>{
+ const {renderToStaticMarkup}=require('react-dom/server');
+ const render=status=>loader({'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>({id,status,legal:null})},
+  '@/components/legal/LegalOrderSummary':()=>null,'@/components/payment/GarantiReconcileAction':({orderId})=>require('react').createElement('button',null,`Tekrar kontrol et:${orderId}`)})('src/components/payment/PaymentResult.tsx').default;
+ const paid=renderToStaticMarkup(await render('paid')({orderId:id}));
+ assert.match(paid,/<h1[^>]*>Ödemeniz alındı\.<\/h1>/);
+ const failed=renderToStaticMarkup(await render('payment_failed')({orderId:id}));
+ assert.match(failed,/Siparişiniz alınmadı\. Lütfen tekrar deneyin\./);
+ const pending=renderToStaticMarkup(await render('pending')({orderId:id}));
+ assert.match(pending,/Ödeme sonucu henüz netleşmedi\. Lütfen daha sonra tekrar kontrol edin\./);
+ assert.match(pending,new RegExp(`Tekrar kontrol et:${id}`));
+ assert.doesNotMatch(pending,/dakika|saat|\b\d{1,2}:\d{2}\b|kalan süre/i);
+});
+
+test('Manual retry action targets only its supplied order and has a repeat-click cooldown',async()=>{
+ const {renderToStaticMarkup}=require('react-dom/server');
+ const view=loader({'next/navigation':{useRouter:()=>({refresh(){}})}})('src/components/payment/GarantiReconcileAction.tsx').default;
+ const html=renderToStaticMarkup(require('react').createElement(view,{orderId:id}));
+ assert.match(html,/Tekrar kontrol et/);
+ const source=fs.readFileSync('src/components/payment/GarantiReconcileAction.tsx','utf8');
+ assert.match(source,/MIN_CLICK_INTERVAL_MS\s*=\s*5_000/);
+ assert.match(source,/JSON\.stringify\(\{ orderId \}\)/);
+ assert.doesNotMatch(source,/checkout\/create|payment\/create|bank.*sale/i);
 });
 
 test('Unassociated receipts retain separate timestamps instead of deduping a new parse failure into an old probe',async()=>{
@@ -188,7 +213,7 @@ test('Rejected success form routes to a technical result; inaccessible order is 
  const response=await handler(new Request(c.successUrl,{method:'POST',headers,body:f.body()+'&oid='+attempt}));
  assert.equal(response.status,303);assert.equal(new URL(response.headers.get('location')).pathname,'/checkout/failure');assert.equal(f.saved().validation_stage,'duplicate_field');assert.equal(f.saved().order_id,null);
  const {renderToStaticMarkup}=require('react-dom/server');
- const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>null},'@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>{throw Error('No unauthorized read')}},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>{throw Error('No unauthorized read')}}})('src/components/payment/PaymentResult.tsx').default;
+ const view=loader({'@/lib/payment/garanti/config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>false},'@/lib/payment/repository':{readAccessiblePaymentOrder:async()=>null},'@/lib/payment/garanti/diagnostics':{readTestDiagnostic:async()=>{throw Error('No unauthorized read')}},'@/lib/payment/garanti/order':{testHandoffUnsubmitted:async()=>{throw Error('No unauthorized read')}},'@/components/payment/GarantiReconcileAction':()=>null})('src/components/payment/PaymentResult.tsx').default;
  const technical=renderToStaticMarkup(await view({failure:true}));assert.ok(technical.includes('Ödeme durumu kontrol ediliyor'));assert.doesNotMatch(technical,/TEST —|teknik dönüş sorunu/);
  const denied=renderToStaticMarkup(await view({orderId:id}));assert.ok(denied.includes('Sipariş bilgisi görüntülenemiyor'));assert.equal(denied.includes('banka dönüş kaydı henüz bulunmuyor'),false);assert.equal(denied.includes('Ödeme doğrulandı'),false);
 });
