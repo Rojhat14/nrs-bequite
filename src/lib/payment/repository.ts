@@ -94,6 +94,28 @@ export async function closeExpiredGarantiNoRecordOrder(orderId: string, handoffE
   if (error) throw new Error('Unverified expired payment could not be closed.')
   return data as { closed: boolean; idempotent: boolean; reason: string }
 }
+export async function acquireGarantiReconciliationCronLock(token: string) {
+  const { data, error } = await paymentDatabase().rpc('nrs_acquire_garanti_reconciliation_cron_lock', { p_token: token })
+  if (error) throw new Error('Garanti reconciliation scheduler lock unavailable.')
+  return data === true
+}
+export async function releaseGarantiReconciliationCronLock(token: string) {
+  const { error } = await paymentDatabase().rpc('nrs_release_garanti_reconciliation_cron_lock', { p_token: token })
+  if (error) throw new Error('Garanti reconciliation scheduler lock release failed.')
+}
+export async function listExpiredGarantiPendingOrders(limit: number, olderThan: string) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50 || !Number.isFinite(Date.parse(olderThan))) {
+    throw new Error('Invalid Garanti reconciliation batch.')
+  }
+  const { data, error } = await paymentDatabase().from('payment_orders')
+    .select('order_id,user_id,redirect_url,updated_at,orders!inner(status)')
+    .eq('provider', 'garanti-oos').eq('state', 'pending').eq('currency', 'TRY')
+    .eq('orders.status', 'payment_pending').not('redirect_url', 'is', null)
+    .like('redirect_url', '%used=1').lt('updated_at', olderThan)
+    .order('updated_at', { ascending: true }).limit(limit)
+  if (error || !Array.isArray(data)) throw new Error('Garanti reconciliation candidates unavailable.')
+  return data as Array<{ order_id: string; user_id: string | null; redirect_url: string; updated_at: string }>
+}
 export async function readGarantiOrderinqReconciliation(orderId: string) {
   const { data, error } = await paymentDatabase().from('garanti_orderinq_reconciliations')
     .select('decision,reason,evidence,updated_at').eq('order_id', orderId).maybeSingle()

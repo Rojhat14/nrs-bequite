@@ -11,6 +11,7 @@ import { bankFields, initiationHash, equalHex, isoBytes, ReturnSignatureError, p
 export class GarantiPending extends Error {
   constructor(readonly reference: string) { super('Payment awaits bank reconciliation.') }
 }
+export const GARANTI_HANDOFF_TTL_SECONDS = 900
 function authDateFormat(value: unknown): 'missing' | 'yyyymmdd' | 'timestamp' | 'invalid' {
   if (value === undefined || value === '') return 'missing'
   if (typeof value !== 'string') return 'invalid'
@@ -87,7 +88,7 @@ export class GarantiProvider implements PaymentProvider {
     if (order.state !== 'initiating' || order.id !== order.merchantReference || !UUID.test(order.id)
       || order.currency !== 'TRY' || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0
       || !context || isIP(context.customerIp) !== 4) throw new Error('Invalid bank initiation.')
-    const payload = Buffer.from(JSON.stringify({ id: order.id, ip: context.customerIp, exp: Math.floor(Date.now() / 1000) + 900 })).toString('base64url')
+    const payload = Buffer.from(JSON.stringify({ id: order.id, ip: context.customerIp, exp: Math.floor(Date.now() / 1000) + GARANTI_HANDOFF_TTL_SECONDS })).toString('base64url')
     const signature = this.sign(payload)
     return { redirectUrl: `${this.config.siteOrigin}/api/payment/garanti/handoff?token=${payload}.${signature}` }
   }
@@ -196,16 +197,23 @@ export class GarantiProvider implements PaymentProvider {
     this.lastLiveReconciliationEvidence = null
     return evidence
   }
-  async expiredSubmittedHandoff(orderId: string, userId: string) {
-    const stored = await this.loadOrder(orderId) as PaymentOrder & { userId?: string; redirectUrl?: string | null }
-    if (stored.userId !== userId || stored.state !== 'pending' || !stored.redirectUrl) return null
-    const redirect = new URL(stored.redirectUrl)
+  submittedHandoffExpiry(orderId: string, redirectUrl: string | null | undefined) {
+    if (!redirectUrl) return null
+    let redirect: URL
+    try { redirect = new URL(redirectUrl) } catch { return null }
     const tokens = redirect.searchParams.getAll('token')
     if (redirect.origin !== this.config.siteOrigin || redirect.pathname !== '/api/payment/garanti/handoff'
       || redirect.searchParams.get('used') !== '1' || tokens.length !== 1) return null
-    const payload = this.handoff(tokens[0], true)
-    if (payload.id !== stored.id) return null
-    return { expiresAt: payload.exp, expired: payload.exp < Math.floor(Date.now() / 1000) }
+    try {
+      const payload = this.handoff(tokens[0], true)
+      if (payload.id !== orderId) return null
+      return { expiresAt: payload.exp, expired: payload.exp < Math.floor(Date.now() / 1000) }
+    } catch { return null }
+  }
+  async expiredSubmittedHandoff(orderId: string, userId: string | null) {
+    const stored = await this.loadOrder(orderId) as PaymentOrder & { userId?: string; redirectUrl?: string | null }
+    if (stored.userId !== userId || stored.state !== 'pending' || !stored.redirectUrl) return null
+    return this.submittedHandoffExpiry(stored.id, stored.redirectUrl)
   }
   private async inquire(order: PaymentOrder, ip: string, queryType: 'orderinq' | 'orderhistoryinq' = 'orderinq') {
     if (isIP(ip) !== 4) throw new GarantiPending(order.id)
@@ -296,7 +304,7 @@ export class GarantiProvider implements PaymentProvider {
     console.info(JSON.stringify({ event: 'garanti_live_read_only_orderinq', ...evidence }))
     return evidence
   }
-  async readOnlyOrderHistoryInquiry(order: PaymentOrder & { userId: string; redirectUrl: string | null }, userId: string) {
+  async readOnlyOrderHistoryInquiry(order: PaymentOrder & { userId: string | null; redirectUrl: string | null }, userId: string | null) {
     const c = this.config
     const ownerMayInspect = c.generalLivePayments === true || (c.liveObservationOnly === true && controlledLiveAccountAllowed(userId))
     if (!ownerMayInspect || c.mode !== 'PROD'
@@ -342,7 +350,7 @@ export class GarantiProvider implements PaymentProvider {
       result_state: resultState, record_count: records.length, records,
       database_changed: false, sale_started: false, cancel_started: false, refund_started: false, finalize_called: false }
   }
-  async reconcileOwnedPendingOrder(orderId: string, userId: string, paymentProof: {
+  async reconcileOwnedPendingOrder(orderId: string, userId: string | null, paymentProof: {
     payment_event_count: number; signed_callback_evidence_count: number; live_finalize_evidence_count: number
   }): Promise<VerifiedPayment> {
     const ownerMayReconcile = this.config.generalLivePayments === true
@@ -383,7 +391,7 @@ export class GarantiProvider implements PaymentProvider {
       && this.lastLiveReconciliationEvidence.outer_reason_code === '0110'
     if (isOrderRecordMissing) {
       const orderinq = this.lastLiveReconciliationEvidence!
-      const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string; redirectUrl: string | null }, userId)
+      const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string | null; redirectUrl: string | null }, userId)
       const orderinqIdentityMatch = orderinq.order_match === true && orderinq.terminal_match === true
         && orderinq.order_currency_match === true
         && orderinq.prov_user_match === true && orderinq.agent_user_match === true && orderinq.mode_match !== false
@@ -434,7 +442,7 @@ export class GarantiProvider implements PaymentProvider {
       throw new GarantiPending(orderId)
     }
     try {
-      const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string; redirectUrl: string | null }, userId)
+      const history = await this.readOnlyOrderHistoryInquiry(stored as PaymentOrder & { userId: string | null; redirectUrl: string | null }, userId)
       const historyIdentityMatch = history.response_terminal_match === true && history.response_merchant_match === true
         && history.response_order_match === true && history.order_currency_match === true
         && history.request_terminal_matches_config === true && history.request_prov_user_matches_expected === true
