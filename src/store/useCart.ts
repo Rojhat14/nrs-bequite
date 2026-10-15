@@ -30,7 +30,11 @@ interface CartStore extends CartTotals {
   items: Item[]
   wishlist: string[]
   isDrawerOpen: boolean
+  catalogPricesSynced: boolean
+  priceUpdateNotice: boolean
   addItem: (product: NewCartItem, quantity?: number) => void
+  syncCatalogPrices: (products: Array<{ id: string; price: number; compareAtPrice: number | null }>) => void
+  setCatalogPricesSynced: (synced: boolean) => void
   removeItem: (cartItemId: string) => void
   updateMeasurements: (cartItemId: string, measurements: Measurements) => void
   updateQuantity: (cartItemId: string, quantity: number) => void
@@ -149,6 +153,8 @@ export const useCart = create<CartStore>()(
       items: [],
       wishlist: [],
       isDrawerOpen: false,
+      catalogPricesSynced: false,
+      priceUpdateNotice: false,
       subtotalAmount: 0,
       discountAmount: 0,
       shippingAmount: 0,
@@ -164,6 +170,9 @@ export const useCart = create<CartStore>()(
             ? state.items.map((item) => sameVariant(item, product)
               ? {
                   ...item,
+                  title: product.title,
+                  price: product.price,
+                  compareAtPrice: product.compareAtPrice ?? null,
                   ...(!item.variantId && product.variantId ? { variantId: product.variantId } : {}),
                   quantity: item.quantity + quantity,
                 }
@@ -173,6 +182,22 @@ export const useCart = create<CartStore>()(
           return { items, ...calculateCartTotals(items) }
         })
       },
+
+      syncCatalogPrices: (products) => set((state) => {
+        const current = new Map(products.map(product => [product.id, product]))
+        let changed = false
+        const items = state.items.map(item => {
+          const product = current.get(item.id)
+          if (!product || !Number.isFinite(product.price) || product.price < 0) return item
+          const price = `₺${product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+          const compareAtPrice = product.compareAtPrice
+          if (parsePrice(item.price) !== product.price || Number(item.compareAtPrice ?? 0) !== Number(compareAtPrice ?? 0)) changed = true
+          return { ...item, price, compareAtPrice }
+        })
+        return { items, ...calculateCartTotals(items), catalogPricesSynced: true, priceUpdateNotice: state.priceUpdateNotice || changed }
+      }),
+
+      setCatalogPricesSynced: (catalogPricesSynced) => set({ catalogPricesSynced }),
 
       removeItem: (cartItemId) => set((state) => {
         const items = state.items.filter((item) => getCartItemId(item) !== cartItemId)
@@ -197,7 +222,7 @@ export const useCart = create<CartStore>()(
 
       openDrawer: () => set({ isDrawerOpen: true }),
       closeDrawer: () => set({ isDrawerOpen: false }),
-      clearCart: () => set({ items: [], ...calculateCartTotals([]) }),
+      clearCart: () => set({ items: [], priceUpdateNotice: false, ...calculateCartTotals([]) }),
     }),
     {
       name: 'nrs-cart-storage',

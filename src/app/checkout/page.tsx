@@ -27,7 +27,7 @@ const money = (amount: number) => new Intl.NumberFormat('tr-TR', { style: 'curre
 
 export default function Checkout() {
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
-  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements } = useCart()
+  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, catalogPricesSynced, priceUpdateNotice } = useCart()
   const { user, profile } = useAuth()
   const [step, setStep] = useState(1) // 1: Auth Choice, 2: Shipping, 3: Payment
   const router = useRouter()
@@ -343,11 +343,12 @@ export default function Checkout() {
                   <Link href="/kvkk" className="text-sm underline">Kişisel verilerinizin işlenmesine ilişkin aydınlatma metni</Link>
                 </div>
                 <button
-                  onClick={() => void reviewPayment()} disabled={busy}
+                  onClick={() => void reviewPayment()} disabled={busy || !catalogPricesSynced}
                   className="mt-12 w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black/90 transition-all"
                 >
-                  {busy ? 'Sipariş özeti doğrulanıyor…' : 'Özeti İncele'}
+                  {busy ? 'Sipariş özeti doğrulanıyor…' : !catalogPricesSynced ? 'Sepet fiyatları kontrol ediliyor…' : 'Özeti İncele'}
                 </button>
+                {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">Sepetinizdeki ürün fiyatları güncellendi. Güncel sipariş özetini inceleyin.</p>}
                 {legalError && <p role="alert" className="text-sm text-rose-700">{legalError}</p>}
               </motion.div>
             )}

@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 import CartDrawer from '@/components/CartDrawer'
+import CartPriceSync from '@/components/CartPriceSync'
 import Navigation from '@/components/Navigation'
 import Newsletter from '@/components/Newsletter'
 import { StorefrontCatalogProvider, type StorefrontNavCategory, type StorefrontNavCollection } from '@/context/StorefrontCatalogContext'
@@ -16,6 +17,7 @@ export default function StorefrontShell({ children, categories, collections, foo
   return (
     <StorefrontCatalogProvider value={{ categories, collections }}>
       <Navigation introFinished={true} />
+      <CartPriceSync />
       {children}
       {footer}
       <Newsletter />

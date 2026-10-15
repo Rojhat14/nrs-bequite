@@ -12,7 +12,7 @@ import CartWhatsappOrder from '@/components/CartWhatsappOrder'
 const money = (value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value)
 
 export default function CartDrawer() {
-  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, totalAmount } = useCart()
+  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, totalAmount, catalogPricesSynced, priceUpdateNotice } = useCart()
   const router = useRouter()
   const dialogRef = useDialog(isDrawerOpen, closeDrawer)
 
@@ -77,14 +77,16 @@ export default function CartDrawer() {
           </ul>
 
           <footer className="shrink-0 border-t border-nrs-ink/10 bg-nrs-warm-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-7">
+            {!catalogPricesSynced && <p role="status" className="mb-3 text-xs text-nrs-ink/65">Sepet fiyatları güncel katalogdan kontrol ediliyor…</p>}
+            {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mb-3 text-xs text-nrs-ink/65">Sepetinizdeki ürün fiyatları güncellendi. Güncel toplamı kontrol edin.</p>}
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm text-nrs-ink/65">Toplam</span>
               <span className="font-serif text-2xl tabular-nums text-nrs-ink">{money(totalAmount)}</span>
             </div>
             <p className="mt-1 text-[11px] text-nrs-ink/50">Kargo ve teslimat koşulları ödeme öncesinde gösterilir.</p>
-            <button type="button" aria-label="Ödemeye geç" onClick={() => { closeDrawer(); router.push('/checkout') }}
-              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-sm bg-nrs-charcoal px-4 text-sm font-medium text-nrs-ivory hover:bg-nrs-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
-              Ödemeye geç <ArrowRight size={16} />
+            <button type="button" aria-label="Ödemeye geç" disabled={!catalogPricesSynced} onClick={() => { closeDrawer(); router.push('/checkout') }}
+              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-sm bg-nrs-charcoal px-4 text-sm font-medium text-nrs-ivory hover:bg-nrs-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60">
+              {catalogPricesSynced ? <>Ödemeye geç <ArrowRight size={16} /></> : 'Fiyatlar kontrol ediliyor…'}
             </button>
             <div className="mt-2 border-t border-nrs-ink/10 pt-2">
               <CartWhatsappOrder items={items} total={totalAmount} compact />

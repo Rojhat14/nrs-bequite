@@ -40,6 +40,37 @@ test('Different sizes remain separate and discounts use integer minor units', ()
   useCart.getState().clearCart();
 });
 
+test('Saved cart items refresh to current catalog prices and recompute totals', () => {
+  useCart.getState().clearCart();
+  useCart.getState().setCatalogPricesSynced(true);
+  useCart.getState().addItem({ id: 'refresh-me', title: 'Ürün', price: '₺100', compareAtPrice: 120 }, 2);
+
+  useCart.getState().syncCatalogPrices([{ id: 'refresh-me', price: 74.9, compareAtPrice: null }]);
+  let state = useCart.getState();
+  assert.equal(state.items[0].price, '₺74.9');
+  assert.equal(state.items[0].compareAtPrice, null);
+  assert.equal(state.totalAmount, 149.8);
+  assert.equal(state.discountAmount, 0);
+  assert.equal(state.catalogPricesSynced, true);
+  assert.equal(state.priceUpdateNotice, true);
+
+  useCart.getState().addItem({ id: 'refresh-me', title: 'Ürün', price: '₺69', compareAtPrice: null });
+  state = useCart.getState();
+  assert.equal(state.items[0].price, '₺69');
+  assert.equal(state.totalAmount, 207);
+  useCart.getState().clearCart();
+});
+
+test('Product structured data uses the normal catalog price and currency, not compare-at price', () => {
+  const { buildProductStructuredData } = loadSource('src/lib/product-structured-data.ts');
+  const schema = buildProductStructuredData({ id: 'dress-id', slug: 'dress-slug', name: 'Dress', description: 'Description',
+    priceAmount: 24900, currency: 'TRY', compareAtPrice: 30000, inStock: true, galleryImages: [{ url: 'https://example.test/dress.webp' }] });
+  assert.equal(schema['@type'], 'Product');
+  assert.equal(schema.offers.price, 24900);
+  assert.equal(schema.offers.priceCurrency, 'TRY');
+  assert.equal(schema.offers.availability, 'https://schema.org/InStock');
+});
+
 test('Malformed saved carts cannot replace store actions or poison totals', () => {
   const state = useCart.getState();
   const restored = useCart.persist.getOptions().merge({

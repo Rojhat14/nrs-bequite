@@ -2,6 +2,7 @@ import ProductDetail from '@/components/ProductDetail';
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getStorefrontProduct } from '@/lib/products'
+import { buildProductStructuredData } from '@/lib/product-structured-data'
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -22,5 +23,9 @@ export default async function ProductPage({ params: paramsPromise }: ProductPage
   const params = await paramsPromise
   const product = await getStorefrontProduct(params.id)
   if (!product) notFound()
-  return <div className="min-h-screen bg-nrs-canvas text-nrs-ink"><ProductDetail product={product} /></div>
+  const structuredData = JSON.stringify(buildProductStructuredData(product)).replace(/</g, '\\u003c')
+  return <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />
+    <ProductDetail product={product} />
+  </div>
 }
