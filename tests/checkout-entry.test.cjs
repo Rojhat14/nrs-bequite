@@ -72,7 +72,8 @@ test('Cart drawer checkout preserves the cart and keeps compact WhatsApp access'
   const item = { id: 'product-1', variantId: 'variant-1', title: 'Test', price: '₺100', size: 'M', quantity: 2 };
   const cart = { items: [item], isDrawerOpen: true, closeDrawer: () => closes.push(true), removeItem: id => removals.push(id), updateQuantity: (...args) => updates.push(args), subtotalAmount: 200, discountAmount: 0, shippingAmount: 0, totalAmount: 200 };
   const Drawer = loader({ 'framer-motion': animation,
-    '@/store/useCart': { getCartItemId: () => 'product-1::variant-1', parsePrice: value => Number(String(value).replace(/[^\d,.-]/g, '').replace(',', '.')), useCart: () => cart },
+    '@/store/useCart': { getCartItemId: () => 'product-1::variant-1', parsePrice: value => Number(String(value).replace(/[^\d,.-]/g, '').replace(',', '.')),
+      getCartLineCampaignPrice: () => ({ normalLineAmount: 200, saleLineAmount: 160 }), useCart: () => cart },
     '@/hooks/useDialog': { useDialog: () => ({ current: null }) },
     'next/navigation': { useRouter: () => ({ push: path => routes.push(path) }) },
     'next/image': { __esModule: true, default: () => null },

@@ -23,20 +23,20 @@ test('Turkish and international prices preserve decimal amounts', () => {
   }
 });
 
-test('Different sizes remain separate and discounts use integer minor units', () => {
+test('Different sizes remain separate and the opening discount uses normal prices in minor units', () => {
   useCart.getState().clearCart();
   const small = { id: 'test-product', title: 'Test', price: '₺99,90', compareAtPrice: 120, size: 'S', variantId: 'small' };
   const large = { ...small, size: 'L', variantId: 'large' };
   useCart.getState().addItem(small, 2);
   useCart.getState().addItem(large);
   assert.equal(useCart.getState().items.length, 2);
-  assert.equal(useCart.getState().subtotalAmount, 360);
-  assert.equal(useCart.getState().discountAmount, 60.3);
-  assert.equal(useCart.getState().totalAmount, 299.7);
+  assert.equal(useCart.getState().subtotalAmount, 299.7);
+  assert.equal(useCart.getState().discountAmount, 59.94);
+  assert.equal(useCart.getState().totalAmount, 239.76);
   useCart.getState().updateQuantity(getCartItemId(small), 0);
   assert.equal(useCart.getState().items.length, 1);
   assert.equal(useCart.getState().items[0].variantId, 'large');
-  assert.equal(useCart.getState().totalAmount, 99.9);
+  assert.equal(useCart.getState().totalAmount, 79.92);
   useCart.getState().clearCart();
 });
 
@@ -49,15 +49,15 @@ test('Saved cart items refresh to current catalog prices and recompute totals', 
   let state = useCart.getState();
   assert.equal(state.items[0].price, '₺74.9');
   assert.equal(state.items[0].compareAtPrice, null);
-  assert.equal(state.totalAmount, 149.8);
-  assert.equal(state.discountAmount, 0);
+  assert.equal(state.totalAmount, 119.84);
+  assert.equal(state.discountAmount, 29.96);
   assert.equal(state.catalogPricesSynced, true);
   assert.equal(state.priceUpdateNotice, true);
 
   useCart.getState().addItem({ id: 'refresh-me', title: 'Ürün', price: '₺69', compareAtPrice: null });
   state = useCart.getState();
   assert.equal(state.items[0].price, '₺69');
-  assert.equal(state.totalAmount, 207);
+  assert.equal(state.totalAmount, 165.6);
   useCart.getState().clearCart();
 });
 
@@ -84,7 +84,7 @@ test('Malformed saved carts cannot replace store actions or poison totals', () =
   assert.equal(restored.items.length, 1);
   assert.equal(restored.items[0].quantity, 2);
   assert.equal(restored.items[0].size, undefined);
-  assert.equal(restored.totalAmount, 20);
+  assert.equal(restored.totalAmount, 16);
   assert.deepEqual(restored.wishlist, ['valid']);
 });
 

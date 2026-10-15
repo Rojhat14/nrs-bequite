@@ -14,15 +14,19 @@ export default function LegalOrderSummary({ summary, preview = false }: { summar
         <p className="font-medium">{item.name}{item.size ? ` — Beden: ${item.size}` : ''}</p>
         <p className="text-nrs-ink/65">{item.description}</p>
         {item.measurements && <p>Özel ölçüler: {formatMeasurements(item.measurements) || 'Belirtilmedi'}</p>}
-        <p>{item.quantity} adet × {money(item.unitPrice)} = {money(Math.round(item.unitPrice * 100) * item.quantity / 100)}</p>
+        {item.normalUnitPrice !== undefined ? <>
+          <p>{item.quantity} adet × {money(item.normalUnitPrice)} = {money(Math.round(item.normalUnitPrice * 100) * item.quantity / 100)}</p>
+          <p className="text-xs text-nrs-ink/65">{summary.campaign?.name || 'Sepet indirimi'}: −{money(item.discountAmount ?? 0)}</p>
+          <p className="font-medium">İndirimli ürün toplamı: {money(Math.round(item.unitPrice * 100) * item.quantity / 100)}</p>
+        </> : <p>{item.quantity} adet × {money(item.unitPrice)} = {money(Math.round(item.unitPrice * 100) * item.quantity / 100)}</p>}
         <p className="text-xs text-nrs-ink/60">Ürün kodu: {item.productId}</p>
         {preview && item.productId !== 'nrs-garanti-live-3try' && <Link href={`/product/${encodeURIComponent(item.productId)}`} target="_blank" rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center underline underline-offset-4">Ürünün temel özelliklerini incele</Link>}
       </li>)}
     </ul>
     <dl className="space-y-2 text-sm">
-      <div className="flex justify-between gap-4"><dt>Ara toplam</dt><dd>{money(summary.subtotal)}</dd></div>
-      <div className="flex justify-between gap-4"><dt>İndirim</dt><dd>{money(summary.discount)}</dd></div>
+      <div className="flex justify-between gap-4"><dt>Ürünler toplamı</dt><dd>{money(summary.subtotal)}</dd></div>
+      {summary.discount > 0 && <div className="flex justify-between gap-4"><dt>{summary.campaign?.name || 'Ürün indirimi'}</dt><dd>−{money(summary.discount)}</dd></div>}
       <div className="flex flex-wrap justify-between gap-2"><dt>Kargo / teslimat</dt><dd>{summary.shipping === null ? 'Henüz belirlenmedi; sipariş teyidinde bildirilir' : money(summary.shipping)}</dd></div>
       <div className="flex justify-between gap-4 border-t border-nrs-ink/10 pt-2"><dt>{preview ? 'Mevcut sepet toplamı' : 'KDV dahil toplam'}</dt><dd>{money(summary.total)}</dd></div>
     </dl>

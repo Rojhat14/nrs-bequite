@@ -118,8 +118,10 @@ test('Repository calculates prices, discount and stock from catalog rather than 
   try {
     const repository = local('src/lib/payment/repository.ts').createPaymentRepository();
     const quote = await repository.quote(request.items, request.customer);
-    assert.equal(quote.summary.total, 199.8); assert.equal(quote.summary.discount, 40.2);
-    assert.equal(quote.summary.shipping, 0); assert.equal(quote.summary.items[0].unitPrice, 99.9);
+    assert.equal(quote.summary.total, 159.84); assert.equal(quote.summary.discount, 39.96);
+    assert.equal(quote.summary.subtotal, 199.8); assert.equal(quote.summary.shipping, 0);
+    assert.equal(quote.summary.items[0].unitPrice, 79.92); assert.equal(quote.summary.items[0].normalUnitPrice, 99.9);
+    assert.equal(quote.summary.items[0].discountAmount, 39.96);
     assert.equal(local('src/lib/payment/repository.ts').quoteHash({ ...quote.summary, orderedAt: '2099-01-01' }), quote.hash);
     stock = 1; await assert.rejects(repository.quote(request.items, request.customer), /stokta yok/);
   } finally {

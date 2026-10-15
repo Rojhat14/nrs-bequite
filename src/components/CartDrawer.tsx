@@ -3,7 +3,8 @@
 import React from 'react'
 import { m as motion, AnimatePresence } from 'framer-motion'
 import { X, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react'
-import { getCartItemId, parsePrice, useCart } from '@/store/useCart'
+import { getCartItemId, getCartLineCampaignPrice, useCart } from '@/store/useCart'
+import { isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useDialog } from '@/hooks/useDialog'
@@ -12,7 +13,7 @@ import CartWhatsappOrder from '@/components/CartWhatsappOrder'
 const money = (value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value)
 
 export default function CartDrawer() {
-  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, totalAmount, catalogPricesSynced, priceUpdateNotice } = useCart()
+  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, subtotalAmount, discountAmount, shippingAmount, totalAmount, catalogPricesSynced, priceUpdateNotice } = useCart()
   const router = useRouter()
   const dialogRef = useDialog(isDrawerOpen, closeDrawer)
 
@@ -46,6 +47,7 @@ export default function CartDrawer() {
           <ul aria-label="Sepet ürünleri" className="min-h-0 flex-1 divide-y divide-nrs-ink/10 overflow-y-auto overscroll-contain px-5 sm:px-7">
             {items.map(item => {
               const id = getCartItemId(item)
+              const line = getCartLineCampaignPrice(item)
               return <li key={id} className="flex gap-3 py-4 sm:gap-4">
                 <div className="relative flex h-[88px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-sm bg-nrs-panel">
                   {item.image ? <Image src={item.image} alt={item.title} fill sizes="68px" className="object-cover" /> : <ShoppingBag size={20} aria-hidden="true" className="text-nrs-ink/25" />}
@@ -56,7 +58,10 @@ export default function CartDrawer() {
                       <h3 className="line-clamp-2 break-words font-serif text-[15px] leading-5 text-nrs-ink">{item.title}</h3>
                       {item.size && <p className="mt-1 text-xs text-nrs-ink/55">Ölçü: {item.size}</p>}
                     </div>
-                    <p className="shrink-0 text-sm font-medium tabular-nums text-nrs-ink">{money(parsePrice(item.price) * item.quantity)}</p>
+                    <div className="shrink-0 text-right text-sm tabular-nums text-nrs-ink">
+                      <p>{money(line.normalLineAmount)}</p>
+                      {isOpeningCampaignActive() && <p className="mt-1 text-xs font-medium text-nrs-ink/65">Sepette {money(line.saleLineAmount)}</p>}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-3 pt-2">
                     <div className="inline-flex h-9 items-center rounded-sm border border-nrs-ink/15">
@@ -79,10 +84,12 @@ export default function CartDrawer() {
           <footer className="shrink-0 border-t border-nrs-ink/10 bg-nrs-warm-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-7">
             {!catalogPricesSynced && <p role="status" className="mb-3 text-xs text-nrs-ink/65">Sepet fiyatları güncel katalogdan kontrol ediliyor…</p>}
             {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mb-3 text-xs text-nrs-ink/65">Sepetinizdeki ürün fiyatları güncellendi. Güncel toplamı kontrol edin.</p>}
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm text-nrs-ink/65">Toplam</span>
-              <span className="font-serif text-2xl tabular-nums text-nrs-ink">{money(totalAmount)}</span>
-            </div>
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">Ürünler toplamı</dt><dd className="tabular-nums">{money(subtotalAmount)}</dd></div>
+              {isOpeningCampaignActive() && <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">{OPENING_CAMPAIGN.name}</dt><dd className="tabular-nums">−{money(discountAmount)}</dd></div>}
+              {shippingAmount > 0 && <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">Kargo</dt><dd className="tabular-nums">{money(shippingAmount)}</dd></div>}
+              <div className="flex justify-between gap-3 border-t border-nrs-ink/10 pt-2"><dt className="font-medium">Ödenecek toplam</dt><dd className="font-serif text-xl tabular-nums">{money(totalAmount)}</dd></div>
+            </dl>
             <p className="mt-1 text-[11px] text-nrs-ink/50">Kargo ve teslimat koşulları ödeme öncesinde gösterilir.</p>
             <button type="button" aria-label="Ödemeye geç" disabled={!catalogPricesSynced} onClick={() => { closeDrawer(); router.push('/checkout') }}
               className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-sm bg-nrs-charcoal px-4 text-sm font-medium text-nrs-ivory hover:bg-nrs-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60">

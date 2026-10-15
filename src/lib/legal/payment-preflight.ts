@@ -25,11 +25,13 @@ export function prepareOrderLegalRecord(orderId: string, requestBody: unknown, t
   // Whitelist fields: extra client metadata (including IP/UA) is not persisted.
   const summary: LegalOrderSummary = {
     items: trustedSummary.items.map(item => ({ productId: item.productId, name: item.name,
-      description: item.description, ...(item.measurementKind ? { measurementKind: item.measurementKind } : {}), ...(item.image ? { image: item.image } : {}), ...(item.variantId ? { variantId: item.variantId } : {}), ...(item.measurements ? { measurements: item.measurements } : {}), ...(item.size ? { size: item.size } : {}), quantity: item.quantity, unitPrice: item.unitPrice })),
+      description: item.description, ...(item.measurementKind ? { measurementKind: item.measurementKind } : {}), ...(item.image ? { image: item.image } : {}), ...(item.variantId ? { variantId: item.variantId } : {}), ...(item.measurements ? { measurements: item.measurements } : {}), ...(item.size ? { size: item.size } : {}), quantity: item.quantity, unitPrice: item.unitPrice,
+      ...(item.normalUnitPrice !== undefined ? { normalUnitPrice: item.normalUnitPrice } : {}), ...(item.discountAmount !== undefined ? { discountAmount: item.discountAmount } : {}) })),
     ...(trustedSummary.orderNote ? { orderNote: trustedSummary.orderNote } : {}),
     buyer: { name: trustedSummary.buyer.name, email: trustedSummary.buyer.email,
       phone: trustedSummary.buyer.phone, address: trustedSummary.buyer.address },
-    subtotal: trustedSummary.subtotal, discount: trustedSummary.discount, shipping: trustedSummary.shipping,
+    subtotal: trustedSummary.subtotal, discount: trustedSummary.discount,
+    ...(trustedSummary.campaign ? { campaign: { ...trustedSummary.campaign } } : {}), shipping: trustedSummary.shipping,
     total: trustedSummary.total, currency: trustedSummary.currency, paymentMethod: trustedSummary.paymentMethod,
     deliveryTerms: trustedSummary.deliveryTerms, orderedAt: trustedSummary.orderedAt,
   }

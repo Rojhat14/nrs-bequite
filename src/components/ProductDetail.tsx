@@ -16,6 +16,7 @@ import BankTransferInfo from '@/components/BankTransferInfo';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { useRouter } from 'next/navigation';
 import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
+import { discountForUnitMinor, isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign';
 
 interface ProductDetailProps {
   product: Product;
@@ -249,8 +250,12 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 </h1>
                 <div className="flex items-baseline gap-3">
                   <p className="text-2xl font-serif text-nrs-ink/80">{product.price}</p>
-                  {product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{product.currency === 'TRY' || !product.currency ? '₺' : `${product.currency} `}{product.compareAtPrice.toLocaleString('en-US')}</del>}
+                  {!isOpeningCampaignActive() && product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{product.currency === 'TRY' || !product.currency ? '₺' : `${product.currency} `}{product.compareAtPrice.toLocaleString('en-US')}</del>}
                 </div>
+                {isOpeningCampaignActive() && product.priceAmount != null && <div className="space-y-1 text-sm">
+                  <p className="font-medium">Açılışa özel sepette: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: product.currency || 'TRY' }).format((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}</p>
+                  <p className="text-xs text-nrs-ink/60">Sepette {OPENING_CAMPAIGN.discountLabel} otomatik uygulanır.</p>
+                </div>}
               </div>
 
               <div className="space-y-8 py-10 border-y border-nrs-ink/10">
@@ -310,7 +315,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       if (error) { setOrderError(error); return; }
                       const message = buildWhatsappOrderMessage([{
                         id: product.id, slug: product.slug, name: product.name, size: variant?.size || undefined, quantity,
-                        unitPrice: product.priceAmount ?? parsePrice(product.price), currency: product.currency,
+                        unitPrice: product.priceAmount ?? parsePrice(product.price), compareAtPrice: product.compareAtPrice, currency: product.currency,
                       }]);
                       const href = whatsappUrl(message || undefined);
                       if (href) { setOrderError(''); window.open(href, '_blank', 'noopener,noreferrer'); }

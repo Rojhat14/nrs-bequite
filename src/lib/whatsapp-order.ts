@@ -1,4 +1,6 @@
 import { formatMeasurements, type Measurements } from '@/lib/order-measurements'
+import { calculateOpeningTotals, discountForUnitMinor, isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign'
+import { SHIPPING_MINOR } from '@/lib/delivery-policy'
 export interface WhatsappOrderItem {
   id: string
   slug?: string
@@ -7,6 +9,7 @@ export interface WhatsappOrderItem {
   size?: string
   quantity: number
   unitPrice: number
+  compareAtPrice?: number | null
   currency?: string
 }
 
@@ -36,7 +39,7 @@ export function formatOrderPrice(amount: number, currency = 'TRY') {
 }
 
 // Display estimates only: this message neither creates nor pays for an order.
-export function buildWhatsappOrderMessage(items: WhatsappOrderItem[], total?: number, customer?: OrderCustomer) {
+export function buildWhatsappOrderMessage(items: WhatsappOrderItem[], _displayedTotal?: number, customer?: OrderCustomer) {
   if (!items.length) return null
   const lines = ['Merhaba NRS,', items.length === 1
     ? 'Aşağıdaki ürün için sipariş vermek istiyorum.'
@@ -51,8 +54,24 @@ export function buildWhatsappOrderMessage(items: WhatsappOrderItem[], total?: nu
   })
   const currencies = Array.from(new Set(items.map(item => item.currency || 'TRY')))
   if (currencies.length === 1) {
-    const amount = total ?? items.reduce((sum, item) => sum + Math.round(item.unitPrice * 100) * item.quantity, 0) / 100
-    lines.push(`Toplam: ${formatOrderPrice(amount, currencies[0])}`, '')
+    const campaignActive = isOpeningCampaignActive()
+    const totals = calculateOpeningTotals(items.map(item => ({
+      unitPriceMinor: campaignActive
+        ? Math.round(item.unitPrice * 100)
+        : Math.max(Math.round(item.unitPrice * 100), Math.round((item.compareAtPrice ?? item.unitPrice) * 100)),
+      quantity: item.quantity,
+    })), SHIPPING_MINOR, campaignActive)
+    const legacyDiscountMinor = campaignActive ? 0 : items.reduce((sum, item) => {
+      const price = Math.round(item.unitPrice * 100)
+      return sum + (Math.max(price, Math.round((item.compareAtPrice ?? item.unitPrice) * 100)) - price) * item.quantity
+    }, 0)
+    const discountMinor = totals.discountMinor + legacyDiscountMinor
+    const totalMinor = totals.totalMinor - legacyDiscountMinor
+    lines.push(`Ürünler toplamı: ${formatOrderPrice(totals.subtotalMinor / 100, currencies[0])}`)
+    if (campaignActive) lines.push(`${OPENING_CAMPAIGN.name}: −${formatOrderPrice(discountMinor / 100, currencies[0])}`)
+    else if (legacyDiscountMinor) lines.push(`Ürün indirimi: −${formatOrderPrice(legacyDiscountMinor / 100, currencies[0])}`)
+    if (SHIPPING_MINOR > 0) lines.push(`Kargo: ${formatOrderPrice(SHIPPING_MINOR / 100, currencies[0])}`)
+    lines.push(`Ödenecek toplam: ${formatOrderPrice(totalMinor / 100, currencies[0])}`, '')
   }
   const name = [customer?.firstName, customer?.lastName].filter(Boolean).join(' ').trim()
   const details = [name && `Ad Soyad: ${name}`, customer?.phone && `Telefon: ${customer.phone}`, customer?.email && `E-posta: ${customer.email}`].filter(Boolean)

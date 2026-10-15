@@ -17,6 +17,7 @@ import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObse
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
+import { discountForUnitMinor, getOpeningCampaign } from '@/lib/opening-campaign'
 
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
@@ -215,7 +216,10 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         db.from('product_variants').select('id,product_id,size,stock_quantity,is_active').in('id', sorted.map(i => i.variantId)),
       ])
       if (products.error || variants.error) throw new PaymentStartError('START_FAILED', 'quote', 'Ürün bilgileri doğrulanamadı.', (products.error || variants.error)?.code)
-      let subtotalMinor = 0, saleMinor = 0
+      let subtotalMinor = 0, discountMinor = 0, saleMinor = 0
+      // The hidden payment-test product is not a sale-open catalog item and
+      // its existing single-price authorization must remain unchanged.
+      const openingCampaign = products.data.some(product => isLiveObservationProduct(product)) ? null : getOpeningCampaign()
       const lines = sorted.map(item => {
         const product = products.data.find(p => p.id === item.productId)
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
@@ -224,24 +228,34 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const priceMinor = Math.round(Number(product.price_amount) * 100)
         const compareMinor = product.compare_at_price == null ? priceMinor : Math.round(Number(product.compare_at_price) * 100)
         if (!Number.isSafeInteger(priceMinor) || priceMinor <= 0 || !Number.isSafeInteger(compareMinor)) throw new Error('Ürün fiyatı doğrulanamadı.')
-        saleMinor += priceMinor * item.quantity
-        subtotalMinor += Math.max(priceMinor, compareMinor) * item.quantity
+        const baseMinor = openingCampaign ? priceMinor : Math.max(priceMinor, compareMinor)
+        const unitDiscountMinor = openingCampaign ? discountForUnitMinor(priceMinor) : 0
+        const lineDiscountMinor = openingCampaign ? unitDiscountMinor * item.quantity : (baseMinor - priceMinor) * item.quantity
+        const payableUnitMinor = priceMinor - unitDiscountMinor
+        subtotalMinor += baseMinor * item.quantity
+        discountMinor += lineDiscountMinor
+        saleMinor += payableUnitMinor * item.quantity
         const category = Array.isArray(product.categories) ? product.categories[0] : product.categories
         const kind = measurementKind(`${product.name} ${category?.name || ''} ${category?.slug || ''}`)
         const measurements = validateRequiredMeasurements(item.measurements, kind)
         const images = product.product_images || []
         const image = images.find((row: { is_primary?: boolean }) => row.is_primary) || images[0]
         return { measurementKind: kind, ...(image ? { image: getProductImageUrl(db, image) || undefined } : {}), productId: item.productId, variantId: item.variantId, measurements, name: product.name, description: product.description || product.name,
-          ...(variant.size ? { size: variant.size } : {}), quantity: item.quantity, unitPrice: priceMinor / 100 }
+          ...(variant.size ? { size: variant.size } : {}), quantity: item.quantity, unitPrice: payableUnitMinor / 100,
+          ...(openingCampaign ? { normalUnitPrice: priceMinor / 100, discountAmount: lineDiscountMinor / 100 } : {}) }
       })
       const shippingMinor = SHIPPING_MINOR
       const summary: LegalOrderSummary = { items: lines,
         orderNote: customer.orderNote, buyer: { name: `${customer.firstName} ${customer.lastName}`, email: customer.email, phone: customer.phone,
           address: [customer.address, customer.district, customer.city, customer.postalCode].filter(Boolean).join(', ') },
-        subtotal: subtotalMinor / 100, discount: (subtotalMinor - saleMinor) / 100, shipping: shippingMinor / 100,
+        subtotal: subtotalMinor / 100, discount: discountMinor / 100,
+        ...(openingCampaign ? { campaign: { id: openingCampaign.id, name: openingCampaign.name,
+          rateBasisPoints: openingCampaign.rateBasisPoints, discountAmount: discountMinor / 100 } } : {}),
+        shipping: shippingMinor / 100,
         total: (saleMinor + shippingMinor) / 100, currency: 'TRY', paymentMethod: manual ? 'Havale / EFT — ödeme henüz doğrulanmadı' : 'Online kartla ödeme',
         deliveryTerms: DELIVERY_TERMS, orderedAt: new Date().toISOString() }
-      if (![subtotalMinor, saleMinor, shippingMinor, saleMinor + shippingMinor].every(Number.isSafeInteger)) throw new Error('Sipariş tutarı doğrulanamadı.')
+      const totalMinor = saleMinor + shippingMinor
+      if (![subtotalMinor, discountMinor, saleMinor, shippingMinor, totalMinor].every(Number.isSafeInteger)) throw new Error('Sipariş tutarı doğrulanamadı.')
       const privateTrial = products.data.some(product => isLiveObservationProduct(product))
       const trialAllowed = privateTrial && !!userId && !manual && process.env.PAYMENT_PROVIDER === 'garanti-oos'
         && isLiveSingleFinalizeCheckout(sorted, saleMinor + shippingMinor)

@@ -12,7 +12,7 @@ export default function CartWhatsappOrder({ items, total, customer, compact = fa
   const priceUpdateNotice = useCart(state => state.priceUpdateNotice)
   if (!items.length) return null
   const message = buildWhatsappOrderMessage(items.map(item => ({
-    id: item.id, slug: item.slug, name: item.title, size: item.size, measurements: item.measurements, quantity: item.quantity, unitPrice: parsePrice(item.price),
+    id: item.id, slug: item.slug, name: item.title, size: item.size, measurements: item.measurements, quantity: item.quantity, unitPrice: parsePrice(item.price), compareAtPrice: item.compareAtPrice == null ? null : Number(item.compareAtPrice),
   })), total, customer)
   const href = whatsappUrl(message || undefined)
   if (!catalogPricesSynced) return <p role="status" className="text-xs text-nrs-ink/60">Sepet fiyatları güncel katalogdan kontrol ediliyor…</p>

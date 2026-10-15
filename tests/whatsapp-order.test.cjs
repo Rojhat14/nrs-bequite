@@ -26,14 +26,16 @@ test('Required sizes block WhatsApp requests, sizeless products work, and stock 
   assert.match(whatsappSelectionError({ requiresSize: false, selected: false, quantity: NaN }), /adet/);
 });
 
-test('All cart variants, decimal prices, quantities and provided totals are preserved', () => {
+test('All cart variants and decimal prices are preserved with the shared automatic campaign amount', () => {
   const message = buildWhatsappOrderMessage([
     { id: 'p1', name: 'İpek & Şık', size: 'M', unitPrice: 99.9, quantity: 3 },
     { id: 'p1', name: 'İpek & Şık', size: 'L', unitPrice: 99.9, quantity: 1 },
   ], 399.6);
   assert.match(message, /Beden: M/); assert.match(message, /Beden: L/);
   assert.match(message, /Adet: 3/); assert.match(message, /Ara toplam: 299,7 TL/);
-  assert.match(message, /Toplam: 399,6 TL/);
+  assert.match(message, /Ürünler toplamı: 399,6 TL/);
+  assert.match(message, /Açılışa Özel %20 İndirim: −79,92 TL/);
+  assert.match(message, /Ödenecek toplam: 319,68 TL/);
   assert.match(message, /Ödeme yöntemi: Havale \/ EFT/);
   assert.doesNotMatch(message, /başarıyla|ödendi|Sipariş numarası/i);
   assert.equal(buildWhatsappOrderMessage([]), null);

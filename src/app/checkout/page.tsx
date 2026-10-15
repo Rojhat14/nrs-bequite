@@ -22,6 +22,7 @@ import type { LegalOrderSummary as OrderSummary } from '@/lib/legal/order-summar
 
 import { MEASUREMENT_LABELS, MEASUREMENT_HELP, MEASUREMENT_RANGES, measurementFields, measurementKind, requiredMeasurements, validateRequiredMeasurements, type Measurements } from '@/lib/order-measurements'
 import { formatMeasurements } from '@/lib/order-measurements'
+import { discountForUnitMinor, getOpeningCampaign, isOpeningCampaignActive } from '@/lib/opening-campaign'
 
 const money = (amount: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount)
 
@@ -64,6 +65,7 @@ export default function Checkout() {
   }, [profile])
 
   const inputKey = JSON.stringify({ items, measurements, formData, subtotalAmount, discountAmount, shippingAmount, totalAmount })
+  const openingCampaign = getOpeningCampaign()
   const confirmedQuote = quoteKey === inputKey ? quote : null
   const snapshotKey = JSON.stringify({ inputKey, quoteHash: confirmedQuote?.hash })
   const checkoutInput = () => ({ items: items.map(item => ({ productId: item.id, variantId: item.variantId, quantity: item.quantity, measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {} })), customer: formData })
@@ -73,13 +75,21 @@ export default function Checkout() {
     setFieldErrors(current => ({ ...current, [field]: '' }))
   }
   const previewSummary: OrderSummary = {
-    items: items.map(item => ({ productId: item.id, name: item.title,
+    items: items.map(item => {
+      const normalMinor = Math.round(parsePrice(item.price) * 100)
+      const discountMinor = isOpeningCampaignActive() ? discountForUnitMinor(normalMinor) * item.quantity : 0
+      return { productId: item.id, name: item.title,
       description: 'Temel özellikler ürün sayfasında yer alır; varsa özel üretim koşulları sipariş teyidinde bildirilir.',
-      ...(item.size ? { size: item.size } : {}), measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {}, quantity: item.quantity, unitPrice: parsePrice(item.price) })),
+      ...(item.size ? { size: item.size } : {}), measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {}, quantity: item.quantity,
+      unitPrice: (normalMinor - (isOpeningCampaignActive() ? discountForUnitMinor(normalMinor) : 0)) / 100,
+      ...(isOpeningCampaignActive() ? { normalUnitPrice: normalMinor / 100, discountAmount: discountMinor / 100 } : {})
+    }}),
     buyer: { name: [formData.firstName, formData.lastName].filter(Boolean).join(' '), email: formData.email,
       phone: formData.phone, address: [formData.address, formData.district, formData.city, formData.postalCode].filter(Boolean).join(', ') },
     orderNote: formData.orderNote,
-    subtotal: subtotalAmount, discount: discountAmount, shipping: 0,
+    subtotal: subtotalAmount, discount: discountAmount,
+    ...(openingCampaign ? { campaign: { id: openingCampaign.id, name: openingCampaign.name,
+      rateBasisPoints: openingCampaign.rateBasisPoints, discountAmount } } : {}), shipping: 0,
     total: totalAmount, currency: 'TRY', paymentMethod: 'Havale / EFT — sipariş teyidinden sonra',
     deliveryTerms: DELIVERY_TERMS,
   }

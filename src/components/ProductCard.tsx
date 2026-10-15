@@ -12,6 +12,7 @@ import { lookupWishlist } from '@/lib/wishlistClient';
 import { Product } from '@/data/products';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { discountForUnitMinor, isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign';
 
 interface ProductCardProps {
   product: Product;
@@ -149,6 +150,9 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
         <p className="text-sm font-sans text-nrs-ink/60 font-light">
           {product.price}
         </p>
+        {isOpeningCampaignActive() && product.priceAmount != null && <p className="text-[11px] font-medium text-nrs-ink/70">
+          Sepette {OPENING_CAMPAIGN.discountLabel} · {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: product.currency || 'TRY' }).format((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}
+        </p>}
       </div>
     </div>
   );

@@ -1,10 +1,11 @@
 import { parseMeasurements, type Measurements, type MeasurementKind } from '@/lib/order-measurements'
 export interface LegalOrderSummary {
-  items: { productId: string; name: string; description: string; size?: string; variantId?: string; measurementKind?: MeasurementKind; image?: string; measurements?: Measurements; quantity: number; unitPrice: number }[]
+  items: { productId: string; name: string; description: string; size?: string; variantId?: string; measurementKind?: MeasurementKind; image?: string; measurements?: Measurements; quantity: number; unitPrice: number; normalUnitPrice?: number; discountAmount?: number }[]
   buyer: { name: string; email: string; phone: string; address: string }
   orderNote?: string
   subtotal: number
   discount: number
+  campaign?: { id: string; name: string; rateBasisPoints: number; discountAmount: number }
   shipping: number | null
   total: number
   currency: string
@@ -40,6 +41,11 @@ export function isLegalOrderSummary(value: unknown): value is LegalOrderSummary 
     phone: summary.buyer.phone, address: summary.buyer.address }).every(text)) return false
   if (![summary.subtotal, summary.discount, summary.total].every(money)
     || !(summary.shipping === null || money(summary.shipping))) return false
+  if (summary.campaign !== undefined && (!summary.campaign || !text(summary.campaign.id) || !text(summary.campaign.name)
+    || !Number.isInteger(summary.campaign.rateBasisPoints) || summary.campaign.rateBasisPoints < 1 || summary.campaign.rateBasisPoints > 10000
+    || !money(summary.campaign.discountAmount))) return false
+  if (summary.items.some(item => (item.normalUnitPrice !== undefined && !money(item.normalUnitPrice))
+    || (item.discountAmount !== undefined && !money(item.discountAmount)))) return false
   if (!/^[A-Z]{3}$/.test(summary.currency) || !text(summary.paymentMethod) || !text(summary.deliveryTerms)) return false
   if (summary.orderedAt !== undefined && (typeof summary.orderedAt !== 'string' || !Number.isFinite(Date.parse(summary.orderedAt)))) return false
   return true
@@ -51,9 +57,13 @@ export function assertFinalLegalOrderSummary(value: unknown): asserts value is L
   }
   const minor = (amount: number) => Math.round(amount * 100)
   const itemsTotal = value.items.reduce((sum, item) => sum + minor(item.unitPrice) * item.quantity, 0)
+  const lineDiscounts = value.items.reduce((sum, item) => sum + minor(item.discountAmount ?? 0), 0)
+  const regularItemsTotal = value.items.reduce((sum, item) => sum + minor(item.normalUnitPrice ?? item.unitPrice) * item.quantity, 0)
   if (minor(value.discount) > minor(value.subtotal)
     || minor(value.total) !== minor(value.subtotal) - minor(value.discount) + minor(value.shipping)
-    || itemsTotal !== minor(value.subtotal) - minor(value.discount)) {
+    || itemsTotal !== minor(value.subtotal) - minor(value.discount)
+    || (value.campaign && (regularItemsTotal !== minor(value.subtotal) || lineDiscounts !== minor(value.discount)
+      || minor(value.campaign.discountAmount) !== minor(value.discount)))) {
     throw new Error('Sipariş tutarları sözleşme özetiyle tutarlı değil.')
   }
 }

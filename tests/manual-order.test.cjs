@@ -23,6 +23,7 @@ async function setup() {
  // Synthetic fixture omits the real catalog foundation's service grants.
  await db.exec('GRANT SELECT,UPDATE ON public.products,public.product_variants TO service_role');
  await db.exec(fs.readFileSync('supabase/migrations/20261010130000_manual_order_details.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261015120000_opening_campaign_checkout.sql','utf8'));
  return db;
 }
 async function create(db,changes={}) {
@@ -222,13 +223,36 @@ for(const [name,indexes]of [['single product',[0]],['two products added in rever
  const crypto=require('node:crypto');assert.equal(legal.summary_hash,crypto.createHash('sha256').update(JSON.stringify(sent.p_legal.order_summary)).digest('hex'));
  assert.equal(legal.document_hash,prepareOrderLegalRecord(sent.p_order_id,createLegalAcceptance(true),quote.summary).document_hash);
  const rows=(await h.db.query('SELECT product_id,quantity,price_at_purchase FROM public.order_items')).rows;
- for(const line of quote.summary.items){const row=rows.find(i=>i.product_id===line.productId);assert.equal(row.quantity,line.quantity);assert.equal(Number(row.price_at_purchase),line.unitPrice);}
+ for(const line of quote.summary.items){const row=rows.find(i=>i.product_id===line.productId);assert.equal(row.quantity,line.quantity);assert.equal(Number(row.price_at_purchase),line.normalUnitPrice ?? line.unitPrice);}
  assert.ok((await h.db.query('SELECT stock_quantity FROM public.product_variants')).rows.every(v=>v.stock_quantity===10));
  // A reordered retry is the same request and does not create another order.
  assert.equal((await h.create([...input].reverse(),quote)).status,200);assert.equal(h.calls.length,1);
  }finally{await h.close()}
  });
 }
+test('Campaign amount is independently rechecked and atomically persisted by the payment RPC',async()=>{
+ const h=await orderedOrderHarness();try{
+  const input=[structuredClone(h.lines[0])];const quote=await h.quote(input);
+  assert.equal(quote.summary.subtotal,100);assert.equal(quote.summary.discount,20);assert.equal(quote.summary.total,80);
+  const forged=structuredClone(quote.summary);forged.items[0].discountAmount=19.99;forged.items[0].unitPrice=80.01;forged.campaign.discountAmount=19.99;forged.discount=19.99;forged.total=80.01;
+  const forgedLegal=prepareOrderLegalRecord(fixture.orderId,createLegalAcceptance(true),forged);
+  await assert.rejects(h.db.query('SELECT public.nrs_create_payment_order($1::uuid,$2::uuid,NULL,$1::uuid,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7)',
+   [fixture.orderId,fixture.userId,'a'.repeat(64),JSON.stringify(input),JSON.stringify(customer),JSON.stringify(forgedLegal),'test-bank']));
+  assert.equal((await h.db.query('SELECT count(*)::int AS count FROM public.orders')).rows[0].count,0);
+  const legal=prepareOrderLegalRecord(fixture.orderId,createLegalAcceptance(true),quote.summary);
+  const result=await h.db.query('SELECT public.nrs_create_payment_order($1::uuid,$2::uuid,NULL,$1::uuid,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7) AS result',
+   [fixture.orderId,fixture.userId,'a'.repeat(64),JSON.stringify(input),JSON.stringify(customer),JSON.stringify(legal),'test-bank']);
+  const order=result.rows[0].result;
+  assert.equal(order.order.amountMinor,8000);
+  const stored=(await h.db.query('SELECT o.total_amount,p.amount_minor,l.order_summary FROM public.orders o JOIN public.payment_orders p ON p.order_id=o.id JOIN public.order_legal_records l ON l.order_id=o.id WHERE o.id=$1::uuid',[fixture.orderId])).rows[0];
+  assert.equal(Number(stored.total_amount),80);assert.equal(Number(stored.amount_minor),8000);
+  assert.equal(stored.order_summary.campaign.id,quote.summary.campaign.id);
+  assert.equal(stored.order_summary.campaign.discountAmount,20);
+  assert.equal(stored.order_summary.items[0].normalUnitPrice,100);
+  assert.equal(stored.order_summary.items[0].discountAmount,20);
+  assert.equal((await h.db.query('SELECT stock_quantity FROM public.product_variants WHERE id=$1::uuid',[variantId])).rows[0].stock_quantity,9);
+ }finally{await h.close()}
+});
 test('Canonical order: duplicate variant and UUID case collision reject instead of merging measurements',async()=>{
  const h=await orderedOrderHarness();try{
  const a=h.lines[2];const duplicate={...structuredClone(a),measurements:{...a.measurements,chest:110}};
