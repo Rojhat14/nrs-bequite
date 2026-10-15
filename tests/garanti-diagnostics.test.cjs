@@ -4,13 +4,13 @@ const id='11111111-1111-4111-8111-111111111111',attempt='22222222-2222-4222-8222
 const c={observationOnly:true,mode:'TEST',merchantId:'1000001',terminalId:'12345678',userId:'GARANTI',provisionUser:'PROVAUT',provisionPassword:'synthetic-password',queryUser:'PROVAUT',queryPassword:'synthetic-query',storeKey:'synthetic-store',handoffSecret:'a'.repeat(64),siteOrigin:'https://shop.example',formUrl:'https://sanalposprovtest.garantibbva.com.tr/servlet/gt3dengine',queryUrl:'https://sanalposprovtest.garantibbva.com.tr/VPServlet',successUrl:'https://shop.example/api/payment/garanti/success',errorUrl:'https://shop.example/api/payment/garanti/failure',installment:'',capturedStatus:'',capturedResultCode:'',saleChargeType:'',failedStatuses:[]};
 const order={id,merchantReference:id,amountMinor:100,currency:'TRY',state:'pending',legal:{order_summary:{buyer:{email:'private@example.com'}}}};
 const headers=new Headers({'content-type':'application/x-www-form-urlencoded;charset=utf-8'});
-function fixture(){let saved;const db={from(){return{select(){return this},eq(){return this},async single(){return{data:{idempotency_key:attempt},error:null}},async upsert(row){saved=row;return{error:null}}}}};
- const load=loader({'./config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>true},'./order':{loadGarantiOrder:async()=>order},'@/lib/payment/repository':{paymentDatabase:()=>db,createPaymentRepository:()=>{throw Error('Settlement forbidden')}}});
+function fixture(){let saved,generalAllowed=false;const db={from(){return{select(){return this},eq(){return this},async single(){return{data:{idempotency_key:attempt},error:null}},async upsert(row){saved=row;return{error:null}}}}};
+ const load=loader({'./config':{garantiObservationOnly:()=>true,garantiLiveObservationOnly:()=>true,garantiLiveGeneralPaymentsEnabled:()=>generalAllowed},'./order':{loadGarantiOrder:async()=>order},'@/lib/payment/repository':{paymentDatabase:()=>db,createPaymentRepository:()=>{throw Error('Settlement forbidden')}}});
  const protocol=load('src/lib/payment/garanti/protocol.ts'),{GarantiProvider}=load('src/lib/payment/garanti/adapter.ts');
  const provider=new GarantiProvider(c,async()=>order,async()=>{throw Error('No capture')});
  function body(changes={},signed=true){const f={...protocol.bankFields(c,order,'192.168.0.1'),clientid:c.terminalId,oid:id,authcode:'synthetic',mdstatus:'0',response:'Declined',procreturncode:'05',cavv:'synthetic',eci:'synthetic',md:'synthetic',rnd:'synthetic',mderrormessage:'Authentication failed',errmsg:'Card expired',...changes};
  f.hashparams='clientid:oid:authcode:procreturncode:response:mdstatus:cavv:eci:md:rnd:';f.hash=signed?crypto.createHash('sha1').update(protocol.isoBytes(f.hashparams.split(':').filter(Boolean).map(n=>f[n]).join('')+c.storeKey)).digest('base64'):'invalid';return new URLSearchParams(f).toString()}
- return{load,provider,body,saved:()=>saved};}
+ return{load,provider,body,saved:()=>saved,enableGeneralDiagnostic:()=>{generalAllowed=true}};}
 test('Signed TEST failure is tied to the existing attempt; unsigned failure remains explicitly untrusted',async()=>{
  for(const signed of [true,false]){const f=fixture(),api=f.load('src/lib/payment/garanti/diagnostics.ts');const d=await api.diagnoseTestReturn(f.provider,f.body({},signed),headers,'failure');
  assert.equal(d.order_id,id);assert.equal(d.payment_attempt_id,attempt);assert.equal(d.signature_verified,signed);assert.equal(d.association,signed?'verified':'claimed');assert.equal(d.outcome,signed?'verified_failure':'unverified_failure');assert.equal(d.error_text_signed,false);
@@ -168,7 +168,7 @@ test('Cancellation result is shown only when the accessible database order is ca
  const pending=renderToStaticMarkup(await makeView('pending')({orderId:id,failure:true}));
  assert.match(pending,/Ödeme durumu kontrol ediliyor/);assert.doesNotMatch(pending,/Siparişiniz iptal edildi/);assert.equal(pending.includes('href="/checkout"'),false);
  const failed=renderToStaticMarkup(await makeView('payment_failed')({orderId:id,failure:true}));
- assert.match(failed,/Ödeme alınamadı\. Lütfen tekrar deneyin\./);assert.match(failed,/href="\/collections"/);
+ assert.match(failed,/Ödeme alınamadı\. Siparişiniz tamamlanmadı\. Lütfen tekrar deneyin\./);assert.match(failed,/href="\/collections"/);
  const unverified=renderToStaticMarkup(await makeView('payment_unverified')({orderId:id,failure:true}));
  assert.match(unverified,/Ödeme doğrulanamadı\. Sipariş tamamlanmadı\./);
  assert.doesNotMatch(unverified,/href="\/collections"|yeniden ödeme/i);
@@ -241,6 +241,19 @@ test('Controlled Production callback diagnostic records safe signature shape and
  const safe=JSON.stringify([malformed,same,different]);
  for(const value of [c.storeKey,c.provisionPassword,'private@example.com','synthetic',id,attempt,'Authentication failed','Card expired','4111111111111111','999']) assert.equal(safe.includes(value),false);
  assert.throws(()=>api.diagnoseLiveReturn({...f.provider,config:{...f.provider.config,liveObservationOnly:false}},f.body(),headers,null),/not enabled/);
+});
+test('General Production callback diagnostics are opt-in and remain non-settling',()=>{
+ const f=fixture(),api=f.load('src/lib/payment/garanti/diagnostics.ts');
+ f.provider.config={...c,mode:'PROD',observationOnly:false,liveObservationOnly:false,generalLivePayments:true};
+ assert.throws(()=>api.diagnoseLiveReturn(f.provider,f.body(),headers,'GARANTI_FAILURE_RETURN_SIGNATURE_HASH_MISMATCH','failure'),/not enabled/);
+ f.enableGeneralDiagnostic();
+ const d=api.diagnoseLiveReturn(f.provider,f.body({response:'Declined',procreturncode:'51',mdstatus:'7'},false),headers,
+  'GARANTI_ORDERINQ_PENDING','failure');
+ assert.equal(d.signature_verified,false);assert.equal(d.reported_response,'declined');
+ assert.equal(d.reported_procreturncode,'51');assert.equal(d.reported_mdstatus,'7');
+ assert.equal(d.reported_fields_trust,'untrusted_unsigned_callback');assert.equal(d.observation_only,false);
+ const stored=JSON.stringify(d);
+ for(const secret of [c.storeKey,c.provisionPassword,'Authentication failed','Card expired','private@example.com'])assert.equal(stored.includes(secret),false);
 });
 test('Controlled live failure diagnostic records bounded result codes as untrusted and distinguishes absent from empty signature fields',()=>{
  const f=fixture(),api=f.load('src/lib/payment/garanti/diagnostics.ts');f.provider.config.liveObservationOnly=true;f.provider.config.mode='PROD';

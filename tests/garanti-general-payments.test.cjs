@@ -146,6 +146,143 @@ test('general verified callback path stores order-bound proof before calling the
   assert.deepEqual(sequence, ['verified', 'evidence-stored', 'finalized'])
 })
 
+test('a verified exact bank refusal closes immediately and a duplicate callback releases stock once', async () => {
+  const orderId = fixture.orderId, sequence = [], events = new Set()
+  let state = 'pending', stockReleases = 0, finalizeCalls = 0
+  class Provider {
+    constructor() { this.name = 'garanti-oos'; this.config = { mode: 'PROD', generalLivePayments: true, liveObservationOnly: false, siteOrigin: 'https://nrsbequiteluminous.com' } }
+    async verifyReturn() { sequence.push('signature-and-exact-orderinq-refusal-verified'); return {
+      eventId: `terminal:${orderId}:failed`, merchantId: 'merchant', merchantReference: orderId,
+      transactionId: `terminal:${orderId}`, amountMinor: 5540000, currency: 'TRY', status: 'failed', threeDS: 'failed', verificationMode: 'PROD' } }
+    takeLiveReturnVerification() { return { signature_verified: true, order_match: true, amount_match: true,
+      currency_match: true, terminal_match: true, request_match: true, callback_mdstatus: '0',
+      callback_response: 'declined', callback_procreturncode: '51' } }
+    takeLiveReconciliationEvidence() { return { order_id: orderId, decision: 'verified_failure', reason: 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS', result_code: '51' } }
+  }
+  const handler = loader({
+    'next/server': { NextResponse: { redirect: url => new Response(null, { status: 303, headers: { location: String(url) } }) } },
+    '@/lib/payment/provider': { paymentAvailable: () => true, getPaymentProvider: () => new Provider() },
+    '@/lib/payment/http': { boundedText: async () => 'synthetic-signed-failure', unavailable: () => new Response(null, { status: 503 }) },
+    '@/lib/payment/repository': {
+      createPaymentRepository: () => ({ finalizeAtomic: async payment => {
+        assert.equal(payment.status, 'failed'); finalizeCalls++; sequence.push('atomic-finalize')
+        if (!events.has(payment.eventId)) { events.add(payment.eventId); state = 'failed'; stockReleases++ }
+      } }),
+      saveGarantiOrderinqReconciliation: async (id, decision, reason) => {
+        assert.equal(id, orderId); assert.equal(decision, 'verified_failure')
+        assert.equal(reason, 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS'); sequence.push('bank-failure-evidence-stored')
+      },
+      saveGarantiPaymentReturnDiagnostic: async () => {},
+    },
+    '@/lib/payment/service': { validateVerifiedPayment: () => {} },
+    './adapter': { GarantiProvider: Provider, GarantiPending: class extends Error {} },
+    './diagnostics': { diagnoseLiveReturn: () => ({ signature_verified: true, signature_result: 'verified' }), diagnoseTestReturn: () => ({}), saveTestDiagnostic: async () => {} },
+    './protocol': { GarantiReturnParseError: class extends Error {}, parseReturn: () => ({}), ReturnSignatureError: class extends Error {} },
+    '@/lib/payment/request': { UUID: /^[0-9a-f-]{36}$/ },
+    './order': { loadGarantiOrder: async id => ({ id, state }), isGarantiLiveSingleFinalizeOrder: async () => false, isGarantiSingleFinalizeOrder: async () => false },
+    './config': { controlledLiveAccountAllowed: () => false },
+  })('src/lib/payment/garanti/return-handler.ts').garantiReturn
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await handler(new Request('https://nrsbequiteluminous.com/api/payment/garanti/failure', { method: 'POST', body: 'synthetic' }))
+    assert.equal(response.status, 303)
+  }
+  assert.deepEqual(sequence, ['signature-and-exact-orderinq-refusal-verified', 'bank-failure-evidence-stored', 'atomic-finalize',
+    'signature-and-exact-orderinq-refusal-verified', 'atomic-finalize'])
+  assert.equal(finalizeCalls, 2)
+  assert.equal(events.size, 1)
+  assert.equal(stockReleases, 1)
+})
+
+test('general Production failure callback stores only safe diagnostics and never closes an unverified or unmapped result', async () => {
+  const orderId = fixture.orderId, saved = [], finalized = []
+  class Pending extends Error { constructor(reference) { super('awaiting independent bank decision'); this.reference = reference } }
+  class Provider {
+    constructor() { this.name = 'garanti-oos'; this.config = { mode: 'PROD', generalLivePayments: true, liveObservationOnly: false, siteOrigin: 'https://nrsbequiteluminous.com' }; this.lastVerificationStage = 'orderinq_result' }
+    async verifyReturn() { throw new Pending(orderId) }
+    takeLiveReturnVerification() { return { signature_verified: false, signature_result: 'hashparams_invalid', order_match: null } }
+    takeLiveReconciliationEvidence() { return { reason: 'GARANTI_ORDERINQ_STATUS_UNMAPPED', result_code: '05', decision: 'pending' } }
+  }
+  const diagnostic = { signature_verified: false, signature_result: 'hashparams_invalid', reported_response: 'declined',
+    reported_procreturncode: '51', reported_mdstatus: '7', mderrormessage_present: true, errmsg_present: true,
+    error_text_signed: false, error_category: 'unclassified' }
+  const handler = loader({
+    'next/server': { NextResponse: { redirect: url => new Response(null, { status: 303, headers: { location: String(url) } }) } },
+    '@/lib/payment/provider': { paymentAvailable: () => true, getPaymentProvider: () => new Provider() },
+    '@/lib/payment/http': { boundedText: async () => 'oid=synthetic&errmsg=private-text', unavailable: () => new Response(null, { status: 503 }) },
+    '@/lib/payment/repository': {
+      saveGarantiPaymentReturnDiagnostic: async (...args) => saved.push(args),
+      saveGarantiOrderinqReconciliation: async (...args) => saved.push(args),
+      createPaymentRepository: () => ({ finalizeAtomic: async () => finalized.push(true) }),
+    },
+    '@/lib/payment/service': { validateVerifiedPayment: () => {} },
+    './adapter': { GarantiProvider: Provider, GarantiPending: Pending },
+    './diagnostics': { diagnoseLiveReturn: () => diagnostic, diagnoseTestReturn: () => ({}), saveTestDiagnostic: async () => {} },
+    './protocol': { GarantiReturnParseError: class extends Error {}, parseReturn: () => ({ oid: orderId }), ReturnSignatureError: class extends Error {} },
+    '@/lib/payment/request': { UUID: /^[0-9a-f-]{36}$/ },
+    './order': { loadGarantiOrder: async id => ({ id, state: 'pending' }), isGarantiLiveSingleFinalizeOrder: async () => false, isGarantiSingleFinalizeOrder: async () => false },
+    './config': { controlledLiveAccountAllowed: () => false },
+  })('src/lib/payment/garanti/return-handler.ts').garantiReturn
+  const response = await handler(new Request('https://nrsbequiteluminous.com/api/payment/garanti/failure', { method: 'POST', body: 'synthetic' }))
+  assert.equal(response.status, 303)
+  assert.match(response.headers.get('location'), /checkout\/verify\?orderId=/)
+  assert.equal(saved[0][0], orderId)
+  assert.equal(saved[0][4].signature_verified, false)
+  assert.equal(saved[0][4].response, 'declined')
+  assert.equal(saved[0][4].procreturncode, '51')
+  assert.equal(saved[0][4].verification_basis, 'callback_runtime')
+  assert.equal(saved[1][2], 'GARANTI_ORDERINQ_STATUS_UNMAPPED')
+  assert.equal(JSON.stringify(saved).includes('private-text'), false)
+  assert.deepEqual(finalized, [])
+})
+
+test('an untrusted failure callback triggers a fresh inquiry; only its exact verified bank refusal closes immediately', async () => {
+  const orderId = fixture.orderId, sequence = []
+  let evidence = null
+  class SignatureError extends Error { constructor() { super('callback signature absent'); this.result = 'hashparams_invalid' } }
+  class Provider {
+    constructor() { this.name = 'garanti-oos'; this.config = { mode: 'PROD', generalLivePayments: true, liveObservationOnly: false,
+      siteOrigin: 'https://nrsbequiteluminous.com' }; this.lastVerificationStage = 'callback_signature' }
+    async verifyReturn() { throw new SignatureError() }
+    takeLiveReturnVerification() { return null }
+    takeLiveReconciliationEvidence() { const result = evidence; evidence = null; return result }
+    async reconcile(id) {
+      assert.equal(id, orderId); sequence.push('fresh-authenticated-orderinq')
+      evidence = { order_id: id, decision: 'verified_failure', reason: 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS',
+        order_match: true, terminal_match: true, amount_match: true, result_code: '51' }
+      return { eventId: `terminal:${id}:failed`, merchantId: 'merchant', merchantReference: id,
+        transactionId: `terminal:${id}`, amountMinor: 5540000, currency: 'TRY', status: 'failed', verificationMode: 'PROD' }
+    }
+  }
+  const savedDiagnostics = []
+  const handler = loader({
+    'next/server': { NextResponse: { redirect: url => new Response(null, { status: 303, headers: { location: String(url) } }) } },
+    '@/lib/payment/provider': { paymentAvailable: () => true, getPaymentProvider: () => new Provider() },
+    '@/lib/payment/http': { boundedText: async () => `oid=${orderId}`, unavailable: () => new Response(null, { status: 503 }) },
+    '@/lib/payment/repository': {
+      saveGarantiPaymentReturnDiagnostic: async (id, source, stage, code, data) => { savedDiagnostics.push({ id, source, stage, code, data }); sequence.push('safe-untrusted-callback-diagnostic') },
+      saveGarantiOrderinqReconciliation: async (id, decision, reason) => { assert.equal(decision, 'verified_failure'); sequence.push('verified-orderinq-evidence') },
+      createPaymentRepository: () => ({ finalizeAtomic: async payment => { assert.equal(payment.status, 'failed'); sequence.push('atomic-failure-finalize') } }),
+    },
+    '@/lib/payment/service': { validateVerifiedPayment: () => {} },
+    './adapter': { GarantiProvider: Provider, GarantiPending: class extends Error { constructor(id) { super('pending'); this.reference = id } } },
+    './diagnostics': { diagnoseLiveReturn: () => ({ signature_verified: false, signature_result: 'hashparams_invalid',
+      reported_response: 'declined', reported_procreturncode: '51', reported_mdstatus: '7', error_category: 'not_recorded' }),
+      diagnoseTestReturn: () => ({}), saveTestDiagnostic: async () => {} },
+    './protocol': { GarantiReturnParseError: class extends Error {}, parseReturn: (_raw, _headers, options) => {
+      const fields = { oid: orderId }; options?.onFields?.(fields); options?.onDuplicates?.([]); return fields
+    }, ReturnSignatureError: SignatureError },
+    '@/lib/payment/request': { UUID: /^[0-9a-f-]{36}$/ },
+    './order': { loadGarantiOrder: async id => ({ id, state: 'pending' }), isGarantiLiveSingleFinalizeOrder: async () => false, isGarantiSingleFinalizeOrder: async () => false },
+    './config': { controlledLiveAccountAllowed: () => false },
+  })('src/lib/payment/garanti/return-handler.ts').garantiReturn
+  const response = await handler(new Request('https://nrsbequiteluminous.com/api/payment/garanti/failure', {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: `oid=${orderId}` }))
+  assert.equal(response.status, 303)
+  assert.equal(savedDiagnostics[0].data.signature_verified, false)
+  assert.deepEqual(sequence, ['safe-untrusted-callback-diagnostic', 'fresh-authenticated-orderinq',
+    'verified-orderinq-evidence', 'atomic-failure-finalize'])
+})
+
 test('expired no-record reconciliation is reusable for any owner-verified order ID', async () => {
   const requestedOrder = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', owner = allowed
   let closed = 0, inquiries = 0, saved = 0

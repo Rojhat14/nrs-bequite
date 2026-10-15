@@ -27,7 +27,7 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
     ? 'Sipariş bilgilerine erişim doğrulanamadı. Hesabınızdaki siparişler bölümünden kontrol edebilir veya bize ulaşabilirsiniz.'
     : paid ? 'Ödemeniz doğrulandı. Siparişinizin ayrıntılarına hesabınızdan ulaşabilirsiniz.'
       : cancelled ? 'Siparişiniz uygulamada iptal edildi olarak doğrulandı. Yeni bir alışverişe başlayabilirsiniz.'
-        : verifiedFailure ? 'Ödeme alınamadı. Lütfen tekrar deneyin.'
+        : verifiedFailure ? 'Ödeme alınamadı. Siparişiniz tamamlanmadı. Lütfen tekrar deneyin.'
           : unverifiedClosed ? 'Ödeme doğrulanamadı. Sipariş tamamlanmadı.'
           : 'Ödeme sonucunuz kontrol ediliyor. Yardım için bizimle iletişime geçebilirsiniz.'
 

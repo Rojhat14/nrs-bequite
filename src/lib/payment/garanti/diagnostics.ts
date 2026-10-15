@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
-import { garantiLiveObservationOnly, garantiObservationOnly } from './config'
+import { garantiLiveGeneralPaymentsEnabled, garantiLiveObservationOnly, garantiObservationOnly } from './config'
 import { GarantiProvider, type SuccessfulTestReturnEvidence } from './adapter'
 import { parseReturn, inspectReturnSignature, inspectHashRepresentation, safeReturnFieldName, GarantiReturnParseError, type DuplicateReturnField, type ReturnSignatureEvidence } from './protocol'
 import { loadGarantiOrder } from './order'
@@ -29,11 +29,14 @@ export function cleanBankExplanation(value?: string) {
   return (explanations[normalized] || 'Açıklama gizlilik nedeniyle saklanmadı.').slice(0, 160)
 }
 
-// Production callback diagnostics are log-only and available solely in the
-// explicitly controlled, one-account observation deployment. They never query
-// the bank, read an order, persist a body, or alter signature acceptance.
+// Production callback diagnostics are available only to explicitly enabled
+// Production paths. They project transient callback fields to a strict safe
+// schema; they never retain a body, alter signature acceptance, or settle an
+// order.
 export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, headers: Headers, rejectionCode: string | null, source: 'success' | 'failure' = 'success') {
-  if (!provider.config.liveObservationOnly || !garantiLiveObservationOnly()) throw new Error('Live diagnostics are not enabled.')
+  const controlledObservation = provider.config.liveObservationOnly && garantiLiveObservationOnly()
+  const generalProduction = provider.config.generalLivePayments && garantiLiveGeneralPaymentsEnabled()
+  if (!controlledObservation && !generalProduction) throw new Error('Live diagnostics are not enabled.')
   let parsed: Readonly<Record<string, string>> | null = null
   let duplicates: DuplicateReturnField[] = []
   let parseStage = 'parsed'
@@ -132,7 +135,7 @@ export function diagnoseLiveReturn(provider: GarantiProvider, raw: string, heade
     reported_procreturncode: source === 'failure' ? procreturncode : null,
     reported_mdstatus: source === 'failure' ? mdstatus : null,
     reported_fields_trust: source === 'failure' ? signatureVerified ? 'signature_verified' : 'untrusted_unsigned_callback' : null,
-    observation_only: true,
+    observation_only: controlledObservation,
     finalize_called: false,
   }
   return diagnostic

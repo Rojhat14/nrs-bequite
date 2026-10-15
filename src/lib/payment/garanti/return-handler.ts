@@ -182,10 +182,156 @@ export async function garantiReturn(request: Request) {
       const evidence = provider.takeSuccessfulLiveReturnEvidence()
       if (!evidence || evidence.order_id !== verified.merchantReference) throw new Error('Verified live evidence missing.')
       await saveGarantiVerifiedPaymentEvidence(verified, evidence)
+    } else if (verified.status === 'failed' && verified.verificationMode === 'PROD') {
+      // Do not release stock from a failure-page visit or a callback code.
+      // The adapter returns `failed` only after a configured exact orderinq
+      // refusal mapping and its amount/history/identity checks have passed.
+      // Persist that order-bound bank decision before the atomic transition.
+      const evidence = provider.takeLiveReconciliationEvidence()
+      if (!evidence || evidence.order_id !== verified.merchantReference || evidence.decision !== 'verified_failure') {
+        throw new Error('Verified bank failure evidence missing.')
+      }
+      const callback = provider.takeLiveReturnVerification() || {}
+      if (provider.config.generalLivePayments && source === 'failure') {
+        try {
+          const diagnostic = diagnoseLiveReturn(provider, raw, request.headers, 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS', 'failure')
+          const signatureResult = ['verified','hashparams_invalid','hash_format_invalid','encoding_rejected','hash_mismatch','field_duplicate_field','not_evaluated','parse_rejected']
+            .includes(String(diagnostic.signature_result)) ? diagnostic.signature_result : 'not_evaluated'
+          await saveGarantiPaymentReturnDiagnostic(verified.merchantReference, 'failure', 'verified_payment',
+            'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS', {
+              signature_verified: callback.signature_verified === true && diagnostic.signature_verified === true,
+              signature_result: signatureResult,
+              order_match: callback.order_match === true,
+              amount_match: callback.amount_match === true,
+              currency_match: callback.currency_match === true,
+              terminal_match: callback.terminal_match === true,
+              request_match: callback.request_match === true,
+              mdstatus: callback.callback_mdstatus || diagnostic.reported_mdstatus,
+              response: callback.callback_response || diagnostic.reported_response,
+              procreturncode: callback.callback_procreturncode || diagnostic.reported_procreturncode,
+              mderrormessage_present: diagnostic.mderrormessage_present,
+              errmsg_present: diagnostic.errmsg_present,
+              error_text_signed: diagnostic.error_text_signed,
+              error_category: diagnostic.error_category,
+              verification_basis: 'callback_runtime',
+            })
+        } catch {
+          console.warn(JSON.stringify({ event: 'garanti_live_failure_diagnostic_store_failed', code: 'GARANTI_DIAGNOSTIC_STORE_FAILED' }))
+        }
+      }
+      const reason = typeof evidence.reason === 'string' && /^GARANTI_[A-Z0-9_]{1,80}$/.test(evidence.reason)
+        ? evidence.reason : 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS'
+      const currentOrder = await loadGarantiOrder(verified.merchantReference)
+      // Persist the query decision while the order is still pending. On a
+      // repeated callback, the first atomic finalize has already committed the
+      // same failed event and released stock; let the idempotent finalizer
+      // recognize that event instead of asking the pending-only evidence RPC
+      // to rewrite a terminal order. A paid/other terminal order is never
+      // changed by a late failure callback.
+      if (currentOrder.state === 'pending') {
+        await saveGarantiOrderinqReconciliation(verified.merchantReference, 'verified_failure', reason,
+          { ...evidence, order_id: verified.merchantReference, decision: 'verified_failure', reason })
+      } else if (currentOrder.state === 'paid') {
+        return destination(`/checkout/verify?orderId=${encodeURIComponent(verified.merchantReference)}`)
+      } else if (currentOrder.state !== 'failed') {
+        throw new Error('Verified bank failure order state is not finalizable.')
+      }
     }
     await createPaymentRepository().finalizeAtomic(verified, provider.name, true)
     return destination(`/checkout/verify?orderId=${encodeURIComponent(verified.merchantReference)}`)
   } catch (error) {
+    // In general Production mode, preserve only the reviewed safe diagnostic
+    // for a failure return. The incoming POST remains untrusted and cannot
+    // decide state. A fresh server-authenticated inquiry may still establish
+    // an exact configured final refusal; all other outcomes remain pending.
+    if (provider.config.generalLivePayments && source === 'failure') {
+      const code = liveFailureCode(error)
+      let associatedOrderId: string | null = null
+      try {
+        let fields: Readonly<Record<string, string>> | null = null
+        try {
+          fields = parseReturn(raw, request.headers, { allowIdenticalDuplicates: true })
+        } catch (parseError) {
+          // A conflicting repeated field rejects the callback for payment
+          // purposes. Still allow a unique OID to identify the order for a
+          // fresh authenticated bank inquiry; never use a repeated OID's
+          // arbitrarily retained value as an association.
+          if (!(parseError instanceof GarantiReturnParseError) || parseError.code !== 'duplicate_field') throw parseError
+          let duplicateSummary: { name: string; values: string }[] = []
+          try {
+            parseReturn(raw, request.headers, { allowIdenticalDuplicates: true,
+              onDuplicates: summary => { duplicateSummary = summary },
+              onFields: candidate => { fields = candidate } })
+          } catch { /* The candidate fields are diagnostic-only; strict verification already rejected them. */ }
+          if (duplicateSummary.some(item => item.name === 'oid' && item.values === 'different')) fields = null
+        }
+        if (fields && UUID.test(fields.oid)) {
+          const order = await loadGarantiOrder(fields.oid)
+          associatedOrderId = order.id
+          const diagnostic = diagnoseLiveReturn(provider, raw, request.headers, code, source)
+          const captured = provider.takeLiveReturnVerification() || {}
+          const signatureResult = ['verified','hashparams_invalid','hash_format_invalid','encoding_rejected','hash_mismatch','field_duplicate_field','not_evaluated','parse_rejected']
+            .includes(String(diagnostic.signature_result)) ? diagnostic.signature_result : 'not_evaluated'
+          const verification = {
+            signature_verified: captured.signature_verified === true || diagnostic.signature_verified === true,
+            signature_result: signatureResult,
+            order_match: typeof captured.order_match === 'boolean' ? captured.order_match : null,
+            amount_match: typeof captured.amount_match === 'boolean' ? captured.amount_match : null,
+            currency_match: typeof captured.currency_match === 'boolean' ? captured.currency_match : null,
+            terminal_match: typeof captured.terminal_match === 'boolean' ? captured.terminal_match : null,
+            request_match: typeof captured.request_match === 'boolean' ? captured.request_match : null,
+            mdstatus: typeof captured.callback_mdstatus === 'string' ? captured.callback_mdstatus : diagnostic.reported_mdstatus,
+            response: typeof captured.callback_response === 'string' ? captured.callback_response : diagnostic.reported_response,
+            procreturncode: typeof captured.callback_procreturncode === 'string' ? captured.callback_procreturncode : diagnostic.reported_procreturncode,
+            mderrormessage_present: diagnostic.mderrormessage_present,
+            errmsg_present: diagnostic.errmsg_present,
+            error_text_signed: diagnostic.error_text_signed,
+            error_category: diagnostic.error_category,
+            verification_basis: 'callback_runtime',
+          }
+          try {
+            await saveGarantiPaymentReturnDiagnostic(order.id, 'failure', provider.lastVerificationStage || 'callback_parse', code, verification)
+          } catch {
+            console.warn(JSON.stringify({ event: 'garanti_live_failure_diagnostic_store_failed', code: 'GARANTI_DIAGNOSTIC_STORE_FAILED' }))
+          }
+          let queryEvidence = provider.takeLiveReconciliationEvidence()
+          // A failure URL or its unsigned fields never decide payment state.
+          // If callback verification did not produce a result, run a fresh
+          // server-authenticated inquiry from the stored handoff. Only the
+          // adapter's exact configured failure mapping can return `failed`;
+          // every missing, conflicting or unavailable result stays pending.
+          if (!queryEvidence && order.state === 'pending') {
+            try {
+              const reconciled = await provider.reconcile(order.id)
+              queryEvidence = provider.takeLiveReconciliationEvidence()
+              if (reconciled.status === 'failed' && queryEvidence?.decision === 'verified_failure') {
+                const reason = typeof queryEvidence.reason === 'string' && /^GARANTI_[A-Z0-9_]{1,80}$/.test(queryEvidence.reason)
+                  ? queryEvidence.reason : 'GARANTI_ORDERINQ_CONFIGURED_FAILURE_STATUS'
+                await saveGarantiOrderinqReconciliation(order.id, 'verified_failure', reason,
+                  { ...queryEvidence, order_id: order.id, decision: 'verified_failure', reason })
+                await createPaymentRepository().finalizeAtomic(reconciled, provider.name, true)
+                return destination(`/checkout/verify?orderId=${encodeURIComponent(order.id)}`)
+              }
+            } catch {
+              queryEvidence = provider.takeLiveReconciliationEvidence() || queryEvidence
+            }
+          }
+          if (queryEvidence) {
+            const reason = queryEvidence.decision === 'verified_success' ? 'GARANTI_SIGNED_SUCCESS_RETURN_REQUIRED'
+              : typeof queryEvidence.reason === 'string' && /^GARANTI_[A-Z0-9_]{1,80}$/.test(queryEvidence.reason)
+                ? queryEvidence.reason : 'GARANTI_RECONCILIATION_UNCLASSIFIED'
+            try { await saveGarantiOrderinqReconciliation(order.id, 'pending', reason,
+              { ...queryEvidence, order_id: order.id, decision: 'pending', reason }) }
+            catch { console.warn(JSON.stringify({ event: 'garanti_live_failure_reconciliation_store_failed', code: 'GARANTI_RECONCILIATION_EVIDENCE_STORE_FAILED' })) }
+          }
+          return destination(`/checkout/verify?orderId=${encodeURIComponent(order.id)}`)
+        }
+      } catch {
+        // Do not replace the bank decision with an incomplete diagnostic. The
+        // existing pending/technical response path below remains authoritative.
+      }
+      if (associatedOrderId) return destination(`/checkout/verify?orderId=${encodeURIComponent(associatedOrderId)}`)
+    }
     if (provider.config.liveObservationOnly) {
       const code = liveFailureCode(error)
       let diagnostic: ReturnType<typeof diagnoseLiveReturn> | null = null
