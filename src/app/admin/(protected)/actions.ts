@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import type { ActionResult, ProductStatus } from '@/lib/admin/types'
+import { productSourceHash } from '@/lib/i18n/source-hash'
+import { sourceHash } from '@/lib/i18n/source-hash'
 
 function text(form: FormData, name: string) {
   return String(form.get(name) ?? '').trim()
@@ -26,7 +28,7 @@ function mapWriteError(error: { code?: string } | null, fallback: string) {
 }
 
 export async function saveProduct(form: FormData): Promise<ActionResult> {
-  await requireAdmin()
+  const adminUser = await requireAdmin()
   const supabase = await createSupabaseServerClient()
   const collectionIds = Array.from(
     new Set(
@@ -113,6 +115,24 @@ export async function saveProduct(form: FormData): Promise<ActionResult> {
       return failure(mapWriteError(collectionInsertError, 'Ürün koleksiyonları kaydedilemedi.'))
     }
   }
+  for (const locale of ['en', 'ar'] as const) {
+    if (text(form, `translation_${locale}_reviewed`) !== 'true') continue
+    const translation = {
+      name: text(form, `translation_${locale}_name`),
+      description: text(form, `translation_${locale}_description`),
+      fabric: text(form, `translation_${locale}_fabric`),
+      care: text(form, `translation_${locale}_care`),
+    }
+    if (!translation.name || translation.name.length > 180 || !translation.description || translation.description.length > 12000
+      || translation.fabric.length > 500 || translation.care.length > 3000) {
+      return failure(`${locale.toUpperCase()} translation needs a name and description within the allowed limits.`)
+    }
+    const { error: translationError } = await supabase.from('storefront_translations').upsert({
+      entity_type: 'product', entity_id: id, locale, source_hash: productSourceHash(payload), payload: translation,
+      updated_by: adminUser.id, updated_at: new Date().toISOString(),
+    }, { onConflict: 'entity_type,entity_id,locale' })
+    if (translationError) return failure(mapWriteError(translationError, `${locale.toUpperCase()} translation could not be saved.`))
+  }
   revalidatePath('/admin')
   revalidatePath('/admin/products')
   revalidatePath(`/admin/products/${encodeURIComponent(id)}`)
@@ -173,7 +193,7 @@ export async function archiveProduct(form: FormData): Promise<ActionResult> {
 }
 
 export async function saveCategory(form: FormData): Promise<ActionResult> {
-  await requireAdmin()
+  const adminUser = await requireAdmin()
   const supabase = await createSupabaseServerClient()
   const id = text(form, 'id')
   const name = text(form, 'name')
@@ -191,12 +211,51 @@ export async function saveCategory(form: FormData): Promise<ActionResult> {
   const payload = { name, slug, description: text(form, 'description') || null, sort_order: order, is_active: text(form, 'is_active') === 'true' }
   const result = id
     ? await supabase.from('categories').update(payload).eq('id', id)
-    : await supabase.from('categories').insert(payload)
+    : await supabase.from('categories').insert(payload).select('id').single()
   if (result.error) return failure(mapWriteError(result.error, id ? 'Kategori güncellenemedi.' : 'Kategori oluşturulamadı.'))
+  const savedCategoryId = id || String((result as { data?: { id?: string } }).data?.id ?? '')
+  if (savedCategoryId) {
+    for (const locale of ['en', 'ar'] as const) {
+      if (text(form, `translation_${locale}_reviewed`) !== 'true') continue
+      const translation = { name: text(form, `translation_${locale}_name`), description: text(form, `translation_${locale}_description`) }
+      if (!translation.name || translation.name.length > 120 || translation.description.length > 2000) return failure(`${locale.toUpperCase()} category translation is invalid.`)
+      const { error: translationError } = await supabase.from('storefront_translations').upsert({
+        entity_type: 'category', entity_id: savedCategoryId, locale,
+        source_hash: sourceHash([payload.name, payload.description]), payload: translation,
+        updated_by: adminUser.id, updated_at: new Date().toISOString(),
+      }, { onConflict: 'entity_type,entity_id,locale' })
+      if (translationError) return failure(mapWriteError(translationError, `${locale.toUpperCase()} category translation could not be saved.`))
+    }
+  }
   revalidatePath('/admin/categories')
   revalidatePath('/admin/products')
   revalidatePath('/admin')
   return { ok: true, message: id ? 'Kategori güncellendi.' : 'Kategori oluşturuldu.' }
+}
+
+export async function saveCollectionTranslations(form: FormData): Promise<ActionResult> {
+  const adminUser = await requireAdmin()
+  const supabase = await createSupabaseServerClient()
+  const id = text(form, 'id')
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return failure('Koleksiyon seçimi geçersiz.')
+  const { data: source, error: sourceError } = await supabase.from('collections').select('name,description,is_active').eq('id', id).maybeSingle()
+  if (sourceError || !source || source.is_active !== true) return failure(mapWriteError(sourceError, 'Aktif koleksiyon bulunamadı.'))
+  let saved = false
+  for (const locale of ['en', 'ar'] as const) {
+    if (text(form, `translation_${locale}_reviewed`) !== 'true') continue
+    const translation = { name: text(form, `translation_${locale}_name`), description: text(form, `translation_${locale}_description`) }
+    if (!translation.name || translation.name.length > 120 || translation.description.length > 2000) return failure(`${locale.toUpperCase()} collection translation is invalid.`)
+    const { error } = await supabase.from('storefront_translations').upsert({
+      entity_type: 'collection', entity_id: id, locale, source_hash: sourceHash([source.name, source.description]),
+      payload: translation, updated_by: adminUser.id, updated_at: new Date().toISOString(),
+    }, { onConflict: 'entity_type,entity_id,locale' })
+    if (error) return failure(mapWriteError(error, `${locale.toUpperCase()} collection translation could not be saved.`))
+    saved = true
+  }
+  if (!saved) return failure('Bir dili seçip çeviriyi kaynakla karşılaştırdığınızı onaylayın.')
+  revalidatePath('/admin/categories')
+  revalidatePath('/collections')
+  return { ok: true, id, message: 'Koleksiyon çevirileri kaydedildi.' }
 }
 
 export async function deleteCategory(form: FormData): Promise<ActionResult> {

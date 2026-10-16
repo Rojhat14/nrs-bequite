@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createHash, randomUUID } from 'node:crypto'
 import { prepareOrderLegalRecord } from '@/lib/legal/payment-preflight'
 import { assertFinalLegalOrderSummary, type LegalOrderSummary, type OrderLegalRecord } from '@/lib/legal/order-summary'
-import type { Buyer, CheckoutItem, CheckoutRequest, PaymentOrder, PaymentRedirect, PaymentRepository, Quote, VerifiedPayment } from './types'
+import type { Buyer, CheckoutDisplayContext, CheckoutItem, CheckoutRequest, PaymentOrder, PaymentRedirect, PaymentRepository, Quote, VerifiedPayment } from './types'
 import { requirePaymentDeployment } from './config'
 import { UUID } from './request'
 import { canonicalCheckoutItems } from './items'
@@ -18,6 +18,8 @@ import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 import { discountForUnitMinor, getOpeningCampaign } from '@/lib/opening-campaign'
+import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
+import { productSourceHash } from '@/lib/i18n/source-hash'
 
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
@@ -209,13 +211,21 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       void context
       return { redirectUrl: stored.redirectUrl }
     },
-    async quote(items: CheckoutItem[], customer: Buyer, userId?: string | null): Promise<Quote> {
+    async quote(items: CheckoutItem[], customer: Buyer, userId?: string | null, display: CheckoutDisplayContext = { locale: 'tr', rate: null }): Promise<Quote> {
       const sorted = canonicalCheckoutItems(items)
       const [products, variants] = await Promise.all([
-        db.from('products').select('id,name,description,price_amount,compare_at_price,currency,status,in_stock,payment_test_only,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
+        db.from('products').select('id,name,description,fabric,care,price_amount,compare_at_price,currency,status,in_stock,payment_test_only,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
         db.from('product_variants').select('id,product_id,size,stock_quantity,is_active').in('id', sorted.map(i => i.variantId)),
       ])
       if (products.error || variants.error) throw new PaymentStartError('START_FAILED', 'quote', 'Ürün bilgileri doğrulanamadı.', (products.error || variants.error)?.code)
+      let translations: { entity_id: string; source_hash: string; payload: Record<string, unknown> }[] = []
+      if (display.locale !== 'tr' && products.data.length) {
+        const result = await db.from('storefront_translations').select('entity_id,source_hash,payload')
+          .eq('entity_type', 'product').eq('locale', display.locale).in('entity_id', products.data.map(product => product.id))
+        if (result.error) throw new PaymentStartError('START_FAILED', 'quote', 'Ürün çevirileri doğrulanamadı.', result.error.code)
+        translations = (result.data ?? []) as typeof translations
+      }
+      const translationsByProduct = new Map(translations.map(row => [row.entity_id, row]))
       let subtotalMinor = 0, discountMinor = 0, saleMinor = 0
       // The hidden payment-test product is not a sale-open catalog item and
       // its existing single-price authorization must remain unchanged.
@@ -225,6 +235,10 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
         if (!product || product.status !== 'active' || product.currency !== 'TRY'
           || variant?.is_active !== true || !Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity) throw new Error('Ürün veya seçilen beden stokta yok.')
+        const translation = translationsByProduct.get(product.id)
+        const localized = translation?.source_hash === productSourceHash(product) ? translation.payload : null
+        const displayName = typeof localized?.name === 'string' ? localized.name : product.name
+        const displayDescription = typeof localized?.description === 'string' ? localized.description : product.description || product.name
         const priceMinor = Math.round(Number(product.price_amount) * 100)
         const compareMinor = product.compare_at_price == null ? priceMinor : Math.round(Number(product.compare_at_price) * 100)
         if (!Number.isSafeInteger(priceMinor) || priceMinor <= 0 || !Number.isSafeInteger(compareMinor)) throw new Error('Ürün fiyatı doğrulanamadı.')
@@ -240,7 +254,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const measurements = validateRequiredMeasurements(item.measurements, kind)
         const images = product.product_images || []
         const image = images.find((row: { is_primary?: boolean }) => row.is_primary) || images[0]
-        return { measurementKind: kind, ...(image ? { image: getProductImageUrl(db, image) || undefined } : {}), productId: item.productId, variantId: item.variantId, measurements, name: product.name, description: product.description || product.name,
+        return { measurementKind: kind, ...(image ? { image: getProductImageUrl(db, image) || undefined } : {}), productId: item.productId, variantId: item.variantId, measurements, name: displayName, description: displayDescription,
           ...(variant.size ? { size: variant.size } : {}), quantity: item.quantity, unitPrice: payableUnitMinor / 100,
           ...(openingCampaign ? { normalUnitPrice: priceMinor / 100, discountAmount: lineDiscountMinor / 100 } : {}) }
       })
@@ -256,6 +270,20 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         deliveryTerms: DELIVERY_TERMS, orderedAt: new Date().toISOString() }
       const totalMinor = saleMinor + shippingMinor
       if (![subtotalMinor, discountMinor, saleMinor, shippingMinor, totalMinor].every(Number.isSafeInteger)) throw new Error('Sipariş tutarı doğrulanamadı.')
+      const displayCurrencyCode = displayCurrency(display.locale, display.rate)
+      const displayLines = allocateDisplayMinor(lines.map(line => Math.round(line.unitPrice * 100) * line.quantity), display.locale, display.rate)
+      const displayedSubtotal = allocateDisplayMinor([subtotalMinor], display.locale, display.rate)[0]
+      const displayedShipping = allocateDisplayMinor([shippingMinor], display.locale, display.rate)[0]
+      const displayedSale = displayLines.reduce((sum, amount) => sum + amount, 0)
+      summary.display = {
+        locale: display.locale, currency: displayCurrencyCode,
+        exchangeRate: displayCurrencyCode === 'USD' ? display.rate!.usdTry : null,
+        exchangeRateAt: displayCurrencyCode === 'USD' ? display.rate!.fetchedAt : null,
+        exchangeRateDate: displayCurrencyCode === 'USD' ? display.rate!.rateDate ?? null : null,
+        subtotalMinor: displayedSubtotal, discountMinor: displayedSubtotal - displayedSale,
+        shippingMinor: displayedShipping, totalMinor: displayedSale + displayedShipping,
+        itemLineMinor: displayLines,
+      }
       const privateTrial = products.data.some(product => isLiveObservationProduct(product))
       const trialAllowed = privateTrial && !!userId && !manual && process.env.PAYMENT_PROVIDER === 'garanti-oos'
         && isLiveSingleFinalizeCheckout(sorted, saleMinor + shippingMinor)

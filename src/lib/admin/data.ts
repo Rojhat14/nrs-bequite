@@ -3,6 +3,8 @@ import 'server-only'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { LOW_STOCK_THRESHOLD } from '@/lib/admin/config'
 import type { CategoryRow, CollectionRow, OrderItemRow, OrderRow, ProductImageRow, ProductRow, ProductVariantRow, ProfileRow, WishlistRow } from '@/lib/admin/types'
+import { productSourceHash } from '@/lib/i18n/source-hash'
+import { sourceHash } from '@/lib/i18n/source-hash'
 
 const pageSize = 20
 
@@ -13,7 +15,17 @@ export function isMissingTable(error: { code?: string; message?: string } | null
 export async function getCategories() {
   const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase.from('categories').select('*').order('sort_order').order('name')
-  return { data: (data ?? []) as unknown as CategoryRow[], error }
+  const categories = (data ?? []) as unknown as CategoryRow[]
+  const translated = categories.length ? await supabase.from('storefront_translations').select('entity_id,locale,source_hash,payload')
+    .eq('entity_type', 'category').in('entity_id', categories.map(category => category.id)) : { data: [], error: null }
+  const byEntity = new Map<string, { locale: 'en' | 'ar'; source_hash: string; payload: Record<string, unknown> }[]>()
+  for (const row of translated.data ?? []) {
+    const entry = row as { entity_id: string; locale: 'en' | 'ar'; source_hash: string; payload: Record<string, unknown> }
+    byEntity.set(entry.entity_id, [...(byEntity.get(entry.entity_id) ?? []), entry])
+  }
+  return { data: categories.map(category => ({ ...category, translations: Object.fromEntries((byEntity.get(category.id) ?? []).map(row => [row.locale, {
+    current: row.source_hash === sourceHash([category.name, category.description]), payload: row.payload,
+  }])) })), error: error ?? translated.error }
 }
 
 export async function getCollections() {
@@ -26,10 +38,17 @@ export async function getCollections() {
     .order('sort_order')
     .order('name')
 
-  return {
-    data: (data ?? []) as unknown as CollectionRow[],
-    error,
+  const collections = (data ?? []) as unknown as CollectionRow[]
+  const translated = collections.length ? await supabase.from('storefront_translations').select('entity_id,locale,source_hash,payload')
+    .eq('entity_type', 'collection').in('entity_id', collections.map(collection => collection.id)) : { data: [], error: null }
+  const byEntity = new Map<string, { locale: 'en' | 'ar'; source_hash: string; payload: Record<string, unknown> }[]>()
+  for (const row of translated.data ?? []) {
+    const entry = row as { entity_id: string; locale: 'en' | 'ar'; source_hash: string; payload: Record<string, unknown> }
+    byEntity.set(entry.entity_id, [...(byEntity.get(entry.entity_id) ?? []), entry])
   }
+  return { data: collections.map(collection => ({ ...collection, translations: Object.fromEntries((byEntity.get(collection.id) ?? []).map(row => [row.locale, {
+    current: row.source_hash === sourceHash([collection.name, collection.description]), payload: row.payload,
+  }])) })), error: error ?? translated.error }
 }
 
 export async function getProductList(options: { page?: number; query?: string; category?: string; status?: string } = {}) {
@@ -69,14 +88,20 @@ export async function getProductList(options: { page?: number; query?: string; c
 
 export async function getProductEditorData(id: string) {
   const supabase = await createSupabaseServerClient()
-  const [productResult, imagesResult, variantsResult, categoryResult, collectionsResult, collectionResult] = await Promise.all([
+  const [productResult, imagesResult, variantsResult, categoryResult, collectionsResult, collectionResult, translationResult] = await Promise.all([
     supabase.from('products').select('*').eq('id', id).maybeSingle(),
     supabase.from('product_images').select('*').eq('product_id', id).order('sort_order'),
     supabase.from('product_variants').select('*').eq('product_id', id).order('size'),
     getCategories(),
     getCollections(),
     supabase.from('product_collections').select('collection_id').eq('product_id', id),
+    supabase.from('storefront_translations').select('locale,source_hash,payload').eq('entity_type', 'product').eq('entity_id', id),
   ])
+  const translationRows = (translationResult.data ?? []) as { locale: 'en' | 'ar'; source_hash: string; payload: Record<string, unknown> }[]
+  const translations = Object.fromEntries(translationRows.map(row => [row.locale, {
+    sourceHash: row.source_hash, current: !!productResult.data && row.source_hash === productSourceHash(productResult.data as ProductRow),
+    payload: row.payload,
+  }])) as Partial<Record<'en' | 'ar', { sourceHash: string; current: boolean; payload: Record<string, unknown> }>>
   const selectedCollectionIds = (collectionResult.data ?? []).map((row) => row.collection_id as string)
   return {
     product: productResult.data as unknown as ProductRow | null,
@@ -85,7 +110,8 @@ export async function getProductEditorData(id: string) {
     categories: categoryResult.data,
     collections: collectionsResult.data,
     selectedCollectionIds,
-    error: productResult.error ?? imagesResult.error ?? variantsResult.error ?? categoryResult.error ?? collectionsResult.error ?? collectionResult.error,
+    translations,
+    error: productResult.error ?? imagesResult.error ?? variantsResult.error ?? categoryResult.error ?? collectionsResult.error ?? collectionResult.error ?? translationResult.error,
   }
 }
 

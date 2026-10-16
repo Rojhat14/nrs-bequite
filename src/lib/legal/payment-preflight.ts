@@ -34,6 +34,7 @@ export function prepareOrderLegalRecord(orderId: string, requestBody: unknown, t
     ...(trustedSummary.campaign ? { campaign: { ...trustedSummary.campaign } } : {}), shipping: trustedSummary.shipping,
     total: trustedSummary.total, currency: trustedSummary.currency, paymentMethod: trustedSummary.paymentMethod,
     deliveryTerms: trustedSummary.deliveryTerms, orderedAt: trustedSummary.orderedAt,
+    ...(trustedSummary.display ? { display: { ...trustedSummary.display, itemLineMinor: [...trustedSummary.display.itemLineMinor] } } : {}),
   }
   const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
   return { order_id: orderId, contract_accepted: true, contract_version: requestBody.contractVersion,

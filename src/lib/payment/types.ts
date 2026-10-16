@@ -1,11 +1,14 @@
 import type { Measurements } from '@/lib/order-measurements'
 import type { LegalOrderSummary, OrderLegalRecord } from '@/lib/legal/order-summary'
 import type { LegalAcceptance } from '@/lib/legal/acceptance'
+import type { Locale } from '@/lib/i18n/messages'
+import type { DisplayRate } from '@/lib/i18n/money'
 
 export interface CheckoutItem { productId: string; variantId: string; quantity: number; measurements?: Measurements }
 export interface Buyer { firstName: string; lastName: string; email: string; phone: string; address: string; city: string; district: string; postalCode: string; orderNote?: string }
 export interface CheckoutRequest extends LegalAcceptance { items: CheckoutItem[]; customer: Buyer; quoteHash: string; idempotencyKey: string }
 export interface Quote { summary: LegalOrderSummary; hash: string }
+export interface CheckoutDisplayContext { locale: Locale; rate: DisplayRate | null }
 export interface PaymentOrder { id: string; merchantReference: string; amountMinor: number; currency: string; state: 'initiating' | 'pending' | 'paid' | 'failed'; legal: OrderLegalRecord }
 export interface PaymentRedirect { redirectUrl: string }
 // The adapter must authenticate raw callback bytes, then independently query the
@@ -34,7 +37,7 @@ export interface PaymentProvider {
 export interface PaymentRepository {
   resumeUnsubmittedTest?(orderId: string, userId: string, provider: PaymentProvider, context?: { customerIp: string }): Promise<PaymentRedirect>
   findExisting(request: CheckoutRequest, userId: string | null, guestHash: string | null): Promise<PaymentOrder | null>
-  quote(items: CheckoutItem[], customer: Buyer, userId?: string | null): Promise<Quote>
+  quote(items: CheckoutItem[], customer: Buyer, userId?: string | null, display?: CheckoutDisplayContext): Promise<Quote>
   createAtomic(request: CheckoutRequest, userId: string | null, guestHash: string | null, quote: Quote): Promise<{ order: PaymentOrder; created: boolean }>
   storeRedirect(orderId: string, redirect: PaymentRedirect): Promise<void>
   getRedirect(orderId: string): Promise<PaymentRedirect | null>

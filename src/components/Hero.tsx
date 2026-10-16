@@ -29,8 +29,8 @@ const Hero = ({ introFinished, products }: HeroProps) => {
         className="absolute inset-0 z-0"
       >
         <Image
-          src="https://images.unsplash.com/photo-1490481651818-503f6c70611d?q=80&w=2070&auto=format&fit=crop"
-          alt="Luxury Fashion Background"
+          src="/images/editorial/categories/dresses.jpg"
+          alt={copy('NRS elbise koleksiyonundan görünüm', 'A look from the NRS dresses collection', 'إطلالة من مجموعة فساتين NRS')}
           fill
           className="object-cover opacity-40 mix-blend-multiply"
           priority

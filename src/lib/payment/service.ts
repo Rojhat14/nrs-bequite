@@ -2,12 +2,12 @@ import 'server-only'
 import { isIP } from 'node:net'
 import { isoBytes } from './garanti/protocol'
 import { UUID, parsePaymentRequest } from './request'
-import type { PaymentProvider, PaymentRepository, VerifiedPayment } from './types'
+import type { CheckoutDisplayContext, PaymentProvider, PaymentRepository, VerifiedPayment } from './types'
 import { PaymentStartError, startStage } from './start-error'
 import { saveGarantiVerifiedPaymentEvidence } from './repository'
 
 export async function initiatePayment(body: unknown, userId: string | null, guestHash: string | null,
-  repository: PaymentRepository, provider: PaymentProvider, context?: { customerIp: string }) {
+  repository: PaymentRepository, provider: PaymentProvider, context?: { customerIp: string } & Partial<CheckoutDisplayContext>) {
   const request = await startStage('request', async () => parsePaymentRequest(body))
   if (!userId || guestHash !== null) throw new Error('Kartla ödeme için hesabınıza giriş yapın.')
   if (provider.name === 'garanti-oos' && (!context || isIP(context.customerIp) !== 4)) throw new Error('Müşteri IP adresi doğrulanamadı.')
@@ -28,7 +28,8 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
     return { orderId: existing.id, ...redirect }
   }
   // All prices and stock come from DB; request prices/totals are discarded.
-  const quote = await startStage('quote', () => repository.quote(request.items, request.customer, userId))
+  const display: CheckoutDisplayContext = { locale: context?.locale ?? 'tr', rate: context?.rate ?? null }
+  const quote = await startStage('quote', () => repository.quote(request.items, request.customer, userId, display))
   if (quote.hash !== request.quoteHash) throw new PaymentStartError('START_FAILED', 'quote', 'Sipariş bilgileri değişti. Özeti yeniden inceleyip onaylayın.')
   if (provider.initiationMaxAmountMinor != null) {
     const totalMinor = Math.round(quote.summary.total * 100)

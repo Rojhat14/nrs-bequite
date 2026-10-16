@@ -38,8 +38,31 @@ if result.returncode == 0 and '--http' in sys.argv:
    except Exception: time.sleep(.15)
   routes=['mesafeli-satis-sozlesmesi','on-bilgilendirme-formu','iade-ve-degisim','iptal-kosullari','gizlilik-politikasi','kvkk','kullanim-kosullari','kargo-ve-teslimat']
   for route in routes:
-   with urlopen(base+'/'+route,timeout=10) as response:
-    assert response.status==200,route
+   try:
+    with urlopen(base+'/'+route,timeout=10) as response:
+     assert response.status==200,route
+   except HTTPError as error:
+    print('HTTP failure route:', route, 'status:', error.code)
+    print('HTTP response:', error.read().decode('utf-8','replace')[:4000])
+    runtime_log.flush()
+    print('Runtime log:', runtime_log.name)
+    raise
+  # Direct locale URLs must resolve on first request, and the server-rendered
+  # document must carry the requested language/direction before hydration.
+  for locale, expected_dir in [('en', 'ltr'), ('ar', 'rtl')]:
+   for path in ['', '/faq','/contact','/care-guide','/mesafeli-satis-sozlesmesi']:
+    try:
+     with urlopen(base+'/'+locale+path,timeout=10) as response:
+      html=response.read().decode('utf-8','replace')
+      if response.status != 200 or f'<html lang="{locale}" dir="{expected_dir}"' not in html:
+       print('Locale HTML head:', html[:1200])
+       raise AssertionError((locale,path,'locale document metadata missing'))
+    except HTTPError as error:
+     print('Locale HTTP failure:', locale, path, error.code, error.headers.get('Location'))
+     runtime_log.flush()
+     print('Runtime log:', runtime_log.name)
+     print(runtime_log.name and Path(runtime_log.name).read_text(errors='replace')[-5000:])
+     raise
   for path in ['/api/payment/create','/api/payment/callback','/api/payment/quote','/api/payment/return',
    '/api/payment/garanti/success','/api/payment/garanti/failure','/api/payment/garanti/handoff']:
    try: urlopen(Request(base+path,data=b'{}',headers={'Content-Type':'application/json'}),timeout=10)
@@ -60,7 +83,7 @@ if result.returncode == 0 and '--http' in sys.argv:
   for path in ['/checkout/success','/checkout/verify','/checkout/failure']:
    with urlopen(base+path+'?orderId=11111111-1111-4111-8111-111111111111&status=paid&success=true',timeout=10) as response:
     html=response.read().decode(); assert response.status==200 and 'Ödeme doğrulandı' not in html,path
-  print('PASS 22 local production HTTP checks: legal routes, redirects, sitemap, disabled APIs including Garanti, forged success claims')
+  print('PASS 32 local production HTTP checks: legal routes, locale URLs and HTML direction, redirects, sitemap, disabled APIs including Garanti, forged success claims')
   if '--browser' in sys.argv:
    browser_env={**env,'PAYMENT_TEST_URL':base}
    subprocess.run(['node','scripts/check-payment-ui.cjs'],cwd=dst,env=browser_env,check=True,timeout=45)

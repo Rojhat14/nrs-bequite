@@ -15,6 +15,11 @@ function productSourceHash(product) {
   return crypto.createHash('sha256').update(source, 'utf8').digest('hex')
 }
 
+function sourceHash(parts) {
+  const source = JSON.stringify(parts.map((value) => (value ?? '').normalize('NFC')))
+  return crypto.createHash('sha256').update(source, 'utf8').digest('hex')
+}
+
 function createQuery(table, data) {
   const filters = new Map()
   const query = {
@@ -99,5 +104,57 @@ test('the storefront product loader applies source-hash-matched persistent EN/AR
       assert.equal(detail.details.fabric, expected.fabric, `${locale}: product page ${label} fabric`)
       assert.equal(detail.details.care, expected.care, `${locale}: product page ${label} care`)
     }
+  }
+})
+
+test('category pages localize the category, products, and collection labels from persistent translations', async () => {
+  const productSource = sourceRows.find((row) => row.id === 'noir-crystal-collar-saten-elbise')
+  const category = { id: 'cat-dresses', name: 'Elbiseler', slug: 'elbiseler', description: null, sort_order: 1, is_active: true }
+  const collection = { id: 'collection-evening', name: 'Akşam', slug: 'aksam', description: null, sort_order: 1, is_active: true }
+  const product = { ...productSource, category_id: category.id, price_amount: '24900', currency: 'TRY', compare_at_price: null, in_stock: true }
+
+  for (const locale of ['en', 'ar']) {
+    const translations = [
+      { entity_type: 'product', entity_id: product.id, locale, source_hash: productSourceHash(product), payload: authored[product.id][locale] },
+      { entity_type: 'category', entity_id: category.id, locale, source_hash: sourceHash([category.name, category.description]), payload: {
+        name: locale === 'en' ? 'Dresses' : 'فساتين', description: '' } },
+      { entity_type: 'collection', entity_id: collection.id, locale, source_hash: sourceHash([collection.name, collection.description]), payload: {
+        name: locale === 'en' ? 'Evening' : 'إطلالات مسائية', description: '' } },
+    ]
+    const tables = {
+      products: [product], categories: [category], collections: [collection],
+      product_collections: [{ product_id: product.id, collection_id: collection.id }],
+      product_images: [], product_variants: [], storefront_translations: translations,
+    }
+    const supabase = { from(table) {
+      const filters = new Map()
+      const query = {
+        select: () => query,
+        eq: (key, value) => (filters.set(key, value), query),
+        in: (key, values) => (filters.set(key, values), query),
+        order: () => query,
+        maybeSingle: async () => ({ data: read(table)[0] ?? null, error: null }),
+        then: (resolve, reject) => Promise.resolve({ data: read(table), error: null }).then(resolve, reject),
+      }
+      function read(requestedTable) {
+        return (tables[requestedTable] ?? []).filter((row) => [...filters].every(([key, value]) =>
+          Array.isArray(value) ? value.includes(row[key]) : row[key] === value))
+      }
+      return query
+    } }
+    const load = loader({
+      react: { cache: (fn) => fn },
+      '@/data/products': { PRODUCTS: [] },
+      '@/lib/supabase/server': { createSupabaseServerClient: async () => supabase },
+      '@/lib/i18n/request-locale': { getRequestLocale: async () => locale },
+      '@/lib/storage/products': { getProductImageUrl: () => null },
+      '@/lib/storage/category-covers': { getHomeCategoryCover: async () => '' },
+      '@/lib/home-category': { isHomeCategory: () => false },
+    })
+    const { category: renderedCategory, products } = await load('src/lib/products.ts').getCategoryCatalog('elbiseler')
+    assert.equal(renderedCategory.name, locale === 'en' ? 'Dresses' : 'فساتين')
+    assert.equal(products[0].name, authored[product.id][locale].name)
+    assert.equal(products[0].category, renderedCategory.name)
+    assert.deepEqual(products[0].collections.map(({ name }) => name), [locale === 'en' ? 'Evening' : 'إطلالات مسائية'])
   }
 })

@@ -43,6 +43,26 @@ function groupByProduct<T extends { product_id: string }>(rows: T[]) {
   return groups
 }
 
+async function localizeTaxonomyRows<T extends { id: string; name: string; description: string | null }>(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  entityType: 'category' | 'collection',
+  rows: T[],
+  locale: Locale,
+): Promise<T[]> {
+  if (locale === 'tr' || rows.length === 0) return rows
+  const { data } = await supabase.from('storefront_translations').select('entity_id,source_hash,payload')
+    .eq('entity_type', entityType).eq('locale', locale).in('entity_id', rows.map(row => row.id))
+  const translations = new Map((data ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
+  return rows.map(row => {
+    const translation = translations.get(row.id)
+    if (!translation || translation.source_hash !== sourceHash([row.name, row.description])) return row
+    return { ...row,
+      name: typeof translation.payload.name === 'string' ? translation.payload.name : row.name,
+      description: typeof translation.payload.description === 'string' ? translation.payload.description : row.description,
+    }
+  })
+}
+
 const categoryRouteAliases: Record<string, string> = {
   dresses: 'elbiseler',
   tops: 'ust-giyim',
@@ -156,8 +176,10 @@ async function mapProductRows(
   const collectionsResult = collectionIds.length
     ? await supabase.from('collections').select(COLLECTION_COLUMNS).in('id', collectionIds).eq('is_active', true)
     : { data: [], error: null }
-  let categories = (categoriesResult.data ?? []) as StorefrontCategory[]
-  const collections = (collectionsResult.data ?? []) as StorefrontCollection[]
+  const [categories, collections] = await Promise.all([
+    localizeTaxonomyRows(supabase, 'category', (categoriesResult.data ?? []) as StorefrontCategory[], locale),
+    localizeTaxonomyRows(supabase, 'collection', (collectionsResult.data ?? []) as StorefrontCollection[], locale),
+  ])
   const categoryMap = new Map(categories.map((category) => [category.id, category]))
   const collectionMap = new Map(collections.map((collection) => [collection.id, collection]))
   const images = (imagesResult.data ?? []) as unknown as ProductImageRow[]
@@ -172,20 +194,6 @@ async function mapProductRows(
       fabric: typeof payload.fabric === 'string' ? payload.fabric : row.fabric,
       care: typeof payload.care === 'string' ? payload.care : row.care }
   })
-  if (locale !== 'tr') {
-    const categoryIds = categories.map(category => category.id).filter(Boolean)
-    if (categoryIds.length) {
-      const result = await supabase.from('storefront_translations').select('entity_id,source_hash,payload').eq('entity_type', 'category').eq('locale', locale).in('entity_id', categoryIds)
-      const map = new Map((result.data ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
-      categories = categories.map(category => {
-        const translation = map.get(category.id)
-        if (!translation || translation.source_hash !== sourceHash([category.name, category.description])) return category
-        return { ...category, name: typeof translation.payload.name === 'string' ? translation.payload.name : category.name,
-          description: typeof translation.payload.description === 'string' ? translation.payload.description : category.description }
-      })
-    }
-  }
-
   const imagesByProduct = groupByProduct(images)
   const variantsByProduct = groupByProduct(variants)
   const relationsByProduct = groupByProduct(relations)
@@ -266,21 +274,11 @@ export const getStorefrontCategories = cache(async function getStorefrontCategor
     if (!error) {
       let categories = (data ?? []) as unknown as StorefrontCategory[]
       const locale = await getRequestLocale()
-      if (locale !== 'tr' && categories.length) {
-        const translated = await (await createSupabaseServerClient()).from('storefront_translations')
-          .select('entity_id,source_hash,payload').eq('entity_type', 'category').eq('locale', locale)
-          .in('entity_id', categories.map(category => category.id))
-        const map = new Map((translated.data ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
-        categories = categories.map(category => {
-          const row = map.get(category.id)
-          if (!row || row.source_hash !== sourceHash([category.name, category.description])) return category
-          return { ...category, name: typeof row.payload.name === 'string' ? row.payload.name : category.name,
-            description: typeof row.payload.description === 'string' ? row.payload.description : category.description }
-        })
-      }
+      if (locale !== 'tr' && categories.length) categories = await localizeTaxonomyRows(
+        await createSupabaseServerClient(), 'category', categories, locale)
       return categories.some(isHomeCategory)
         ? await Promise.all(categories.map(async category => isHomeCategory(category)
-          ? { ...category, name: 'Home', imageUrl: await getHomeCategoryCover(category.id) } : category))
+          ? { ...category, name: locale === 'ar' ? 'المنزل' : 'Home', imageUrl: await getHomeCategoryCover(category.id) } : category))
         : [...categories, HOME_CATEGORY]
     }
   } catch {
@@ -294,18 +292,10 @@ export const getStorefrontCollections = cache(async function getStorefrontCollec
     const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase.from('collections').select(COLLECTION_COLUMNS).eq('is_active', true).order('sort_order').order('name')
     if (!error) {
-      const rows = (data ?? []) as unknown as StorefrontCollection[]
+      let rows = (data ?? []) as unknown as StorefrontCollection[]
       const locale = await getRequestLocale()
-      if (locale === 'tr' || !rows.length) return rows
-      const { data: translations } = await supabase.from('storefront_translations').select('entity_id,source_hash,payload')
-        .eq('entity_type', 'collection').eq('locale', locale).in('entity_id', rows.map(row => row.id))
-      const map = new Map((translations ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
-      return rows.map(row => {
-        const translation = map.get(row.id)
-        if (!translation || translation.source_hash !== sourceHash([row.name, row.description])) return row
-        return { ...row, name: typeof translation.payload.name === 'string' ? translation.payload.name : row.name,
-          description: typeof translation.payload.description === 'string' ? translation.payload.description : row.description }
-      })
+      if (locale !== 'tr' && rows.length) rows = await localizeTaxonomyRows(supabase, 'collection', rows, locale)
+      return rows
     }
   } catch {
     return []
@@ -321,6 +311,7 @@ export const getStorefrontNavigationData = cache(async function getStorefrontNav
 export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: string) {
   try {
     const supabase = await createSupabaseServerClient()
+    const locale = await getRequestLocale()
     const requestedSlug = slug.toLowerCase()
     const mappedSlug = categoryRouteAliases[requestedSlug]
     let { data: categoryData, error: categoryError } = await supabase
@@ -344,7 +335,10 @@ export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: 
     }
     if (!categoryData) return { category: requestedHome ? HOME_CATEGORY : null, products: [] as Product[] }
     const rawCategory = categoryData as unknown as StorefrontCategory
-    const category = isHomeCategory(rawCategory) ? { ...rawCategory, name: 'Home' } : rawCategory
+    const [localizedCategory] = await localizeTaxonomyRows(supabase, 'category', [rawCategory], locale)
+    const category = isHomeCategory(rawCategory)
+      ? { ...localizedCategory, name: locale === 'ar' ? 'المنزل' : 'Home' }
+      : localizedCategory
     const { data, error } = await supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
@@ -353,7 +347,7 @@ export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: 
       .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return { category, products: [] as Product[] }
-    const products = await mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], [category])
+    const products = await mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], [rawCategory], locale)
     return { category, products }
   } catch {
     return fallbackCategoryCatalog(slug)
@@ -393,17 +387,8 @@ export const getCollectionCatalog = cache(async function getCollectionCatalog(sl
       .eq('is_active', true)
       .maybeSingle()
     if (collectionError || !collectionData) return { collection: null, products: [] as Product[] }
-    let collection = collectionData as unknown as StorefrontCollection
-    if (locale !== 'tr') {
-      const { data: translation } = await supabase.from('storefront_translations').select('source_hash,payload')
-        .eq('entity_type', 'collection').eq('locale', locale).eq('entity_id', collection.id).maybeSingle()
-      if (translation?.source_hash === sourceHash([collection.name, collection.description])) {
-        collection = { ...collection,
-          name: typeof translation.payload.name === 'string' ? translation.payload.name : collection.name,
-          description: typeof translation.payload.description === 'string' ? translation.payload.description : collection.description,
-        }
-      }
-    }
+    const [collection] = await localizeTaxonomyRows(supabase, 'collection',
+      [collectionData as unknown as StorefrontCollection], locale)
     const { data: relations, error: relationError } = await supabase
       .from('product_collections')
       .select('product_id')

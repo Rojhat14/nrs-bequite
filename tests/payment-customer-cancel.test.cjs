@@ -101,7 +101,9 @@ test('Customer API binds cancellation to the authenticated owner and reconciles 
  assert.match(route,/finalizeAtomic\(verified, provider\.name\)/);
  assert.doesNotMatch(route,/\.initiate\(/);
  const ui=fs.readFileSync('src/app/profile/components/OrderHistory.tsx','utf8');
- for(const marker of ['payment_pending','İptal edildi']) assert.ok(ui.includes(marker),marker);
+ assert.ok(ui.includes('payment_pending'));
+ assert.ok(ui.includes("t('orderStatusCancelled')"),'cancelled orders retain a localized status label');
+ assert.ok(fs.readFileSync('src/lib/i18n/messages.ts','utf8').includes("orderStatusCancelled: 'İptal edildi'"));
  assert.doesNotMatch(ui,/Siparişi İptal Et|cancelOrder\(/);
  const handoff=fs.readFileSync('src/app/api/payment/garanti/handoff/route.ts','utf8');
  assert.match(handoff,/Referrer-Policy': 'strict-origin'/);

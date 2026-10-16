@@ -13,13 +13,17 @@ import { isHomeCategory } from '@/lib/home-category'
 const EMPTY_COLLECTIONS: CollectionRow[] = []
 const EMPTY_COLLECTION_IDS: string[] = []
 
-export default function AdminProductForm({ product, categories, initialCategoryId = '', collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [], images }: { product?: ProductRow; categories: CategoryRow[]; initialCategoryId?: string; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[]; images?: ProductImageRow[] }) {
+type EditableTranslation = { sourceHash: string; current: boolean; payload: Record<string, unknown> }
+type EditableTranslations = Partial<Record<'en' | 'ar', EditableTranslation>>
+
+export default function AdminProductForm({ product, categories, initialCategoryId = '', collections = EMPTY_COLLECTIONS, selectedCollectionIds = EMPTY_COLLECTION_IDS, variants = [], images, translations = {} }: { product?: ProductRow; categories: CategoryRow[]; initialCategoryId?: string; collections?: CollectionRow[]; selectedCollectionIds?: string[]; variants?: ProductVariantRow[]; images?: ProductImageRow[]; translations?: EditableTranslations }) {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null)
   const [slug, setSlug] = useState(product?.slug ?? '')
   const [selectedCollections, setSelectedCollections] = useState<string[]>(selectedCollectionIds)
+  const [translationReviewed, setTranslationReviewed] = useState({ en: translations.en?.current ?? false, ar: translations.ar?.current ?? false })
 
   useEffect(() => {
     setSelectedCollections(selectedCollectionIds)
@@ -59,7 +63,11 @@ export default function AdminProductForm({ product, categories, initialCategoryI
 
   return (
     <div className="space-y-6">
-      <form onSubmit={submit} onChange={() => { setDirty(true); setNotice(null) }} className="space-y-6">
+      <form onSubmit={submit} onChange={(event) => {
+        setDirty(true); setNotice(null)
+        const target = event.target as HTMLInputElement
+        if (['name', 'description', 'fabric', 'care'].includes(target.name)) setTranslationReviewed({ en: false, ar: false })
+      }} className="space-y-6">
         <input type="hidden" name="id" value={product?.id ?? slug} />
         <section className="grid gap-5 border border-[#E4DED2] bg-white p-5 sm:grid-cols-2 sm:p-7">
           <h2 className="font-serif text-xl sm:col-span-2">Temel bilgiler</h2>
@@ -105,6 +113,22 @@ export default function AdminProductForm({ product, categories, initialCategoryI
           <Field label="Para birimi" name="currency" defaultValue={product?.currency ?? DEFAULT_ADMIN_SETTINGS.currency} maxLength={3} required />
           <Field label="Kumaş" name="fabric" defaultValue={product?.fabric ?? ''} />
           <Field label="Bakım bilgisi" name="care" defaultValue={product?.care ?? ''} />
+          {product && <fieldset className="space-y-4 border border-[#E4DED2] bg-[#FAF9F6] p-4 sm:col-span-2 sm:p-5">
+            <legend className="px-1 font-serif text-lg">English / العربية translations</legend>
+            <p className="text-xs leading-5 text-[#777165]">Translations stay attached to this product ID. Editing any Turkish source field marks both translations as needing review. The storefront uses Turkish fallback until a translation matches the latest source.</p>
+            {(['en', 'ar'] as const).map(locale => {
+              const existing = translations[locale]?.payload ?? {}
+              const reviewed = translationReviewed[locale]
+              return <section key={locale} lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} className="grid gap-3 border-t border-[#E4DED2] pt-4 sm:grid-cols-2">
+                <h3 className="font-medium sm:col-span-2">{locale === 'en' ? 'English' : 'العربية'} · {translations[locale] ? translations[locale]?.current ? 'Current' : 'Out of date' : 'Missing'}</h3>
+                <Field label={locale === 'en' ? 'Translated name' : 'اسم المنتج'} name={`translation_${locale}_name`} defaultValue={String(existing.name ?? '')} required={false} maxLength={180} />
+                <Field label={locale === 'en' ? 'Translated fabric' : 'الخامة'} name={`translation_${locale}_fabric`} defaultValue={String(existing.fabric ?? '')} maxLength={500} />
+                <div className="space-y-2 sm:col-span-2"><label htmlFor={`translation_${locale}_description`} className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">{locale === 'en' ? 'Translated description / style' : 'الوصف والتفاصيل'}</label><textarea id={`translation_${locale}_description`} name={`translation_${locale}_description`} defaultValue={String(existing.description ?? '')} rows={6} className="admin-field resize-y" /></div>
+                <div className="space-y-2 sm:col-span-2"><label htmlFor={`translation_${locale}_care`} className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">{locale === 'en' ? 'Translated care' : 'تعليمات العناية'}</label><textarea id={`translation_${locale}_care`} name={`translation_${locale}_care`} defaultValue={String(existing.care ?? '')} rows={3} className="admin-field resize-y" /></div>
+                <label className="flex items-start gap-3 text-xs leading-5 sm:col-span-2"><input type="checkbox" name={`translation_${locale}_reviewed`} value="true" checked={reviewed} onChange={event => setTranslationReviewed(current => ({ ...current, [locale]: event.currentTarget.checked }))} className="mt-1 size-4 accent-[#8A744F]" /><span>{locale === 'en' ? 'I reviewed this translation against the current Turkish source.' : 'راجعت الترجمة مقابل النص التركي الحالي.'}</span></label>
+              </section>
+            })}
+          </fieldset>}
           <div className="space-y-2"><label htmlFor="status" className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">Durum</label><select id="status" name="status" defaultValue={product?.status ?? DEFAULT_ADMIN_SETTINGS.defaultProductStatus} className="admin-field"><option value="draft">Taslak</option><option value="active">Aktif</option><option value="archived">Arşivlendi</option></select></div>
           <div className="space-y-2"><label htmlFor="in_stock" className="block text-[10px] uppercase tracking-[0.16em] text-[#777165]">Eski storefront stok bayrağı</label><select id="in_stock" name="in_stock" defaultValue={String(product?.in_stock ?? false)} className="admin-field"><option value="false">Stokta yok</option><option value="true">Stokta</option></select><p className="text-[10px] text-[#9A9385]">Checkout davranışı değiştirilmez. Variant stokları ayrı yönetilir.</p></div>
           {notice && <p role={notice.ok ? 'status' : 'alert'} className={`text-sm sm:col-span-2 ${notice.ok ? 'text-emerald-800' : 'text-rose-800'}`}>{notice.message}</p>}

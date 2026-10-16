@@ -31,7 +31,7 @@ function loader(mocks = {}) {
             bankRedirecting: 'Garanti BBVA’ya yönlendiriliyorsunuz…', goToBank: 'Garanti BBVA ödeme sayfasına geç', resumeTestOrder: 'Bekleyen test siparişine devam et',
             cardPayment: 'Kartla ödeme yap', saving: 'Kaydediliyor…', saveTransferRequest: 'Havale / WhatsApp sipariş talebini kaydet',
             requestSaved: 'Sipariş talebiniz kaydedildi', paymentNotTaken: 'Ödeme alınmadı; teyit için WhatsApp üzerinden iletişime geçin.',
-            orderSummary: 'Sipariş özeti', items: 'ürün', sizeLabel: 'Ölçü', pieces: 'adet', customMeasurements: 'Özel ölçüler', measurementsUnspecified: 'Ölçü belirtilmedi',
+            orderSummary: 'Sipariş özeti', orderHistory: 'Siparişlerim', orderIdLabel: 'Sipariş numarası', dateLabel: 'Tarih', orderStatusProcessing: 'Hazırlanıyor', orderStatusReviewing: 'İncelemede', orderPaymentDetails: 'Ödeme durumu ve sipariş özeti', items: 'ürün', sizeLabel: 'Ölçü', pieces: 'adet', customMeasurements: 'Özel ölçüler', measurementsUnspecified: 'Ölçü belirtilmedi',
             shippingConfirmed: 'Sipariş teyidinde', free: 'Ücretsiz', quotePending: 'Tutar, stok ve teslimat bedeli sunucuda doğrulanınca kesinleşir.',
             statusOrder: 'Sipariş durumu', orderNumber: 'Sipariş numarası', orderDetails: 'Sipariş ayrıntıları', orderUnavailable: 'Sipariş bilgisi görüntülenemiyor',
             statusChecking: 'Ödeme durumu kontrol ediliyor', paymentReceived: 'Ödemeniz alındı.', paymentReceivedBody: 'Ödemeniz doğrulandı. Siparişinizin ayrıntılarına hesabınızdan ulaşabilirsiniz.',

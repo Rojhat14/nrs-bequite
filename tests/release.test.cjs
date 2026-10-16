@@ -61,14 +61,19 @@ test('Saved cart items refresh to current catalog prices and recompute totals', 
   useCart.getState().clearCart();
 });
 
-test('Product structured data uses the normal catalog price and currency, not compare-at price', () => {
+test('Product structured data matches the campaign display and uses the selected currency, not compare-at price', () => {
   const { buildProductStructuredData } = loadSource('src/lib/product-structured-data.ts');
   const schema = buildProductStructuredData({ id: 'dress-id', slug: 'dress-slug', name: 'Dress', description: 'Description',
     priceAmount: 24900, currency: 'TRY', compareAtPrice: 30000, inStock: true, galleryImages: [{ url: 'https://example.test/dress.webp' }] });
   assert.equal(schema['@type'], 'Product');
-  assert.equal(schema.offers.price, 24900);
+  assert.equal(schema.offers.price, '19920.00');
   assert.equal(schema.offers.priceCurrency, 'TRY');
   assert.equal(schema.offers.availability, 'https://schema.org/InStock');
+  const usd = buildProductStructuredData({ id: 'dress-id', slug: 'dress-slug', name: 'Dress', description: 'Description',
+    priceAmount: 24900, currency: 'TRY', compareAtPrice: 30000, inStock: true }, 'en', { usdTry: 50, fetchedAt: '2026-10-16T00:00:00.000Z' });
+  assert.equal(usd.offers.price, '398.40');
+  assert.equal(usd.offers.priceCurrency, 'USD');
+  assert.match(usd.offers.url, /\/en\/product\/dress-slug$/);
 });
 
 test('Malformed saved carts cannot replace store actions or poison totals', () => {

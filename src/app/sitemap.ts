@@ -5,6 +5,7 @@ import { isGarantiTestSetup } from '@/lib/payment/garanti/test-setup'
 
 const SITE_URL = 'https://nrsbequiteluminous.com'
 const PAGE_SIZE = 500
+const LOCALES = ['tr', 'en', 'ar'] as const
 
 export const revalidate = 3600
 
@@ -48,7 +49,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/', '/collections', '/curated', '/about', '/contact',
     '/size-guide', '/care-guide', '/faq', ...LEGAL_ROUTES,
   ]
-  const entries: MetadataRoute.Sitemap = staticPaths.map(path => ({ url: `${SITE_URL}${path}` }))
+  const entries: MetadataRoute.Sitemap = staticPaths.flatMap(path => LOCALES.map(locale => ({
+    url: `${SITE_URL}${locale === 'tr' ? '' : `/${locale}`}${path === '/' ? '' : path}`,
+    alternates: { languages: {
+      tr: `${SITE_URL}${path}`,
+      en: `${SITE_URL}/en${path === '/' ? '' : path}`,
+      ar: `${SITE_URL}/ar${path === '/' ? '' : path}`,
+      'x-default': `${SITE_URL}${path}`,
+    } },
+  })))
 
   for (const [prefix, rows] of [
     ['/category', categories], ['/product', products], ['/collections', collections],
@@ -57,18 +66,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!row.slug) continue
       const lastModified = new Date(row.updated_at)
       entries.push({
-        url: `${SITE_URL}${prefix}/${encodeURIComponent(row.slug)}`,
+        url: `${SITE_URL}${localePrefixForSitemap('tr')}${prefix}/${encodeURIComponent(row.slug)}`,
         ...(!Number.isNaN(lastModified.getTime()) ? { lastModified } : {}),
+      })
+      for (const locale of ['en', 'ar'] as const) entries.push({
+        url: `${SITE_URL}/${locale}${prefix}/${encodeURIComponent(row.slug)}`,
+        ...(Number.isNaN(lastModified.getTime()) ? {} : { lastModified }),
+        alternates: { languages: {
+          tr: `${SITE_URL}${prefix}/${encodeURIComponent(row.slug)}`,
+          en: `${SITE_URL}/en${prefix}/${encodeURIComponent(row.slug)}`,
+          ar: `${SITE_URL}/ar${prefix}/${encodeURIComponent(row.slug)}`,
+          'x-default': `${SITE_URL}${prefix}/${encodeURIComponent(row.slug)}`,
+        } },
       })
     }
   }
 
   // This public route also exists without a categories row (sale fallback).
   if (!categories.some(category => category.slug === 'sale' || category.slug === 'indirim')) {
-    entries.push({ url: `${SITE_URL}/category/sale` })
+    entries.push(...['', '/en', '/ar'].map(prefix => ({ url: `${SITE_URL}${prefix}/category/sale` })))
   }
   if (!categories.some(category => category.slug === 'bedding')) {
-    entries.push({ url: `${SITE_URL}/category/bedding` })
+    entries.push(...['', '/en', '/ar'].map(prefix => ({ url: `${SITE_URL}${prefix}/category/bedding` })))
   }
   return entries
 }
+
+function localePrefixForSitemap(locale: typeof LOCALES[number]) { return locale === 'tr' ? '' : `/${locale}` }

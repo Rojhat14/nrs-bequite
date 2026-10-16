@@ -34,7 +34,7 @@ interface CartStore extends CartTotals {
   catalogPricesSynced: boolean
   priceUpdateNotice: boolean
   addItem: (product: NewCartItem, quantity?: number) => void
-  syncCatalogPrices: (products: Array<{ id: string; price: number; compareAtPrice: number | null }>) => void
+  syncCatalogPrices: (products: Array<{ id: string; title?: string; price: number; compareAtPrice: number | null }>) => void
   setCatalogPricesSynced: (synced: boolean) => void
   removeItem: (cartItemId: string) => void
   updateMeasurements: (cartItemId: string, measurements: Measurements) => void
@@ -206,7 +206,7 @@ export const useCart = create<CartStore>()(
           const price = `₺${product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
           const compareAtPrice = product.compareAtPrice
           if (parsePrice(item.price) !== product.price || Number(item.compareAtPrice ?? 0) !== Number(compareAtPrice ?? 0)) changed = true
-          return { ...item, price, compareAtPrice }
+          return { ...item, title: product.title || item.title, price, compareAtPrice }
         })
         return { items, ...calculateCartTotals(items), catalogPricesSynced: true, priceUpdateNotice: state.priceUpdateNotice || changed }
       }),

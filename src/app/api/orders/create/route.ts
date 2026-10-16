@@ -5,6 +5,8 @@ import { boundedJson, sameOrigin } from '@/lib/payment/http'
 import { parsePaymentRequest } from '@/lib/payment/request'
 import { createPaymentRepository, paymentDatabase } from '@/lib/payment/repository'
 import { prepareOrderLegalRecord } from '@/lib/legal/payment-preflight'
+import { localeFromCookieHeader } from '@/lib/i18n/messages'
+import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 403 })
@@ -26,7 +28,8 @@ export async function POST(request: Request) {
       if (previous.data.user_id !== user.id || previous.data.manual_request_hash !== hash) throw new Error('Retry mismatch')
       return NextResponse.json({ orderId: previous.data.id, paid: false }, { headers: { 'Cache-Control': 'no-store' } })
     }
-    const quote = await createPaymentRepository(true).quote(input.items, input.customer)
+    const display = { locale: localeFromCookieHeader(request.headers.get('cookie')), rate: await getCurrentUsdTryRate() }
+    const quote = await createPaymentRepository(true).quote(input.items, input.customer, user.id, display)
     if (quote.hash !== input.quoteHash) throw new Error('Quote changed')
     const legal = prepareOrderLegalRecord(id, input, quote.summary)
     const { data, error } = await db.rpc('nrs_create_manual_order', { p_order_id: id, p_user_id: user.id,

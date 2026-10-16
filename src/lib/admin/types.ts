@@ -28,6 +28,7 @@ export interface CategoryRow {
   is_active: boolean
   created_at: string
   updated_at: string
+  translations?: Partial<Record<'en' | 'ar', { current: boolean; payload: Record<string, unknown> }>>
 }
 
 export interface CollectionRow {
@@ -39,6 +40,7 @@ export interface CollectionRow {
   is_active: boolean
   created_at: string
   updated_at: string
+  translations?: Partial<Record<'en' | 'ar', { current: boolean; payload: Record<string, unknown> }>>
 }
 
 export interface ProductImageRow {

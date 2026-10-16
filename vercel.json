@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/garanti-reconciliation",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/update-currency-rate",
+      "schedule": "15 17 * * 1-5"
     }
   ]
 }

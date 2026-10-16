@@ -18,12 +18,31 @@ let ws;
  const send=(method,params={})=>new Promise((resolve,reject)=>{pending.set(++id,[resolve,reject]);ws.send(JSON.stringify({id,method,params}))});
  const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value};
  await send('Page.enable');await send('Runtime.enable');
- await send('Page.navigate',{url:(process.env.PAYMENT_TEST_URL || 'http://127.0.0.1:3118')+'/mesafeli-satis-sozlesmesi'});
- await new Promise(r=>setTimeout(r,2000));
+ const base=(process.env.PAYMENT_TEST_URL || 'http://127.0.0.1:3118');
+ for(const [path,lang,dir] of [['/en/faq','en','ltr'],['/ar/faq','ar','rtl']]){
+  await send('Page.navigate',{url:base+path});await new Promise(r=>setTimeout(r,900));
+  for(const width of [320,390,1280]){
+   await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<500});
+   const page=await evaluate('({lang:document.documentElement.lang,dir:document.documentElement.dir,overflow:document.documentElement.scrollWidth>window.innerWidth,title:document.querySelector("h1")?.innerText||""})');
+   assert.equal(page.lang,lang,'wrong language on '+path);assert.equal(page.dir,dir,'wrong direction on '+path);assert.equal(page.overflow,false,'page overflow on '+path+' at '+width);
+   if(lang==='ar'&&(width===320||width===1280)){
+    await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("aria-label")==="فتح القائمة")?.click()');await new Promise(r=>setTimeout(r,400));
+    const drawer=await evaluate('(()=>{const n=document.querySelector("[role=dialog]");const r=n?.getBoundingClientRect();const groups=[...(n?.querySelectorAll("[role=group]")||[])];return{exists:!!n,left:r?.left,right:r?.right,width:r?.width,overflow:document.documentElement.scrollWidth>window.innerWidth,selector:groups.some(g=>g.getAttribute("aria-label")==="اللغة")}})()');
+    assert.equal(drawer.exists,true,'Arabic menu dialog missing');assert.equal(drawer.overflow,false,'Arabic menu overflow');assert.ok(drawer.left>=0&&drawer.right<=width,'Arabic drawer outside viewport '+width);assert.equal(drawer.selector,true,'language selector missing in Arabic menu');
+    const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync('/tmp/nrs-ar-menu-'+width+'.png',Buffer.from(shot.data,'base64'));
+    await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("aria-label")==="إغلاق القائمة")?.click()');await new Promise(r=>setTimeout(r,250));
+   }
+   if(width===320||width===1280){const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync('/tmp/nrs-'+lang+'-faq-'+width+'.png',Buffer.from(shot.data,'base64'));}
+   console.log('PASS '+lang+' '+width+'px lang/dir and no horizontal overflow');
+  }
+ }
+ await send('Network.clearBrowserCookies');
+ await send('Page.navigate',{url:base+'/mesafeli-satis-sozlesmesi'});await new Promise(r=>setTimeout(r,900));
+ assert.equal(await evaluate('document.documentElement.lang'),'tr','Turkish URL should retain Turkish');
  assert.ok((await evaluate('document.body.innerText')).includes('Mesafeli Satış Sözleşmesi'), 'Legal page did not hydrate');
  for(const width of [320,390,1280]){
   await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<500});
-  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'legal overflow '+width);
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'),true,'legal overflow '+width);
   const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync('/tmp/nrs-legal-'+width+'.png',Buffer.from(shot.data,'base64'));
  }
  // Isolated fixture: actual consent component + production CSS. The live flag
@@ -35,7 +54,7 @@ let ws;
  await new Promise(r=>setTimeout(r,300));
  for(const width of [320,390,1280]){
   await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<500});
-  const result=await evaluate(`(()=>{const checkbox=document.querySelector('input[type=checkbox]');return{overflow:document.documentElement.scrollWidth>innerWidth,checked:checkbox.checked,links:[...document.querySelector('main').querySelectorAll('a')].map(a=>a.getAttribute('href')),checkboxWidth:checkbox.getBoundingClientRect().width,labelHeight:document.querySelector('label[for=checkout-contract]').getBoundingClientRect().height,buttonWidth:document.querySelector('main button').getBoundingClientRect().width}})()`);
+  const result=await evaluate(`(()=>{const checkbox=document.querySelector('input[type=checkbox]');return{overflow:document.documentElement.scrollWidth>window.innerWidth,checked:checkbox.checked,links:[...document.querySelector('main').querySelectorAll('a')].map(a=>a.getAttribute('href')),checkboxWidth:checkbox.getBoundingClientRect().width,labelHeight:document.querySelector('label[for=checkout-contract]').getBoundingClientRect().height,buttonWidth:document.querySelector('main button').getBoundingClientRect().width}})()`);
   assert.equal(result.overflow,false);assert.equal(result.checked,false);assert.ok(result.checkboxWidth>=20);assert.ok(result.labelHeight>=44);assert.ok(result.buttonWidth>=250);assert.ok(result.links.includes('/mesafeli-satis-sozlesmesi'));assert.ok(result.links.includes('/on-bilgilendirme-formu'));
   const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync('/tmp/nrs-consent-'+width+'.png',Buffer.from(shot.data,'base64'));
   console.log('PASS viewport '+width+' legal/consent links, unchecked, touch targets, no horizontal overflow');
