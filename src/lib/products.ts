@@ -1,6 +1,9 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { getRequestLocale } from '@/lib/i18n/request-locale'
+import { productSourceHash, sourceHash } from '@/lib/i18n/source-hash'
+import type { Locale } from '@/lib/i18n/messages'
 
 import { PRODUCTS, type Product } from '@/data/products'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -94,7 +97,7 @@ function toStorefrontProduct(
     )
     .flatMap((image) => {
       const url = getProductImageUrl(supabase, image)
-      return url ? [{ url, altText: image.alt_text || row.name, sortOrder: image.sort_order, isPrimary: image.is_primary }] : []
+      return url ? [{ url, altText: row.name, sortOrder: image.sort_order, isPrimary: image.is_primary }] : []
     })
   const legacy = PRODUCTS.find((product) => product.id === row.id)
   const activeVariants = variants.filter((variant) => variant.is_active)
@@ -129,13 +132,14 @@ async function mapProductRows(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   rows: CatalogProductRow[],
   knownCategories?: StorefrontCategory[],
+  locale: Locale = 'tr',
 ) {
   // Enforce privacy in application code as well as in the database's public
   // policy. A test-only product must never enter a public product surface.
   rows = rows.filter((row) => row.payment_test_only !== true)
   if (rows.length === 0) return [] as Product[]
   const productIds = rows.map((row) => row.id)
-  const [imagesResult, variantsResult, relationResult, categoriesResult] = await Promise.all([
+  const [imagesResult, variantsResult, relationResult, categoriesResult, translationResult] = await Promise.all([
     supabase.from('product_images').select(IMAGE_COLUMNS).in('product_id', productIds)
       .order('sort_order').order('created_at').order('id'),
     supabase.from('product_variants').select(VARIANT_COLUMNS).in('product_id', productIds).eq('is_active', true),
@@ -143,6 +147,8 @@ async function mapProductRows(
     knownCategories
       ? Promise.resolve({ data: knownCategories, error: null })
       : getActiveCategoryRows(),
+    locale === 'tr' ? Promise.resolve({ data: [], error: null })
+      : supabase.from('storefront_translations').select('entity_id,source_hash,payload').eq('entity_type', 'product').eq('locale', locale).in('entity_id', productIds),
   ])
 
   const relations = (relationResult.data ?? []) as { product_id: string; collection_id: string }[]
@@ -150,18 +156,41 @@ async function mapProductRows(
   const collectionsResult = collectionIds.length
     ? await supabase.from('collections').select(COLLECTION_COLUMNS).in('id', collectionIds).eq('is_active', true)
     : { data: [], error: null }
-  const categories = (categoriesResult.data ?? []) as StorefrontCategory[]
+  let categories = (categoriesResult.data ?? []) as StorefrontCategory[]
   const collections = (collectionsResult.data ?? []) as StorefrontCollection[]
   const categoryMap = new Map(categories.map((category) => [category.id, category]))
   const collectionMap = new Map(collections.map((collection) => [collection.id, collection]))
   const images = (imagesResult.data ?? []) as unknown as ProductImageRow[]
   const variants = (variantsResult.data ?? []) as unknown as CatalogVariantRow[]
+  const productTranslations = new Map((translationResult.data ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
+  const localizedRows = rows.map(row => {
+    const translation = productTranslations.get(row.id)
+    if (!translation || translation.source_hash !== productSourceHash(row)) return row
+    const payload = translation.payload
+    return { ...row, name: typeof payload.name === 'string' ? payload.name : row.name,
+      description: typeof payload.description === 'string' ? payload.description : row.description,
+      fabric: typeof payload.fabric === 'string' ? payload.fabric : row.fabric,
+      care: typeof payload.care === 'string' ? payload.care : row.care }
+  })
+  if (locale !== 'tr') {
+    const categoryIds = categories.map(category => category.id).filter(Boolean)
+    if (categoryIds.length) {
+      const result = await supabase.from('storefront_translations').select('entity_id,source_hash,payload').eq('entity_type', 'category').eq('locale', locale).in('entity_id', categoryIds)
+      const map = new Map((result.data ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
+      categories = categories.map(category => {
+        const translation = map.get(category.id)
+        if (!translation || translation.source_hash !== sourceHash([category.name, category.description])) return category
+        return { ...category, name: typeof translation.payload.name === 'string' ? translation.payload.name : category.name,
+          description: typeof translation.payload.description === 'string' ? translation.payload.description : category.description }
+      })
+    }
+  }
 
   const imagesByProduct = groupByProduct(images)
   const variantsByProduct = groupByProduct(variants)
   const relationsByProduct = groupByProduct(relations)
 
-  return rows.map((row) => {
+  return localizedRows.map((row) => {
     const product = toStorefrontProduct(
       supabase,
       row,
@@ -190,7 +219,7 @@ export const getStorefrontProducts = cache(async function getStorefrontProducts(
       .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return PRODUCTS.map(toFallbackProduct)
-    return mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[])
+    return mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], undefined, await getRequestLocale())
   } catch {
     return PRODUCTS.map(toFallbackProduct)
   }
@@ -219,7 +248,7 @@ export const getStorefrontProduct = cache(async function getStorefrontProduct(sl
     }
     if (error) return fallbackById(slugOrId)
     if (!data || data.payment_test_only === true) return null
-    const [product] = await mapProductRows(supabase, [data as unknown as CatalogProductRow])
+    const [product] = await mapProductRows(supabase, [data as unknown as CatalogProductRow], undefined, await getRequestLocale())
     return product ?? null
   } catch {
     return fallbackById(slugOrId)
@@ -235,7 +264,20 @@ export const getStorefrontCategories = cache(async function getStorefrontCategor
   try {
     const { data, error } = await getActiveCategoryRows()
     if (!error) {
-      const categories = (data ?? []) as unknown as StorefrontCategory[]
+      let categories = (data ?? []) as unknown as StorefrontCategory[]
+      const locale = await getRequestLocale()
+      if (locale !== 'tr' && categories.length) {
+        const translated = await (await createSupabaseServerClient()).from('storefront_translations')
+          .select('entity_id,source_hash,payload').eq('entity_type', 'category').eq('locale', locale)
+          .in('entity_id', categories.map(category => category.id))
+        const map = new Map((translated.data ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
+        categories = categories.map(category => {
+          const row = map.get(category.id)
+          if (!row || row.source_hash !== sourceHash([category.name, category.description])) return category
+          return { ...category, name: typeof row.payload.name === 'string' ? row.payload.name : category.name,
+            description: typeof row.payload.description === 'string' ? row.payload.description : category.description }
+        })
+      }
       return categories.some(isHomeCategory)
         ? await Promise.all(categories.map(async category => isHomeCategory(category)
           ? { ...category, name: 'Home', imageUrl: await getHomeCategoryCover(category.id) } : category))
@@ -251,7 +293,20 @@ export const getStorefrontCollections = cache(async function getStorefrontCollec
   try {
     const supabase = await createSupabaseServerClient()
     const { data, error } = await supabase.from('collections').select(COLLECTION_COLUMNS).eq('is_active', true).order('sort_order').order('name')
-    if (!error) return (data ?? []) as unknown as StorefrontCollection[]
+    if (!error) {
+      const rows = (data ?? []) as unknown as StorefrontCollection[]
+      const locale = await getRequestLocale()
+      if (locale === 'tr' || !rows.length) return rows
+      const { data: translations } = await supabase.from('storefront_translations').select('entity_id,source_hash,payload')
+        .eq('entity_type', 'collection').eq('locale', locale).in('entity_id', rows.map(row => row.id))
+      const map = new Map((translations ?? []).map((row: { entity_id: string; source_hash: string; payload: Record<string, unknown> }) => [row.entity_id, row]))
+      return rows.map(row => {
+        const translation = map.get(row.id)
+        if (!translation || translation.source_hash !== sourceHash([row.name, row.description])) return row
+        return { ...row, name: typeof translation.payload.name === 'string' ? translation.payload.name : row.name,
+          description: typeof translation.payload.description === 'string' ? translation.payload.description : row.description }
+      })
+    }
   } catch {
     return []
   }
@@ -330,6 +385,7 @@ function getLegacyCategories(): StorefrontCategory[] {
 export const getCollectionCatalog = cache(async function getCollectionCatalog(slug: string) {
   try {
     const supabase = await createSupabaseServerClient()
+    const locale = await getRequestLocale()
     const { data: collectionData, error: collectionError } = await supabase
       .from('collections')
       .select(COLLECTION_COLUMNS)
@@ -337,7 +393,17 @@ export const getCollectionCatalog = cache(async function getCollectionCatalog(sl
       .eq('is_active', true)
       .maybeSingle()
     if (collectionError || !collectionData) return { collection: null, products: [] as Product[] }
-    const collection = collectionData as unknown as StorefrontCollection
+    let collection = collectionData as unknown as StorefrontCollection
+    if (locale !== 'tr') {
+      const { data: translation } = await supabase.from('storefront_translations').select('source_hash,payload')
+        .eq('entity_type', 'collection').eq('locale', locale).eq('entity_id', collection.id).maybeSingle()
+      if (translation?.source_hash === sourceHash([collection.name, collection.description])) {
+        collection = { ...collection,
+          name: typeof translation.payload.name === 'string' ? translation.payload.name : collection.name,
+          description: typeof translation.payload.description === 'string' ? translation.payload.description : collection.description,
+        }
+      }
+    }
     const { data: relations, error: relationError } = await supabase
       .from('product_collections')
       .select('product_id')
@@ -353,7 +419,7 @@ export const getCollectionCatalog = cache(async function getCollectionCatalog(sl
       .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return { collection, products: [] as Product[] }
-    const products = await mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[])
+    const products = await mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], undefined, locale)
     return { collection, products }
   } catch {
     return { collection: null, products: [] as Product[] }

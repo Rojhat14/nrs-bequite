@@ -15,6 +15,8 @@ import { getCollectionPresentation } from '@/lib/collectionPresentation';
 import { isHomeCategory, HOME_CATEGORY_IMAGE, HOME_CATEGORY_THUMBNAIL } from '@/lib/home-category';
 import { canOptimizeImage } from '@/lib/imageOptimization';
 import { getOpeningCampaign } from '@/lib/opening-campaign';
+import { useLocale } from '@/context/LocaleContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 // Navigation Mode Definition for Adaptive UI
 type NavigationMode = 'transparent' | 'solid' | 'dark' | 'adaptive';
@@ -36,6 +38,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
   const openDrawer = useCart(state => state.openDrawer);
   const { user, profile, signOut } = useAuth();
   const { categories, collections } = useStorefrontCatalog();
+  const { locale, t } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const headerRef = useRef<HTMLElement>(null);
@@ -110,27 +113,27 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
   }, [user]);
 
   const categoryOrder = [
-    { slugs: ['elbiseler', 'dresses'], names: ['elbiseler'], fallback: 'elbiseler', label: 'ELBİSELER' },
-    { slugs: ['ust-giyim', 'tops'], names: ['üst giyim'], fallback: 'ust-giyim', label: 'ÜST GİYİM' },
-    { slugs: ['ceketler-blazerlar', 'blazers'], names: ['ceketler & blazerlar'], fallback: 'ceketler-blazerlar', label: 'CEKETLER & BLAZERLAR' },
-    { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM' },
-    { slugs: ['takimlar', 'suits'], names: ['takımlar'], fallback: 'takimlar', label: 'TAKIMLAR' },
-    { slugs: ['dis-giyim'], names: ['dış giyim'], fallback: 'dis-giyim', label: 'DIŞ GİYİM' },
-    { slugs: ['bedding', 'home', 'nevresim'], names: ['home', 'bedding', 'nevresim'], fallback: 'bedding', label: 'HOME' },
+    { slugs: ['elbiseler', 'dresses'], names: ['elbiseler'], fallback: 'elbiseler', label: 'ELBİSELER', key: 'dresses' as const },
+    { slugs: ['ust-giyim', 'tops'], names: ['üst giyim'], fallback: 'ust-giyim', label: 'ÜST GİYİM', key: 'tops' as const },
+    { slugs: ['ceketler-blazerlar', 'blazers'], names: ['ceketler & blazerlar'], fallback: 'ceketler-blazerlar', label: 'CEKETLER & BLAZERLAR', key: 'blazers' as const },
+    { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM', key: 'bottoms' as const },
+    { slugs: ['takimlar', 'suits'], names: ['takımlar'], fallback: 'takimlar', label: 'TAKIMLAR', key: 'sets' as const },
+    { slugs: ['dis-giyim'], names: ['dış giyim'], fallback: 'dis-giyim', label: 'DIŞ GİYİM', key: 'outerwear' as const },
+    { slugs: ['bedding', 'home', 'nevresim'], names: ['home', 'bedding', 'nevresim'], fallback: 'bedding', label: 'HOME', key: 'bedding' as const },
   ];
   const categoryLinks = categoryOrder.map((item) => {
     const category = categories.find((entry) => item.slugs.includes(entry.slug) || item.names.includes(entry.name.toLocaleLowerCase('tr-TR')))
-    return { name: category?.name.toLocaleUpperCase('tr-TR') ?? item.label, href: `/category/${category?.slug ?? item.fallback}` }
+    return { name: (category?.name ?? t(item.key)).toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: `/category/${category?.slug ?? item.fallback}` }
   });
   const collectionHref = (slug: string, fallback: string) => {
     const collection = collections.find((entry) => entry.slug === slug)
     return collection ? `/collections/${encodeURIComponent(collection.slug)}` : fallback
   };
   const navLinks = [
-    { name: 'YENİ GELENLER', href: collectionHref('yeni-gelenler', '/') },
+    { name: t('newArrivals').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: collectionHref('yeni-gelenler', '/') },
     ...categoryLinks,
-    { name: 'KOLEKSİYONLAR', href: '/collections' },
-    { name: 'İNDİRİM', href: collectionHref('indirim', '/category/sale') },
+    { name: t('collections').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: '/collections' },
+    { name: t('sale').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: collectionHref('indirim', '/category/sale') },
   ];
 
   const openMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -250,7 +253,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
       <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} />
 
       {openingCampaign && <div role="status" className="flex min-h-9 items-center justify-center bg-nrs-ink px-4 py-2 text-center text-[11px] tracking-wide text-nrs-canvas sm:text-xs">
-        {openingCampaign.announcement}
+        {t('campaign')}
       </div>}
 
       <nav className={`transition-all duration-500 ease-in-out ${styles.container}`}>
@@ -260,7 +263,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               <button
                 type="button"
                 onClick={openMenu}
-                aria-label="Menüyü aç"
+                aria-label={t('menu')}
                 aria-haspopup="dialog"
                 aria-expanded={isMenuOpen}
                 aria-controls={drawerId}
@@ -269,7 +272,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                 <Menu size={21} strokeWidth={1.25} />
               </button>
               <button
-                aria-label="Ürün ara"
+                aria-label={t('search')}
                 onClick={() => router.push('/search')}
                 className={`p-2 ${styles.text} opacity-60 hover:opacity-100 transition-all duration-500 transform hover:scale-110`}
               >
@@ -294,26 +297,28 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
             </div>
 
             <div className="hidden md:flex items-center justify-end gap-3 xl:gap-6 w-1/3">
+              <LanguageSelector />
               <AccountControl
                 compact
                 user={user}
                 profile={profile}
                 isAdmin={isAdmin}
                 textClass={styles.text}
+                translate={t}
                 onSignIn={() => setIsAccountOpen(true)}
                 onSignOut={signOut}
               />
               <button
                 onClick={() => router.push('/profile#wishlist')}
                 className={`p-2 ${styles.text} opacity-60 hover:opacity-100 transition-all duration-300`}
-                aria-label="Favorilerim"
+                aria-label={t('wishlist')}
               >
                 <Heart size={18} strokeWidth={1} />
               </button>
               <button
                 onClick={openDrawer}
                 className={`p-2 ${styles.text} opacity-60 hover:opacity-100 transition-all duration-300 relative`}
-                aria-label="Alışveriş çantası"
+                aria-label={t('bag')}
               >
                 <ShoppingBag size={18} strokeWidth={1} />
                 {totalItems > 0 && <span className="absolute top-1 right-1 bg-nrs-black text-nrs-ivory text-[8px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-light">{totalItems}</span>}
@@ -325,7 +330,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                 type="button"
                 onClick={openMenu}
                 className={`inline-flex min-h-11 min-w-11 items-center justify-start transition-all duration-300 ${styles.text}`}
-                aria-label="Menüyü aç"
+                aria-label={t('menu')}
                 aria-haspopup="dialog"
                 aria-expanded={isMenuOpen}
                 aria-controls={drawerId}
@@ -343,7 +348,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                 />
               </Link>
               <div className="flex items-center gap-2">
-                <button onClick={() => router.push('/search')} className={`p-2 ${styles.text}`} aria-label="Ürün ara">
+                <button onClick={() => router.push('/search')} className={`p-2 ${styles.text}`} aria-label={t('search')}>
                   <Search size={20} strokeWidth={1} />
                 </button>
                 <AccountControl
@@ -351,11 +356,12 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                   profile={profile}
                   isAdmin={isAdmin}
                   textClass={styles.text}
+                  translate={t}
                   compact
                   onSignIn={() => setIsAccountOpen(true)}
                   onSignOut={signOut}
                 />
-                <button onClick={openDrawer} className={`p-2 ${styles.text} relative`} aria-label="Shopping Bag">
+                <button onClick={openDrawer} className={`p-2 ${styles.text} relative`} aria-label={t('bag')}>
                   <ShoppingBag size={20} strokeWidth={1} />
                   {totalItems > 0 && (
                     <span className="absolute top-0 right-0 bg-nrs-black text-nrs-ivory text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
@@ -390,7 +396,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
           {isMenuOpen && <>
             <motion.button
               type="button"
-              aria-label="Menüyü kapat"
+              aria-label={t('closeMenu')}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -404,22 +410,22 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               role="dialog"
               aria-modal="true"
               aria-labelledby={drawerTitleId}
-              initial={{ x: reduceMotion ? 0 : '-100%' }}
+              initial={{ x: reduceMotion ? 0 : locale === 'ar' ? '100%' : '-100%' }}
               animate={{ x: 0 }}
-              exit={{ x: reduceMotion ? 0 : '-100%' }}
+              exit={{ x: reduceMotion ? 0 : locale === 'ar' ? '100%' : '-100%' }}
               transition={{ duration: reduceMotion ? 0.1 : 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-y-0 left-0 z-[121] flex h-[100dvh] w-[92vw] max-w-[410px] flex-col border-r border-nrs-ink/10 bg-nrs-canvas text-nrs-ink shadow-[16px_0_50px_rgba(20,18,15,0.12)]"
+              className={`fixed inset-y-0 z-[121] flex h-[100dvh] w-[92vw] max-w-[410px] flex-col bg-nrs-canvas text-nrs-ink shadow-[16px_0_50px_rgba(20,18,15,0.12)] ${locale === 'ar' ? 'right-0 border-l border-nrs-ink/10' : 'left-0 border-r border-nrs-ink/10'}`}
             >
               <div className="flex items-start justify-between border-b border-nrs-ink/10 px-7 pb-6 pt-8 sm:px-9">
                 <div>
                   <h2 id={drawerTitleId} className="font-serif text-3xl tracking-[0.18em]">NRS</h2>
-                  <p className="mt-2 text-[9px] uppercase tracking-[0.3em] text-nrs-ink/60">Shop</p>
+                  <p className="mt-2 text-[9px] uppercase tracking-[0.3em] text-nrs-ink/60">{t('shop')}</p>
                 </div>
                 <button
                   ref={closeButtonRef}
                   type="button"
                   onClick={() => closeMenu(true)}
-                  aria-label="Menüyü kapat"
+                  aria-label={t('closeMenu')}
                   className="inline-flex min-h-11 min-w-11 items-center justify-center text-nrs-ink/55 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2"
                 >
                   <X size={22} strokeWidth={1.2} />
@@ -428,7 +434,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
               <div className="flex-1 overflow-y-auto px-7 py-7 sm:px-9">
                 <section aria-labelledby={drawerCategoriesId}>
-                  <h3 id={drawerCategoriesId} className="mb-4 text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">Kategoriler</h3>
+                  <h3 id={drawerCategoriesId} className="mb-4 text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">{t('categories')}</h3>
                   <nav className="space-y-1">
                     {categories.map((category) => <Link
                       key={category.id || category.slug}
@@ -450,8 +456,8 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
                 <section aria-labelledby={drawerCollectionsId} className="mt-9">
                   <div className="mb-4 flex items-center justify-between">
-                    <h3 id={drawerCollectionsId} className="text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">Collections</h3>
-                    <Link href="/collections" onClick={() => closeMenu()} className="text-[9px] uppercase tracking-[0.15em] text-nrs-ink/60 transition-colors hover:text-nrs-ink">Tümünü gör</Link>
+                    <h3 id={drawerCollectionsId} className="text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">{t('collections')}</h3>
+                    <Link href="/collections" onClick={() => closeMenu()} className="text-[9px] uppercase tracking-[0.15em] text-nrs-ink/60 transition-colors hover:text-nrs-ink">{t('all')}</Link>
                   </div>
                   <nav className="space-y-1">
                     {collections.filter(collection => collection.slug !== 'seckiler').map((collection) => <Link
@@ -467,7 +473,8 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               </div>
 
               <div className="border-t border-nrs-ink/10 px-5 py-4 sm:px-7">
-                <nav aria-label="Hesap ve alışveriş" className="grid grid-cols-3 divide-x divide-nrs-black/10">
+                <div className="mb-3 flex justify-center"><LanguageSelector /></div>
+                <nav aria-label={t('accountAndShopping')} className="grid grid-cols-3 divide-x divide-nrs-black/10">
                   <button
                     type="button"
                     onClick={() => {
@@ -480,16 +487,16 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                       router.push('/profile')
                     }}
                     className="flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 text-[9px] uppercase tracking-[0.12em] text-nrs-ink/65 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
-                  ><User size={16} strokeWidth={1.2} />Hesabım</button>
+                  ><User size={16} strokeWidth={1.2} />{t('account')}</button>
                   <Link href="/profile#wishlist" onClick={() => closeMenu()} className="flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 text-[9px] uppercase tracking-[0.12em] text-nrs-ink/65 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1">
-                    <Heart size={16} strokeWidth={1.2} />Favoriler
+                    <Heart size={16} strokeWidth={1.2} />{t('favorites')}
                   </Link>
                   <button type="button" onClick={() => { deferredMenuActionRef.current = 'cart'; closeMenu() }} className="relative flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 text-[9px] uppercase tracking-[0.12em] text-nrs-ink/65 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1">
-                    <ShoppingBag size={16} strokeWidth={1.2} />Sepet
+                    <ShoppingBag size={16} strokeWidth={1.2} />{t('cart')}
                     {totalItems > 0 && <span className="absolute right-4 top-2 flex size-4 items-center justify-center rounded-full bg-nrs-black text-[8px] text-nrs-ivory">{totalItems}</span>}
                   </button>
                 </nav>
-                {isAdmin && <Link href="/admin" onClick={() => closeMenu()} className="mt-2 flex min-h-10 items-center justify-center text-[9px] uppercase tracking-[0.18em] text-nrs-ink/60 transition-colors hover:text-nrs-ink">Admin Paneli</Link>}
+                {isAdmin && <Link href="/admin" onClick={() => closeMenu()} className="mt-2 flex min-h-10 items-center justify-center text-[9px] uppercase tracking-[0.18em] text-nrs-ink/60 transition-colors hover:text-nrs-ink">{t('adminPanel')}</Link>}
               </div>
             </motion.aside>
           </>}
@@ -504,12 +511,13 @@ interface AccountControlProps {
   profile: ReturnType<typeof useAuth>['profile']
   isAdmin: boolean
   textClass: string
+  translate: ReturnType<typeof useLocale>['t']
   compact?: boolean
   onSignIn: () => void
   onSignOut: () => Promise<void>
 }
 
-function AccountControl({ user, profile, isAdmin, textClass, compact = false, onSignIn, onSignOut }: AccountControlProps) {
+function AccountControl({ user, profile, isAdmin, textClass, translate: t, compact = false, onSignIn, onSignOut }: AccountControlProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -517,7 +525,7 @@ function AccountControl({ user, profile, isAdmin, textClass, compact = false, on
   const reduceMotion = useReducedMotion()
   const firstName = typeof profile?.first_name === 'string' ? profile.first_name.trim() : ''
   const lastName = typeof profile?.last_name === 'string' ? profile.last_name.trim() : ''
-  const accountName = [firstName, lastName].filter(Boolean).join(' ') || user?.email?.split('@')[0] || 'Hesabım'
+  const accountName = [firstName, lastName].filter(Boolean).join(' ') || user?.email?.split('@')[0] || t('account')
 
   useEffect(() => {
     if (!isOpen) return
@@ -545,7 +553,7 @@ function AccountControl({ user, profile, isAdmin, textClass, compact = false, on
       className={`inline-flex min-h-11 items-center gap-2 border-b border-transparent px-2 text-[10px] uppercase tracking-[0.2em] opacity-75 transition-opacity duration-300 hover:opacity-100 hover:border-current focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 ${textClass}`}
     >
       <span className="flex size-7 items-center justify-center rounded-full border border-current/30"><User size={15} strokeWidth={1.2} /></span>
-      <span>Giriş Yap</span>
+      <span>{t('signIn')}</span>
     </button>
   }
 
@@ -554,7 +562,7 @@ function AccountControl({ user, profile, isAdmin, textClass, compact = false, on
       ref={triggerRef}
       type="button"
       onClick={() => setIsOpen((open) => !open)}
-      aria-label={`Hesap menüsünü ${isOpen ? 'kapat' : 'aç'}: ${accountName}`}
+      aria-label={`${isOpen ? t('accountMenuClose') : t('accountMenuOpen')}: ${accountName}`}
       aria-haspopup="dialog"
       aria-expanded={isOpen}
       aria-controls={popoverId}
@@ -570,35 +578,35 @@ function AccountControl({ user, profile, isAdmin, textClass, compact = false, on
       {isOpen && <motion.div
         id={popoverId}
         role="dialog"
-        aria-label="Hesap menüsü"
+        aria-label={t('accountMenu')}
         initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: reduceMotion ? 0 : 4, scale: 1 }}
         transition={{ duration: reduceMotion ? 0.1 : 0.18, ease: 'easeOut' }}
-        className="absolute right-0 top-full z-[120] mt-3 w-[min(20rem,calc(100vw-2rem))] overflow-hidden border border-nrs-ink/20 bg-nrs-canvas text-nrs-ink shadow-[0_12px_36px_rgba(25,22,18,0.12)]"
+        className="absolute end-0 top-full z-[120] mt-3 w-[min(20rem,calc(100vw-2rem))] overflow-hidden border border-nrs-ink/20 bg-nrs-canvas text-start text-nrs-ink shadow-[0_12px_36px_rgba(25,22,18,0.12)]"
       >
         <div className="border-b border-nrs-ink/10 px-5 py-5">
-          <p className="mb-2 text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">Hesap</p>
+          <p className="mb-2 text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">{t('account')}</p>
           <p className="truncate font-serif text-lg leading-tight">{accountName}</p>
           {user.email && <a href={`mailto:${user.email}`} className="mt-1 block truncate text-xs text-nrs-ink/55 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1">{user.email}</a>}
         </div>
         <div className="px-2 py-3">
-          <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] text-nrs-ink/60">Hesabım</p>
-          <AccountLink href="/profile" onClick={() => setIsOpen(false)}>Profilim</AccountLink>
-          <AccountLink href="/profile#orders" onClick={() => setIsOpen(false)}>Siparişlerim</AccountLink>
-          <AccountLink href="/profile#wishlist" onClick={() => setIsOpen(false)}>Favorilerim</AccountLink>
+          <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] text-nrs-ink/60">{t('account')}</p>
+          <AccountLink href="/profile" onClick={() => setIsOpen(false)}>{t('profile')}</AccountLink>
+          <AccountLink href="/profile#orders" onClick={() => setIsOpen(false)}>{t('myOrders')}</AccountLink>
+          <AccountLink href="/profile#wishlist" onClick={() => setIsOpen(false)}>{t('myFavorites')}</AccountLink>
         </div>
         {isAdmin && <div className="border-t border-nrs-ink/10 px-2 py-3">
-          <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] text-nrs-ink/60">Yönetim</p>
-          <AccountLink href="/admin" onClick={() => setIsOpen(false)}><span className="flex items-center gap-2"><ShieldCheck size={15} strokeWidth={1.4} />Admin Paneli</span></AccountLink>
+          <p className="px-3 pb-2 text-[9px] uppercase tracking-[0.2em] text-nrs-ink/60">{t('management')}</p>
+          <AccountLink href="/admin" onClick={() => setIsOpen(false)}><span className="flex items-center gap-2"><ShieldCheck size={15} strokeWidth={1.4} />{t('adminPanel')}</span></AccountLink>
         </div>}
         <div className="border-t border-nrs-ink/10 p-2">
           <button
             type="button"
             onClick={async () => { setIsOpen(false); await onSignOut() }}
-            className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm text-nrs-ink/65 transition-colors hover:bg-nrs-ink/[0.035] hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
+            className="flex min-h-11 w-full items-center gap-2 px-3 text-start text-sm text-nrs-ink/65 transition-colors hover:bg-nrs-ink/[0.035] hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
           >
-            <LogOut size={15} strokeWidth={1.4} />Çıkış Yap
+            <LogOut size={15} strokeWidth={1.4} />{t('signOut')}
           </button>
         </div>
       </motion.div>}

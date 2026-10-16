@@ -4,8 +4,12 @@ import React from 'react';
 import { m as motion } from 'framer-motion';
 import EditorialImage from '@/components/EditorialImage'
 import { getCollectionEditorialImage } from '@/lib/editorialImages'
+import { useLocale } from '@/context/LocaleContext'
+import { marketing } from '@/lib/i18n/marketing'
 
 export default function CuratedPage() {
+  const { locale } = useLocale()
+  const t = (key: Parameters<typeof marketing>[1]) => marketing(locale, key)
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
@@ -17,29 +21,29 @@ export default function CuratedPage() {
               animate={{ opacity: 1, y: 0 }}
               className="text-4xl md:text-6xl font-serif tracking-tight"
             >
-              SÖZEL SEÇKİLER
+              {t('curatedTitle')}
             </motion.h1>
             <div className="h-px w-20 bg-nrs-black/20 mx-auto"></div>
             <p className="text-nrs-ink/60 font-sans italic text-sm max-w-xl mx-auto">
-              NRS küratörleri tarafından belirlenen, sezonun ruhunu yansıtan özel kombinler ve zamansız parçalar.
+              {t('curatedIntro')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {[
               {
-                title: 'Minimalist Lüks',
-                desc: 'Sessiz lüksün en saf hali. Monokrom tonlar ve kusursuz kesimler.',
+                title: t('curatedMinimal'),
+                desc: t('curatedMinimalBody'),
                 collectionSlug: 'imza',
               },
               {
-                title: 'Tesettür Zarafeti',
-                desc: 'Tesettür stiline eşlik eden zarif siluetler ve özenle seçilmiş parçalar.',
+                title: t('curatedModest'),
+                desc: t('curatedModestBody'),
                 collectionSlug: 'davet',
               },
               {
-                title: 'Modern Şehir',
-                desc: 'Şehrin ritmine ayak uyduran, konfor ve zarafeti birleştiren parçalar.',
+                title: t('curatedCity'),
+                desc: t('curatedCityBody'),
                 collectionSlug: 'gunduz',
               },
             ].map((item, index) => (
@@ -65,7 +69,7 @@ export default function CuratedPage() {
                   {item.desc}
                 </p>
                 <span className="text-[10px] uppercase tracking-widest text-nrs-ink font-medium border-b border-nrs-ink pb-1 group-hover:text-nrs-rosegold group-hover:border-nrs-rosegold transition-all duration-500">
-                  Keşfet
+                  {t('discover')}
                 </span>
               </motion.div>
             ))}

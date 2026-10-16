@@ -10,9 +10,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getProductImageUrl } from '@/lib/storage/products';
 import type { ProductImageRow } from '@/lib/admin/types';
+import { useLocale } from '@/context/LocaleContext'
+import { localePrefix } from '@/lib/i18n/messages'
 
 export default function WishlistGrid() {
   const { user } = useAuth();
+  const { locale, money, t } = useLocale()
+  const prefix = localePrefix(locale)
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -40,6 +44,18 @@ export default function WishlistGrid() {
           return;
         }
 
+        let localizedNames = new Map<string, string>()
+        try {
+          const response = await fetch('/api/storefront/cart-products', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: productIds }), cache: 'no-store',
+          })
+          if (response.ok) {
+            const result = await response.json() as { products?: Array<{ id: string; title: string }> }
+            localizedNames = new Map((result.products ?? []).map(row => [row.id, row.title]))
+          }
+        } catch { /* The account remains usable with its loaded catalogue records. */ }
+
         // Fetch product details from Supabase
         const { data: dbProducts, error: productsError } = await supabase
           .from('products')
@@ -57,12 +73,11 @@ export default function WishlistGrid() {
         const mappedDbProducts: Product[] = (dbProducts || []).map((p: any) => {
           const images = (p.product_images ?? []) as ProductImageRow[];
           const primaryImg = getProductImageUrl(supabase, images.find(img => img.is_primary) ?? images[0]);
-          const currencySymbol = p.currency === 'TRY' || !p.currency ? '₺' : `${p.currency} `;
           return {
             id: p.id,
-            name: p.name,
-            category: p.categories?.name || 'Koleksiyon',
-            price: `${currencySymbol}${Number(p.price_amount ?? 0).toLocaleString('en-US')}`,
+            name: localizedNames.get(p.id) || p.name,
+            category: p.categories?.name || t('collections'),
+            price: money(Number(p.price_amount ?? 0)),
             image: primaryImg || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop',
             description: '',
             inStock: true,
@@ -81,7 +96,7 @@ export default function WishlistGrid() {
             combined.push(foundDb);
           } else {
             const foundStatic = PRODUCTS.find(p => p.id === id);
-            if (foundStatic) combined.push(foundStatic);
+            if (foundStatic) combined.push({ ...foundStatic, name: localizedNames.get(id) || foundStatic.name, price: money(Number(foundStatic.price.replace(/\D/g, '')) || 0) });
           }
         }
 
@@ -95,7 +110,7 @@ export default function WishlistGrid() {
     };
 
     fetchWishlist();
-  }, [user]);
+  }, [user, locale, money, t]);
 
   const toggleFavorite = async (productId: string) => {
     if (!user) return;
@@ -122,16 +137,16 @@ export default function WishlistGrid() {
     <div id="wishlist" className="space-y-8 scroll-mt-32">
       <div className="flex items-center gap-4">
         <Heart size={20} className="text-nrs-ink/60" />
-        <h2 className="text-2xl font-serif italic text-nrs-ink">My Wishlist</h2>
+        <h2 className="text-2xl font-serif italic text-nrs-ink">{t('wishlistTitle')}</h2>
       </div>
 
-      {errorMessage ? <p role="alert" className="text-sm text-red-400">{errorMessage}</p> : loading ? (
+      {errorMessage ? <p role="alert" className="text-sm text-red-400">{t('wishlistLoadFailed')}</p> : loading ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-nrs-ink/20 border-t-nrs-ink rounded-full animate-spin" />
         </div>
       ) : wishlistProducts.length === 0 ? (
         <div className="text-center py-12 px-6 bg-nrs-panel/30 border border-dashed border-nrs-ink/20">
-          <p className="text-sm text-nrs-ink/65 font-light italic">Your wishlist is currently empty.</p>
+          <p className="text-sm text-nrs-ink/65 font-light italic">{t('emptyWishlist')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -142,7 +157,7 @@ export default function WishlistGrid() {
               animate={{ opacity: 1, scale: 1 }}
               className="group relative bg-nrs-panel border border-nrs-ink/10 p-4 hover:border-nrs-ink/30 transition-all duration-500"
             >
-              <Link href={`/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden mb-4">
+              <Link href={`${prefix}/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden mb-4">
                 <Image
                   src={product.image}
                   alt={product.name}
@@ -153,7 +168,7 @@ export default function WishlistGrid() {
               </Link>
               <div className="flex justify-between items-end">
                 <div>
-                  <Link href={`/product/${product.id}`}>
+                  <Link href={`${prefix}/product/${product.id}`}>
                     <h3 className="text-sm font-serif text-nrs-ink hover:text-nrs-rosegold transition-colors">{product.name}</h3>
                   </Link>
                   <p className="text-xs text-nrs-ink/60">{product.price}</p>
@@ -161,7 +176,7 @@ export default function WishlistGrid() {
                 <button
                   onClick={() => toggleFavorite(product.id)}
                   className="p-2 text-red-500 hover:text-red-700 transition-colors"
-                  aria-label="Favorilerden çıkar"
+                  aria-label={t('removeFavorite')}
                 >
                   <Heart size={16} fill="currentColor" />
                 </button>

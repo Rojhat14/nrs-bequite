@@ -9,6 +9,43 @@ function loader(mocks = {}) {
     const standardRequire = loaded.require.bind(loaded);
     loaded.require = name => {
       if (Object.hasOwn(mocks, name)) return mocks[name];
+      if (name === '@/context/LocaleContext') return {
+        useLocale: () => ({ locale: 'tr', rate: null, fxAvailable: false,
+          t: key => ({ campaign: 'Açılışa özel tüm ürünlerde sepette %20 indirim.', campaignShort: 'Sepette %20 indirim', checkout: 'Ödemeye geç',
+            categories: 'Kategoriler', collections: 'Koleksiyonlar', all: 'Tümünü gör', bag: 'Alışveriş çantası', wishlist: 'Favorilerim',
+            menu: 'Menüyü aç', closeMenu: 'Menüyü kapat', search: 'Ürün ara', account: 'Hesabım', favorites: 'Favoriler', cart: 'Sepet',
+            productTotal: 'Ürünler toplamı', discount: 'Açılış indirimi', shipping: 'Kargo', total: 'Ödenecek toplam',
+            currencyNote: 'USD tutarları güncel kura göre yaklaşık karşılıktır. Ödeme Türk lirası olarak alınır.',
+            fxUnavailable: 'Güncel kur bilgisi alınamadı; fiyatlar Türk lirası olarak gösteriliyor.', paymentTry: 'Ödeme Türk lirası olarak alınacaktır.',
+            firstName: 'Ad', lastName: 'Soyad', email: 'E-posta', phone: 'Telefon', address: 'Açık adres', city: 'İl', district: 'İlçe', postalCode: 'Posta kodu',
+            addToBag: 'Sepete ekle', bagEmptyTitle: 'Sepetiniz boş', bagEmptyBody: 'Gözünüze takılan parçaları sepetinize ekleyerek başlayın.',
+            checkoutLoading: 'Sepet yükleniyor…', checkoutTitle: 'Ödeme ve teslimat', orderRequest: 'Sipariş talebi', chosenItemsReady: 'Seçtiğiniz parçalar sizin için hazır.',
+            stepInformation: 'Bilgiler', stepSummary: 'Özet', stepApproval: 'Onay', continueWithAccount: 'Hesabınızla devam edin', accountContinue: 'Hesabımla devam et',
+            trackOrders: 'Siparişlerinizi ve belgelerinizi hesabınızdan takip edin.', loginForPayment: 'Kartla ödeme için hesabınıza giriş yapın.', customerDelivery: 'Müşteri ve teslimat bilgileri',
+            addressPlaceholder: 'Mahalle, sokak, bina, daire…', orderNoteOptional: 'Sipariş notu (isteğe bağlı)', measurementsTitle: 'Beden ve özel ölçüler',
+            measurementsHelp: 'Ölçülerinizi sipariş öncesinde girin.', privacyNotice: 'Kişisel verilerinizin işlenmesine ilişkin aydınlatma metni',
+            reviewingQuote: 'Sipariş özeti doğrulanıyor…', checkingCartPrices: 'Sepet fiyatları kontrol ediliyor…', reviewSummary: 'Özeti incele',
+            cartUpdated: 'Sepetinizdeki ürün fiyatları güncellendi. Güncel sipariş özetini inceleyin.', summaryApproval: 'Sipariş özeti ve onay',
+            quoteInstruction: 'Sipariş özetini ve sözleşmeleri inceleyin.', bankHandoffNote: 'Bir sonraki adım Garanti BBVA’nın güvenli ödeme sayfasına geçiştir.',
+            viewOrderTerms: 'Sözleşmeye esas sipariş bilgilerini görüntüle', documentVersion: 'içeriği', openLegal: 'sayfasını aç',
+            bankRedirecting: 'Garanti BBVA’ya yönlendiriliyorsunuz…', goToBank: 'Garanti BBVA ödeme sayfasına geç', resumeTestOrder: 'Bekleyen test siparişine devam et',
+            cardPayment: 'Kartla ödeme yap', saving: 'Kaydediliyor…', saveTransferRequest: 'Havale / WhatsApp sipariş talebini kaydet',
+            requestSaved: 'Sipariş talebiniz kaydedildi', paymentNotTaken: 'Ödeme alınmadı; teyit için WhatsApp üzerinden iletişime geçin.',
+            orderSummary: 'Sipariş özeti', items: 'ürün', sizeLabel: 'Ölçü', pieces: 'adet', customMeasurements: 'Özel ölçüler', measurementsUnspecified: 'Ölçü belirtilmedi',
+            shippingConfirmed: 'Sipariş teyidinde', free: 'Ücretsiz', quotePending: 'Tutar, stok ve teslimat bedeli sunucuda doğrulanınca kesinleşir.',
+            statusOrder: 'Sipariş durumu', orderNumber: 'Sipariş numarası', orderDetails: 'Sipariş ayrıntıları', orderUnavailable: 'Sipariş bilgisi görüntülenemiyor',
+            statusChecking: 'Ödeme durumu kontrol ediliyor', paymentReceived: 'Ödemeniz alındı.', paymentReceivedBody: 'Ödemeniz doğrulandı. Siparişinizin ayrıntılarına hesabınızdan ulaşabilirsiniz.',
+            paymentFailureBody: 'Siparişiniz alınmadı. Lütfen tekrar deneyin.', paymentUnknownBody: 'Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.',
+            verifiedCancelled: 'Siparişiniz iptal edildi', verifiedCancelledBody: 'Siparişiniz uygulamada iptal edildi olarak doğrulandı. Yeni bir alışverişe başlayabilirsiniz.',
+            orderAccessUnavailable: 'Sipariş bilgilerine erişim doğrulanamadı.', orderLinks: 'Sonraki adımlar', orderPage: 'Sipariş ayrıntılarına git', myOrders: 'Siparişlerime git',
+            getHelp: 'Yardım alın', discoverCollection: 'Koleksiyonu keşfet', paymentPending: 'Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.', checkAgain: 'Tekrar kontrol et',
+            measurementRequired: 'zorunlu', measurementOptional: 'isteğe bağlı', measurementValidationError: 'Ölçüleri tamamlayıp kontrol edin.',
+            checkoutQuoteError: 'Sipariş özeti doğrulanamadı.', checkoutSaveError: 'Sipariş talebi kaydedilemedi.',
+            checkoutConsentError: 'Sipariş özetini yeniden inceleyip sözleşmeleri kabul edin.', checkoutPaymentError: 'Ödeme başlatılamadı; sipariş özetini yeniden doğrulayın.' })[key] || key,
+          money: amount => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount),
+          minorMoney: minor => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(minor / 100),
+        }), LocaleProvider: ({ children }) => children,
+      };
       if (name === 'server-only') return {};
       if (name.startsWith('@/') || name.startsWith('./')) {
         const base = name.startsWith('@/') ? path.resolve('src', name.slice(2)) : path.resolve(path.dirname(filename), name);

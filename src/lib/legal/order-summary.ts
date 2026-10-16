@@ -12,6 +12,18 @@ export interface LegalOrderSummary {
   paymentMethod: string
   deliveryTerms: string
   orderedAt?: string
+  display?: {
+    locale: 'tr' | 'en' | 'ar'
+    currency: 'TRY' | 'USD'
+    exchangeRate: number | null
+    exchangeRateAt: string | null
+    exchangeRateDate?: string | null
+    subtotalMinor: number
+    discountMinor: number
+    shippingMinor: number
+    totalMinor: number
+    itemLineMinor: number[]
+  }
 }
 
 export interface OrderLegalRecord {
@@ -46,6 +58,21 @@ export function isLegalOrderSummary(value: unknown): value is LegalOrderSummary 
     || !money(summary.campaign.discountAmount))) return false
   if (summary.items.some(item => (item.normalUnitPrice !== undefined && !money(item.normalUnitPrice))
     || (item.discountAmount !== undefined && !money(item.discountAmount)))) return false
+  if (summary.display !== undefined) {
+    const display = summary.display
+    if (!display || !['tr', 'en', 'ar'].includes(display.locale) || !['TRY', 'USD'].includes(display.currency)
+      || (display.exchangeRate !== null && (!Number.isFinite(display.exchangeRate) || display.exchangeRate <= 0))
+      || (display.exchangeRateAt !== null && !Number.isFinite(Date.parse(display.exchangeRateAt)))
+      || (display.exchangeRateDate !== undefined && display.exchangeRateDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(display.exchangeRateDate))
+      || ![display.subtotalMinor, display.discountMinor, display.shippingMinor, display.totalMinor].every(value => Number.isSafeInteger(value) && value >= 0)
+      || !Array.isArray(display.itemLineMinor) || display.itemLineMinor.length !== summary.items.length
+      || !display.itemLineMinor.every(value => Number.isSafeInteger(value) && value >= 0)
+      || (display.currency === 'USD' && display.exchangeRate === null)
+      || (display.currency === 'TRY' && display.locale !== 'tr' && display.exchangeRate !== null)) return false
+    const displayLines = display.itemLineMinor.reduce((sum, value) => sum + value, 0)
+    if (display.totalMinor !== displayLines + display.shippingMinor
+      || display.subtotalMinor - display.discountMinor !== displayLines) return false
+  }
   if (!/^[A-Z]{3}$/.test(summary.currency) || !text(summary.paymentMethod) || !text(summary.deliveryTerms)) return false
   if (summary.orderedAt !== undefined && (typeof summary.orderedAt !== 'string' || !Number.isFinite(Date.parse(summary.orderedAt)))) return false
   return true

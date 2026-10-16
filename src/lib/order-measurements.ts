@@ -9,13 +9,13 @@ export const MEASUREMENT_HELP = {
 export const MEASUREMENT_RANGES = { chest: [50,180], waist: [40,180], hips: [50,200], height: [120,220], shoulder: [20,70], sleeve: [10,100], length: [20,200], inseam: [30,120] } as const
 export function measurementKind(category: string): MeasurementKind {
   const type = category.toLocaleLowerCase('tr-TR')
-  if (/\bhome\b|bedding|nevresim/.test(type)) return 'accessory'
-  if (/şal|eşarp|aksesuar/.test(type)) return 'accessory'
-  if (/takım|takim/.test(type)) return 'suit'
-  if (/elbise/.test(type)) return 'dress'
-  if (/pantolon/.test(type)) return 'trousers'
-  if (/etek/.test(type)) return 'skirt'
-  if (/ceket|blazer|bluz|üst|ust|gömlek|gomlek|dış|dis-giyim/.test(type)) return 'top'
+  if (/\bhome\b|bedding|nevresim|مفروشات|أغطية|سرير/.test(type)) return 'accessory'
+  if (/şal|eşarp|aksesuar|accessor|إكسسوارات|ملحقات/.test(type)) return 'accessory'
+  if (/takım|takim|\bsets?\b|\bsuits?\b|أطقم|طقم/.test(type)) return 'suit'
+  if (/elbise|\bdress(?:es)?\b|\bgown\b|فستان|فساتين/.test(type)) return 'dress'
+  if (/pantolon|\btrousers?\b|\bpants\b|بنطال|سراويل/.test(type)) return 'trousers'
+  if (/etek|\bskirts?\b|تنورة|تنانير/.test(type)) return 'skirt'
+  if (/ceket|blazer|bluz|üst|ust|gömlek|gomlek|dış|dis-giyim|\b(?:tops?|shirts?|blouses?|jackets?|coats?|outerwear)\b|قميص|قمصان|بلوزة|بلوزات|جاكيت|سترة|معطف|علوية/.test(type)) return 'top'
   return 'dress'
 }
 export function requiredMeasurements(kind: MeasurementKind): (keyof Measurements)[] {

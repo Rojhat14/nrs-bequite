@@ -20,13 +20,14 @@ import { withLegalAcceptance } from '@/lib/legal/acceptance'
 import type { Quote } from '@/lib/payment/types'
 import type { LegalOrderSummary as OrderSummary } from '@/lib/legal/order-summary'
 
-import { MEASUREMENT_LABELS, MEASUREMENT_HELP, MEASUREMENT_RANGES, measurementFields, measurementKind, requiredMeasurements, validateRequiredMeasurements, type Measurements } from '@/lib/order-measurements'
-import { formatMeasurements } from '@/lib/order-measurements'
+import { MEASUREMENT_RANGES, measurementFields, measurementKind, requiredMeasurements, validateRequiredMeasurements, type Measurements } from '@/lib/order-measurements'
 import { discountForUnitMinor, getOpeningCampaign, isOpeningCampaignActive } from '@/lib/opening-campaign'
-
-const money = (amount: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount)
+import { useLocale } from '@/context/LocaleContext'
+import { formatMinor } from '@/lib/i18n/money'
+import { formatLocalizedMeasurements, measurementHelp, measurementLabel } from '@/lib/i18n/measurements'
 
 export default function Checkout() {
+  const { locale, money, t, fxAvailable } = useLocale()
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
   const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, catalogPricesSynced, priceUpdateNotice } = useCart()
   const { user, profile } = useAuth()
@@ -95,25 +96,31 @@ export default function Checkout() {
   }
 
   const orderSummary = confirmedQuote?.summary ?? previewSummary
+  const summaryDisplay = orderSummary.display
+  const summaryRate = summaryDisplay?.currency === 'USD' && summaryDisplay.exchangeRate !== null && summaryDisplay.exchangeRateAt
+    ? { usdTry: summaryDisplay.exchangeRate, fetchedAt: summaryDisplay.exchangeRateAt, rateDate: summaryDisplay.exchangeRateDate ?? undefined } : null
+  const displaySummaryMoney = (amountTry: number) => summaryDisplay
+    ? formatMinor(Math.round(amountTry * 100 / (summaryDisplay.currency === 'USD' && summaryRate ? summaryRate.usdTry : 1)), summaryDisplay.locale, summaryRate)
+    : money(amountTry)
   async function reviewPayment() {
     if (busy) return
     if (!user) { setAuthOpen(true); return }
     const errors: Record<string, string> = {}
-    if (!formData.firstName.trim()) errors.firstName = 'Adınızı girin.'
-    if (!formData.lastName.trim()) errors.lastName = 'Soyadınızı girin.'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Geçerli bir e-posta adresi girin.'
-    if (!formData.phone.trim()) errors.phone = 'Telefon numaranızı girin.'
-    if (!formData.address.trim()) errors.address = 'Açık adresinizi girin.'
-    if (!formData.city.trim()) errors.city = 'İl bilgisini girin.'
-    if (!formData.district.trim()) errors.district = 'İlçe bilgisini girin.'
-    if (!/^\d{5}$/.test(formData.postalCode)) errors.postalCode = '5 haneli posta kodu girin.'
+    if (!formData.firstName.trim()) errors.firstName = `${t('firstName')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
+    if (!formData.lastName.trim()) errors.lastName = `${t('lastName')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = locale === 'en' ? 'Enter a valid email address.' : locale === 'ar' ? 'أدخلي بريداً إلكترونياً صالحاً.' : 'Geçerli bir e-posta adresi girin.'
+    if (!formData.phone.trim()) errors.phone = `${t('phone')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
+    if (!formData.address.trim()) errors.address = `${t('address')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
+    if (!formData.city.trim()) errors.city = `${t('city')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوبة.' : 'bilgisini girin.'}`
+    if (!formData.district.trim()) errors.district = `${t('district')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوبة.' : 'bilgisini girin.'}`
+    if (!/^\d{5}$/.test(formData.postalCode)) errors.postalCode = locale === 'en' ? 'Enter a 5-digit postal code.' : locale === 'ar' ? 'أدخلي رمزاً بريدياً من 5 أرقام.' : '5 haneli posta kodu girin.'
     if (Object.keys(errors).length) {
       setFieldErrors(errors)
       setLegalError('')
       document.getElementById(`checkout-${Object.keys(errors)[0]}`)?.focus()
       return
     }
-    try { for (const item of items) validateRequiredMeasurements(measurements[getCartItemId(item)] || item.measurements, measurementKind((item.category || '') + ' ' + item.title)) } catch (error) { setLegalError(error instanceof Error ? error.message : 'Ölçüleri doldurun.'); return }
+    try { for (const item of items) validateRequiredMeasurements(measurements[getCartItemId(item)] || item.measurements, measurementKind((item.category || '') + ' ' + item.title)) } catch { setLegalError(t('measurementValidationError')); return }
     setSavedOrder(null)
     setBusy(true)
     setLegalError('')
@@ -124,11 +131,11 @@ export default function Checkout() {
       setQuote(data); setQuoteKey(inputKey); setAcceptedSnapshot(null)
       if (!idempotencyKey || quoteKey !== inputKey) setIdempotencyKey(crypto.randomUUID())
       setStep(3)
-    } catch (error) { setLegalError(error instanceof Error ? error.message : 'Sipariş özeti doğrulanamadı.') }
+    } catch { setLegalError(t('checkoutQuoteError')) }
     finally { setBusy(false) }
   }
   async function saveManualOrder() {
-    if (busy || !confirmedQuote || !contractAccepted) { setLegalError('Özeti doğrulayın ve sözleşmeleri onaylayın.'); return }
+    if (busy || !confirmedQuote || !contractAccepted) { setLegalError(t('checkoutConsentError')); return }
     setBusy(true); setLegalError('')
     try {
       const response = await fetch('/api/orders/create', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -136,19 +143,19 @@ export default function Checkout() {
       const result = await response.json()
       if (!response.ok || !result.orderId || result.paid !== false) throw new Error(result.error || 'Sipariş kaydedilemedi.')
       setSavedOrder(result.orderId)
-    } catch (error) { setLegalError(error instanceof Error ? error.message : 'Sipariş kaydedilemedi.') }
+    } catch { setLegalError(t('checkoutSaveError')) }
     finally { setBusy(false) }
   }
 
   async function prepareCardPayment() {
     if (busy) return
     if (!ENABLE_CARD_PAYMENT) { setPaymentMessage(CARD_PAYMENT_COMING_SOON); return }
+    if (!contractAccepted) { setLegalError(t('checkoutConsentError')); return }
+    if (!user || !confirmedQuote) { setLegalError(t('checkoutPaymentError')); return }
     try {
       // Consent is checked BEFORE any payment request. Client commercial values
       // never reach payment/create; only IDs, quantity and approved quote hash.
       const payload = withLegalAcceptance({ ...checkoutInput(), quoteHash: confirmedQuote?.hash, idempotencyKey }, contractAccepted)
-      if (!user) throw new Error('Kartla ödeme için hesabınıza giriş yapın.')
-      if (!confirmedQuote) throw new Error('Ödeme öncesinde sipariş özetini yeniden doğrulayın.')
       setLegalError(''); setPendingOrderUrl(null); setBusy(true)
       const response = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await response.json()
@@ -158,26 +165,26 @@ export default function Checkout() {
       }
       if (typeof data.redirectUrl !== 'string' || !data.redirectUrl.startsWith('https://')) throw new Error('Ödeme yönlendirmesi doğrulanamadı.')
       window.location.assign(data.redirectUrl)
-    } catch (error) {
-      setLegalError(error instanceof Error ? error.message : 'Sözleşme onayı doğrulanamadı.')
+    } catch {
+      setLegalError(t('checkoutPaymentError'))
       setPaymentMessage('')
     } finally { setBusy(false) }
   }
 
-  if (!hydrated) return <main className="min-h-screen pt-[calc(var(--nrs-header-height)+3rem)] text-center">Sepet yükleniyor…</main>
+  if (!hydrated) return <main className="min-h-screen pt-[calc(var(--nrs-header-height)+3rem)] text-center">{t('checkoutLoading')}</main>
 
   if (items.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-nrs-canvas">
         <div className="max-w-md px-6 py-32 text-center">
           <span className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-nrs-panel"><ShoppingBag size={26} className="text-nrs-ink/55" /></span>
-          <h2 className="mb-3 font-serif text-3xl text-nrs-ink">Sepetiniz boş</h2>
-          <p className="mb-8 text-sm leading-6 text-nrs-ink/60">Gözünüze takılan parçaları sepetinize ekleyerek başlayın.</p>
+          <h2 className="mb-3 font-serif text-3xl text-nrs-ink">{t('bagEmptyTitle')}</h2>
+          <p className="mb-8 text-sm leading-6 text-nrs-ink/60">{t('bagEmptyBody')}</p>
           <button
             onClick={() => router.push('/')}
             className="bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory px-8 py-3 text-xs uppercase tracking-widest hover:bg-nrs-black/90 transition-colors"
           >
-            Koleksiyonu keşfet
+            {t('exploreCollection')}
           </button>
         </div>
       </div>
@@ -198,14 +205,14 @@ export default function Checkout() {
                 className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors mb-6 group"
               >
                 <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                {step === 1 ? 'Alışverişe dön' : 'Önceki adım'}
+                {step === 1 ? t('returnShopping') : t('previousStep')}
               </button>
             )}
-            <h1 className="mb-2 font-serif text-3xl text-nrs-ink sm:text-4xl">{ENABLE_CARD_PAYMENT ? 'Ödeme ve teslimat' : 'Sipariş talebi'}</h1>
-            <p className="text-sm text-nrs-ink/60">Seçtiğiniz parçalar sizin için hazır.</p>
+            <h1 className="mb-2 font-serif text-3xl text-nrs-ink sm:text-4xl">{ENABLE_CARD_PAYMENT ? t('checkoutTitle') : t('orderRequest')}</h1>
+            <p className="text-sm text-nrs-ink/60">{t('chosenItemsReady')}</p>
             </div>
             <ol aria-label="Sipariş adımları" className="flex items-center gap-2 pt-1 text-xs text-nrs-ink/55 sm:gap-3">
-              {['Bilgiler', 'Özet', 'Onay'].map((label, index) => <li key={label} className="flex items-center gap-2">
+              {[t('stepInformation'), t('stepSummary'), t('stepApproval')].map((label, index) => <li key={label} className="flex items-center gap-2">
                 <span className={`flex h-7 w-7 items-center justify-center rounded-full border ${step >= index + 1 ? 'border-nrs-ink bg-nrs-ink text-nrs-ivory' : 'border-nrs-ink/20'}`}>{step > index + 1 ? <Check size={14} /> : index + 1}</span>
                 <span className="hidden sm:inline">{label}</span>
               </li>)}
@@ -216,7 +223,7 @@ export default function Checkout() {
           <section className="min-w-0 space-y-7">
             {ENABLE_CARD_PAYMENT && step === 1 && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <h2 className="font-serif text-2xl text-nrs-ink">Hesabınızla devam edin</h2>
+                <h2 className="font-serif text-2xl text-nrs-ink">{t('continueWithAccount')}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <button
                     onClick={() => { if (!user) { setAuthOpen(true); return; } setStep(2); }}
@@ -224,45 +231,45 @@ export default function Checkout() {
                   >
                     <User size={32} className="text-nrs-ink group-hover:scale-110 transition-transform" />
                     <div>
-                      <h3 className="font-serif text-lg text-nrs-ink">Hesabımla devam et</h3>
-                    <p className="mt-2 text-sm leading-6 text-nrs-ink/60">Siparişlerinizi ve belgelerinizi hesabınızdan takip edin.</p>
+                      <h3 className="font-serif text-lg text-nrs-ink">{t('accountContinue')}</h3>
+                    <p className="mt-2 text-sm leading-6 text-nrs-ink/60">{t('trackOrders')}</p>
                     </div>
                   </button>
-                  <p className="p-5 text-sm leading-6 text-nrs-ink/65">Kartla ödeme ve sipariş belgelerine erişim için hesabınıza giriş yapın. Hesapsız sipariş talebinizi WhatsApp üzerinden iletebilirsiniz.</p>
+                  <p className="p-5 text-sm leading-6 text-nrs-ink/65">{t('loginForPayment')}</p>
                 </div>
               </motion.div>
             )}
 
             {(!ENABLE_CARD_PAYMENT || step === 2) && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-                <h2 className="font-serif text-2xl text-nrs-ink">Müşteri ve teslimat bilgileri</h2>
+                <h2 className="font-serif text-2xl text-nrs-ink">{t('customerDelivery')}</h2>
                 <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-firstName" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">Ad</label>
+                    <label htmlFor="checkout-firstName" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">{t('firstName')}</label>
                     <input
                       type="text"
                       id="checkout-firstName" autoComplete="given-name" value={formData.firstName}
                       aria-invalid={Boolean(fieldErrors.firstName)} aria-describedby={fieldErrors.firstName ? 'checkout-firstName-error' : undefined}
                       onChange={(e) => updateCustomer('firstName', e.target.value)}
                       className={`w-full min-w-0 border-b bg-transparent px-0 py-3 transition-colors focus:border-nrs-ink focus:outline-none ${fieldErrors.firstName ? 'border-red-700' : 'border-nrs-ink/20'}`}
-                      placeholder="Ad"
+                      placeholder={t('firstName')}
                     />
                     {fieldErrors.firstName && <p id="checkout-firstName-error" className="text-xs text-red-700">{fieldErrors.firstName}</p>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-lastName" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">Soyad</label>
+                    <label htmlFor="checkout-lastName" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">{t('lastName')}</label>
                     <input
                       type="text"
                       id="checkout-lastName" autoComplete="family-name" value={formData.lastName}
                       aria-invalid={Boolean(fieldErrors.lastName)} aria-describedby={fieldErrors.lastName ? 'checkout-lastName-error' : undefined}
                       onChange={(e) => updateCustomer('lastName', e.target.value)}
                       className={`w-full min-w-0 border-b bg-transparent px-0 py-3 transition-colors focus:border-nrs-ink focus:outline-none ${fieldErrors.lastName ? 'border-red-700' : 'border-nrs-ink/20'}`}
-                      placeholder="Soyad"
+                      placeholder={t('lastName')}
                     />
                     {fieldErrors.lastName && <p id="checkout-lastName-error" className="text-xs text-red-700">{fieldErrors.lastName}</p>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-email" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">E-posta</label>
+                    <label htmlFor="checkout-email" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">{t('email')}</label>
                     <input
                       type="email"
                       id="checkout-email" autoComplete="email" value={formData.email}
@@ -274,7 +281,7 @@ export default function Checkout() {
                     {fieldErrors.email && <p id="checkout-email-error" className="text-xs text-red-700">{fieldErrors.email}</p>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-phone" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">Telefon</label>
+                    <label htmlFor="checkout-phone" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">{t('phone')}</label>
                     <input
                       type="text"
                       id="checkout-phone" autoComplete="tel" value={formData.phone}
@@ -286,92 +293,92 @@ export default function Checkout() {
                     {fieldErrors.phone && <p id="checkout-phone-error" className="text-xs text-red-700">{fieldErrors.phone}</p>}
                   </div>
                   <div className="flex min-w-0 flex-col gap-2 sm:col-span-2">
-                    <label htmlFor="checkout-address" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">Açık adres</label>
+                    <label htmlFor="checkout-address" className="text-xs uppercase tracking-[0.12em] text-nrs-ink/65">{t('address')}</label>
                     <textarea
                       id="checkout-address" autoComplete="street-address" value={formData.address}
                       aria-invalid={Boolean(fieldErrors.address)} aria-describedby={fieldErrors.address ? 'checkout-address-error' : undefined}
                       onChange={(e) => updateCustomer('address', e.target.value)}
                       className={`w-full min-w-0 resize-y border-b bg-transparent px-0 py-3 transition-colors focus:border-nrs-ink focus:outline-none ${fieldErrors.address ? 'border-red-700' : 'border-nrs-ink/20'}`}
-                      placeholder="Mahalle, sokak, bina, daire..."
+                      placeholder={t('addressPlaceholder')}
                       rows={3}
                     />
                     {fieldErrors.address && <p id="checkout-address-error" className="text-xs text-red-700">{fieldErrors.address}</p>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-city" className="text-xs uppercase tracking-widest text-nrs-ink/60">İl</label>
+                    <label htmlFor="checkout-city" className="text-xs uppercase tracking-widest text-nrs-ink/60">{t('city')}</label>
                     <input
                       type="text"
                       id="checkout-city" autoComplete="address-level1" value={formData.city}
                       aria-invalid={Boolean(fieldErrors.city)} aria-describedby={fieldErrors.city ? 'checkout-city-error' : undefined}
                       onChange={(e) => updateCustomer('city', e.target.value)}
                       className={`w-full min-w-0 border-b bg-transparent px-0 py-3 transition-colors focus:border-nrs-ink focus:outline-none ${fieldErrors.city ? 'border-red-700' : 'border-nrs-ink/20'}`}
-                      placeholder="İl"
+                      placeholder={t('city')}
                     />
                     {fieldErrors.city && <p id="checkout-city-error" className="text-xs text-red-700">{fieldErrors.city}</p>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-district" className="text-xs uppercase tracking-widest text-nrs-ink/60">İlçe</label>
+                    <label htmlFor="checkout-district" className="text-xs uppercase tracking-widest text-nrs-ink/60">{t('district')}</label>
                     <input
                       type="text"
                       id="checkout-district" autoComplete="address-level2" value={formData.district}
                       aria-invalid={Boolean(fieldErrors.district)} aria-describedby={fieldErrors.district ? 'checkout-district-error' : undefined}
                       onChange={(e) => updateCustomer('district', e.target.value)}
                       className={`w-full min-w-0 border-b bg-transparent px-0 py-3 transition-colors focus:border-nrs-ink focus:outline-none ${fieldErrors.district ? 'border-red-700' : 'border-nrs-ink/20'}`}
-                      placeholder="İlçe"
+                      placeholder={t('district')}
                     />
                     {fieldErrors.district && <p id="checkout-district-error" className="text-xs text-red-700">{fieldErrors.district}</p>}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="checkout-postalCode" className="text-xs uppercase tracking-widest text-nrs-ink/60">Posta kodu</label>
+                    <label htmlFor="checkout-postalCode" className="text-xs uppercase tracking-widest text-nrs-ink/60">{t('postalCode')}</label>
                     <input
                       type="text"
                       id="checkout-postalCode" autoComplete="postal-code" value={formData.postalCode}
                       aria-invalid={Boolean(fieldErrors.postalCode)} aria-describedby={fieldErrors.postalCode ? 'checkout-postalCode-error' : undefined}
                       onChange={(e) => updateCustomer('postalCode', e.target.value)}
                       className={`w-full min-w-0 border-b bg-transparent px-0 py-3 transition-colors focus:border-nrs-ink focus:outline-none ${fieldErrors.postalCode ? 'border-red-700' : 'border-nrs-ink/20'}`}
-                      placeholder="Posta kodu"
+                      placeholder={t('postalCode')}
                     />
                     {fieldErrors.postalCode && <p id="checkout-postalCode-error" className="text-xs text-red-700">{fieldErrors.postalCode}</p>}
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <label className="block text-sm">Sipariş notu (isteğe bağlı)
+                  <label className="block text-sm">{t('orderNoteOptional')}
                     <textarea value={formData.orderNote} maxLength={2000} onChange={e => setFormData({ ...formData, orderNote: e.target.value })} className="mt-2 w-full border border-nrs-ink/20 bg-transparent p-3" />
                   </label>
-                  <h3 className="font-serif text-xl">Beden ve özel ölçüler</h3>
-                  <p className="text-sm text-nrs-ink/65">Bütün kıyafetler ölçülerinize göre özel dikilir. Standart beden tek başına yeterli değildir; yıldızlı ölçüler zorunludur. Ölçü girmek tek başına cayma hakkını kaldırmaz. Ölçüleriniz yalnızca siparişin hazırlanması ve ilgili müşteri desteği için siparişe bağlı saklanır; sağlık bilgisi yazmayın.</p>
+                  <h3 className="font-serif text-xl">{t('measurementsTitle')}</h3>
+                  <p className="text-sm text-nrs-ink/65">{t('measurementsHelp')}</p>
                   {items.map(item => <fieldset key={getCartItemId(item)} className="border border-nrs-ink/15 p-4">
                     <legend>{item.title} · Beden: {item.size || 'Belirtilmedi'}</legend>
-                    <div className="grid min-w-0 grid-cols-2 gap-3">{measurementFields((item.category || '') + ' ' + item.title).map(field => <label key={field} className="min-w-0 break-words text-sm">{MEASUREMENT_LABELS[field]} (cm){requiredMeasurements(measurementKind((item.category || '') + ' ' + item.title)).includes(field) ? ' *' : ' (isteğe bağlı)'}
+                    <div className="grid min-w-0 grid-cols-2 gap-3">{measurementFields((item.category || '') + ' ' + item.title).map(field => <label key={field} className="min-w-0 break-words text-sm">{measurementLabel(locale, field)} ({locale === 'ar' ? 'سم' : 'cm'}){requiredMeasurements(measurementKind((item.category || '') + ' ' + item.title)).includes(field) ? ' *' : ` (${t('measurementOptional')})`}
                       <input type="number" required={requiredMeasurements(measurementKind((item.category || '') + ' ' + item.title)).includes(field)} min={MEASUREMENT_RANGES[field][0]} max={MEASUREMENT_RANGES[field][1]} step="0.1" value={(measurements[getCartItemId(item)] ?? item.measurements)?.[field] ?? ''} onChange={e => {
                         const values = { ...(measurements[getCartItemId(item)] ?? item.measurements) }; if (e.target.value === '') delete values[field]; else values[field] = Number(e.target.value)
                         setMeasurements({ ...measurements, [getCartItemId(item)]: values }); updateMeasurements(getCartItemId(item), values)
                       }} className="mt-1 w-full min-w-0 border border-nrs-ink/20 bg-transparent p-2" />
-                      <span className="block text-xs text-nrs-ink/60">{MEASUREMENT_HELP[field]}</span>
+                      <span className="block text-xs text-nrs-ink/60">{measurementHelp(locale, field)}</span>
                     </label>)}</div>
                   </fieldset>)}
-                  <Link href="/kvkk" className="text-sm underline">Kişisel verilerinizin işlenmesine ilişkin aydınlatma metni</Link>
+                  <Link href="/kvkk" className="text-sm underline">{t('privacyNotice')}</Link>
                 </div>
                 <button
                   onClick={() => void reviewPayment()} disabled={busy || !catalogPricesSynced}
                   className="mt-12 w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black/90 transition-all"
                 >
-                  {busy ? 'Sipariş özeti doğrulanıyor…' : !catalogPricesSynced ? 'Sepet fiyatları kontrol ediliyor…' : 'Özeti İncele'}
+                  {busy ? t('reviewingQuote') : !catalogPricesSynced ? t('checkingCartPrices') : t('reviewSummary')}
                 </button>
-                {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">Sepetinizdeki ürün fiyatları güncellendi. Güncel sipariş özetini inceleyin.</p>}
+                {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">{t('cartUpdated')}</p>}
                 {legalError && <p role="alert" className="text-sm text-rose-700">{legalError}</p>}
               </motion.div>
             )}
 
             {(!ENABLE_CARD_PAYMENT || step === 3) && (
               <div className="space-y-5">
-                <h2 className="font-serif text-2xl">Sipariş özeti ve onay</h2>
+                <h2 className="font-serif text-2xl">{t('summaryApproval')}</h2>
                 {ENABLE_CARD_PAYMENT && <>
-                  <p role="status" className="text-nrs-ink/60">Lütfen sunucuda doğrulanan sipariş özetini ve sözleşmeleri inceleyin. Ödeme yükümlülüğü, aşağıdaki ödeme butonuna basıldığında doğar.</p>
+                  <p role="status" className="text-nrs-ink/60">{t('quoteInstruction')}</p>
                 </>}
-                {ENABLE_CARD_PAYMENT && <p role="status" className="rounded-sm bg-nrs-panel px-4 py-3 text-sm leading-6 text-nrs-ink/70">Bir sonraki adım Garanti BBVA’nın güvenli ödeme sayfasına geçiştir. Ödeme sonucu banka tarafından bildirildikten sonra gösterilir.</p>}
+                {ENABLE_CARD_PAYMENT && <p role="status" className="rounded-sm bg-nrs-panel px-4 py-3 text-sm leading-6 text-nrs-ink/70">{t('bankHandoffNote')}</p>}
                 {confirmedQuote && <details className="rounded-sm border border-nrs-ink/15 bg-nrs-warm-white px-4 py-3">
-                  <summary className="min-h-11 cursor-pointer py-2 text-sm underline underline-offset-4">Sözleşmeye esas sipariş bilgilerini görüntüle</summary>
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm underline underline-offset-4">{t('viewOrderTerms')}</summary>
                   <div className="pt-3">{/* The server-quoted snapshot remains the source recorded with legal acceptance. */}
                     <LegalOrderSummary summary={orderSummary} preview={!confirmedQuote} />
                   </div>
@@ -382,10 +389,10 @@ export default function Checkout() {
                     const document = getLegalDocument(slug, LEGAL_DOCUMENT_VERSIONS[kind])!
                     return <div key={kind} className="min-w-0 border border-nrs-ink/15 p-4 sm:p-6">
                       <details>
-                        <summary className="min-h-11 cursor-pointer font-serif text-lg">{document.title} · {LEGAL_DOCUMENT_VERSIONS[kind]} içeriği</summary>
+                        <summary className="min-h-11 cursor-pointer font-serif text-lg">{document.title} · {LEGAL_DOCUMENT_VERSIONS[kind]} {t('documentVersion')}</summary>
                         <div className="pt-4"><LegalDocumentContent document={document} /></div>
                       </details>
-                      <Link href={`/${slug}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center text-sm underline underline-offset-4">{document.title} sayfasını aç</Link>
+                      <Link href={`/${slug}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center text-sm underline underline-offset-4">{document.title} · {t('openLegal')}</Link>
                     </div>
                   })}
                 </div>
@@ -395,22 +402,22 @@ export default function Checkout() {
                   }} error={legalError} />
                   <button type="button" onClick={() => void prepareCardPayment()} disabled={busy}
                     className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs hover:bg-nrs-black/90 transition-all">
-                    {busy ? 'Garanti BBVA’ya yönlendiriliyorsunuz…' : 'Garanti BBVA ödeme sayfasına geç'}
+                    {busy ? t('bankRedirecting') : t('goToBank')}
                   </button>
                   {paymentMessage && <p role="status" className="text-sm text-nrs-ink/65">{paymentMessage}</p>}
-                  {pendingOrderUrl && <Link href={pendingOrderUrl} className="inline-flex min-h-11 items-center text-sm underline">Bekleyen test siparişine devam et</Link>}
+                  {pendingOrderUrl && <Link href={pendingOrderUrl} className="inline-flex min-h-11 items-center text-sm underline">{t('resumeTestOrder')}</Link>}
                 </div>}
                 {!ENABLE_CARD_PAYMENT && <div className="space-y-3 border border-nrs-ink/15 p-4 sm:p-6">
                   <button type="button" disabled aria-describedby="checkout-card-payment-status"
                     className="flex min-h-12 w-full items-center justify-center bg-nrs-charcoal px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ivory opacity-50 cursor-not-allowed">
-                    Kartla Ödeme Yap
+                    {t('cardPayment')}
                   </button>
                   <CardPaymentNotice id="checkout-card-payment-status" />
                 </div>}
                 {!ENABLE_CARD_PAYMENT && confirmedQuote && <div className="space-y-3">
                   <CheckoutLegalConsent accepted={contractAccepted} onChange={value => setAcceptedSnapshot(value ? snapshotKey : null)} error={legalError} />
-                  <button type="button" disabled={busy || !!savedOrder} onClick={() => void saveManualOrder()} className="w-full bg-nrs-charcoal py-4 text-nrs-ivory">{busy ? 'Kaydediliyor…' : 'Havale / WhatsApp sipariş talebini kaydet'}</button>
-                  {savedOrder && <p role="status">Sipariş talebiniz kaydedildi: {savedOrder}. Ödeme alınmadı; teyit için WhatsApp üzerinden iletişime geçin.</p>}
+                  <button type="button" disabled={busy || !!savedOrder} onClick={() => void saveManualOrder()} className="w-full bg-nrs-charcoal py-4 text-nrs-ivory">{busy ? t('saving') : t('saveTransferRequest')}</button>
+                  {savedOrder && <p role="status">{t('requestSaved')}: {savedOrder}. {t('paymentNotTaken')}</p>}
                 </div>}
               </div>
             )}
@@ -420,29 +427,31 @@ export default function Checkout() {
           <aside aria-label="Sipariş özeti" className="order-first min-w-0 lg:order-none lg:sticky lg:top-[calc(var(--nrs-header-height)+1.5rem)]">
             <section className="rounded-sm border border-nrs-ink/10 bg-nrs-panel/70 p-4 sm:p-5">
               <div className="mb-3 flex items-baseline justify-between gap-3">
-                <h2 className="font-serif text-xl text-nrs-ink">Sipariş özeti</h2>
-                <span className="text-xs text-nrs-ink/55">{orderSummary.items.reduce((sum, item) => sum + item.quantity, 0)} ürün</span>
+              <h2 className="font-serif text-xl text-nrs-ink">{t('orderSummary')}</h2>
+                <span className="text-xs text-nrs-ink/55">{orderSummary.items.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}</span>
               </div>
               <ul className="divide-y divide-nrs-ink/10">
                 {orderSummary.items.map((item, index) => <li key={`${item.productId}-${index}`} className="flex min-w-0 justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="break-words text-sm leading-5 text-nrs-ink">{item.name}</p>
-                    <p className="mt-1 text-xs text-nrs-ink/55">{item.size ? `Ölçü ${item.size} · ` : ''}{item.quantity} adet</p>
+                    <p className="mt-1 text-xs text-nrs-ink/55">{item.size ? <>{t('sizeLabel')} <bdi dir="ltr">{item.size}</bdi> · </> : ''}{item.quantity} {t('pieces')}</p>
                     {item.measurements && <details className="mt-1 min-w-0">
-                      <summary className="inline-flex min-h-8 cursor-pointer items-center text-xs text-nrs-ink/60 underline underline-offset-2">Özel ölçüler</summary>
-                      <p className="break-words pb-1 text-xs leading-5 text-nrs-ink/60">{formatMeasurements(item.measurements) || 'Ölçü belirtilmedi'}</p>
+                      <summary className="inline-flex min-h-8 cursor-pointer items-center text-xs text-nrs-ink/60 underline underline-offset-2">{t('customMeasurements')}</summary>
+                      <p className="break-words pb-1 text-xs leading-5 text-nrs-ink/60">{formatLocalizedMeasurements(item.measurements, locale) || t('measurementsUnspecified')}</p>
                     </details>}
                   </div>
-                  <span className="shrink-0 text-sm tabular-nums text-nrs-ink">{money(item.unitPrice * item.quantity)}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-nrs-ink">{summaryDisplay?.itemLineMinor[index] !== undefined ? formatMinor(summaryDisplay.itemLineMinor[index], summaryDisplay.locale, summaryRate) : displaySummaryMoney(item.unitPrice * item.quantity)}</span>
                 </li>)}
               </ul>
               <dl className="space-y-2 border-t border-nrs-ink/10 pt-3 text-sm">
-                <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>Ara toplam</dt><dd className="tabular-nums">{money(orderSummary.subtotal)}</dd></div>
-                {orderSummary.discount > 0 && <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>İndirim</dt><dd className="tabular-nums">−{money(orderSummary.discount)}</dd></div>}
-                <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>Kargo</dt><dd>{orderSummary.shipping === null ? 'Sipariş teyidinde' : orderSummary.shipping === 0 ? 'Ücretsiz' : money(orderSummary.shipping)}</dd></div>
-                <div className="flex items-baseline justify-between gap-3 border-t border-nrs-ink/10 pt-3 font-medium text-nrs-ink"><dt>Toplam</dt><dd className="font-serif text-2xl tabular-nums">{money(orderSummary.total)}</dd></div>
+                <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>{t('productTotal')}</dt><dd className="tabular-nums">{summaryDisplay ? formatMinor(summaryDisplay.subtotalMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.subtotal)}</dd></div>
+                {orderSummary.discount > 0 && <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>{t('discount')}</dt><dd className="tabular-nums">−{summaryDisplay ? formatMinor(summaryDisplay.discountMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.discount)}</dd></div>}
+                <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>{t('shipping')}</dt><dd>{orderSummary.shipping === null ? t('shippingConfirmed') : orderSummary.shipping === 0 ? t('free') : summaryDisplay ? formatMinor(summaryDisplay.shippingMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.shipping)}</dd></div>
+                <div className="flex items-baseline justify-between gap-3 border-t border-nrs-ink/10 pt-3 font-medium text-nrs-ink"><dt>{t('total')}</dt><dd className="font-serif text-2xl tabular-nums">{summaryDisplay ? formatMinor(summaryDisplay.totalMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.total)}</dd></div>
               </dl>
-              {!confirmedQuote && <p className="mt-3 text-xs leading-5 text-nrs-ink/55">Tutar, stok ve teslimat bedeli sunucuda doğrulanınca kesinleşir.</p>}
+              {locale !== 'tr' && <p className="mt-2 text-xs leading-5 text-nrs-ink/60">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
+              {ENABLE_CARD_PAYMENT && confirmedQuote && <p className="mt-2 border-t border-nrs-ink/10 pt-2 text-xs leading-5 text-nrs-ink/70">{t('paymentTry')} <bdi dir="ltr">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(orderSummary.total)}</bdi></p>}
+              {!confirmedQuote && <p className="mt-3 text-xs leading-5 text-nrs-ink/55">{t('quotePending')}</p>}
             </section>
             <div className="mt-3">
               <CartWhatsappOrder items={items.map(item => ({ ...item, measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {} }))} total={orderSummary.total} customer={{ ...formData, orderId: confirmedQuote ? savedOrder || undefined : undefined }} compact />

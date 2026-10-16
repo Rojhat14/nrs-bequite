@@ -8,7 +8,10 @@ import { isHomeCategory } from '@/lib/home-category'
 import { getHomeCategoryCover } from '@/lib/storage/category-covers'
 import HomeEmbroideryRequest from '@/components/HomeEmbroideryRequest'
 import { whatsappUrl } from '@/lib/storefront-config'
+import { headers } from 'next/headers'
+import { isLocale, languageAlternates, type Locale } from '@/lib/i18n/messages'
 import WhatsAppIcon from '@/components/WhatsAppIcon'
+import { getRequestLocale } from '@/lib/i18n/request-locale'
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>
@@ -48,19 +51,22 @@ async function getPageData(slug: string) {
 
 export async function generateMetadata({ params: paramsPromise }: CategoryPageProps): Promise<Metadata> {
   const params = await paramsPromise
+  const requestHeaders = await headers()
+  const currentLocale = requestHeaders.get('x-nrs-locale')
+  const locale: Locale = isLocale(currentLocale) ? currentLocale : 'tr'
   const { category } = await getPageData(params.slug)
   if (!category) return { title: 'Kategori bulunamadı | NRS' }
   return {
     title: `NRS | ${category.name}`,
     // Keep aliases self-referencing; category consolidation is a separate phase.
-    alternates: { canonical: `/category/${encodeURIComponent(params.slug)}` },
+    alternates: { canonical: `${locale === 'tr' ? '' : `/${locale}`}/category/${encodeURIComponent(params.slug)}`, languages: languageAlternates(`/category/${encodeURIComponent(params.slug)}`) },
     description: category.description || `${category.name} kategorisindeki NRS tasarımlarını keşfedin.`,
   }
 }
 
 export default async function CategoryPage({ params: paramsPromise }: CategoryPageProps) {
   const params = await paramsPromise
-  const { category, products } = await getPageData(params.slug)
+  const [{ category, products }, locale] = await Promise.all([getPageData(params.slug), getRequestLocale()])
   if (!category) notFound()
   const banner = categoryBanners[params.slug.toLowerCase()] ?? categoryBanners[category.slug] ?? {
     title: category.name.toLocaleUpperCase('tr-TR'),
@@ -71,15 +77,17 @@ export default async function CategoryPage({ params: paramsPromise }: CategoryPa
 
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
-      <CategoryHero title={banner.title} description={isHomeCategory(category)
-        ? 'İsminiz, baş harfleriniz veya hayalinizdeki desenle kişiye özel nakışlı nevresimler. Sizin için tasarlayalım.'
-        : banner.description} image={image}>
+      <CategoryHero title={locale === 'tr' ? banner.title : category.name.toLocaleUpperCase(locale === 'ar' ? 'ar' : 'en-US')} description={isHomeCategory(category)
+        ? locale === 'en' ? 'Personalised embroidered bedding with your name, initials or a design you imagine. Let us create it with you.'
+          : locale === 'ar' ? 'مفروشات مطرزة حسب الطلب باسمك أو بأحرفك الأولى أو بنقش تختارينه. دعينا نصممها لك.'
+            : 'İsminiz, baş harfleriniz veya hayalinizdeki desenle kişiye özel nakışlı nevresimler. Sizin için tasarlayalım.'
+        : locale === 'tr' ? (category.description || banner.description) : (category.description || banner.description)} image={image}>
         {isHomeCategory(category) && <>
-          {whatsappUrl() && <a href={whatsappUrl('Merhaba, NRS HOME kişiye özel nakışlı nevresim için bilgi almak istiyorum.')!}
+          {whatsappUrl(locale === 'en' ? 'Hello, I would like information about personalised embroidered NRS HOME bedding.' : locale === 'ar' ? 'مرحباً، أود الاستفسار عن مفروشات NRS HOME المطرزة حسب الطلب.' : 'Merhaba, NRS HOME kişiye özel nakışlı nevresim için bilgi almak istiyorum.') && <a href={whatsappUrl(locale === 'en' ? 'Hello, I would like information about personalised embroidered NRS HOME bedding.' : locale === 'ar' ? 'مرحباً، أود الاستفسار عن مفروشات NRS HOME المطرزة حسب الطلب.' : 'Merhaba, NRS HOME kişiye özel nakışlı nevresim için bilgi almak istiyorum.')!}
             target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-3 bg-white px-6 py-3 text-sm text-nrs-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
-            <WhatsAppIcon />Kişiye Özel Nakış İçin İletişime Geç
+            <WhatsAppIcon />{locale === 'en' ? 'Ask about custom embroidery' : locale === 'ar' ? 'استفسري عن التطريز حسب الطلب' : 'Kişiye Özel Nakış İçin İletişime Geç'}
           </a>}
-          <a href="#nakis-talebi" className="inline-flex min-h-12 items-center border border-white/70 px-6 py-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">Nakış İsteğini Not Et</a>
+          <a href="#nakis-talebi" className="inline-flex min-h-12 items-center border border-white/70 px-6 py-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">{locale === 'en' ? 'Add an embroidery request' : locale === 'ar' ? 'أضيفي طلب تطريز' : 'Nakış İsteğini Not Et'}</a>
         </>}
       </CategoryHero>
       {isHomeCategory(category) && <HomeEmbroideryRequest />}

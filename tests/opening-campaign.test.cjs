@@ -10,7 +10,8 @@ test('Storefront renders the campaign as its only top announcement', () => {
   const navigation = fs.readFileSync(path.join(__dirname, '../src/components/Navigation.tsx'), 'utf8')
   const shell = fs.readFileSync(path.join(__dirname, '../src/components/StorefrontShell.tsx'), 'utf8')
   assert.doesNotMatch(navigation, /Kargo ve Teslimat Bilgileri Sipariş Teyidinde Paylaşılır/)
-  assert.match(navigation, /openingCampaign\.announcement/)
+  assert.match(navigation, /openingCampaign &&/)
+  assert.match(navigation, /t\('campaign'\)/)
   assert.doesNotMatch(shell, /getOpeningCampaign|role="status"/)
 })
 
@@ -51,8 +52,8 @@ test('WhatsApp order messages show normal subtotal, campaign reduction, and paya
     { id: 'dress', name: 'Elbise', slug: 'elbise', quantity: 1, unitPrice: 24900, compareAtPrice: 30000 },
     { id: 'home', name: 'Nevresim', slug: 'nevresim', quantity: 1, unitPrice: 7490 },
   ], 1)
-  assert.match(message, /Ürünler toplamı: 32\.390 TL/)
-  assert.match(message, /Açılışa Özel %20 İndirim: −6\.478 TL/)
-  assert.match(message, /Ödenecek toplam: 25\.912 TL/)
+  assert.match(message, /Ürünler toplamı: ₺32\.390,00/)
+  assert.match(message, /Açılışa Özel %20 İndirim: −₺6\.478,00/)
+  assert.match(message, /Ödenecek toplam: ₺25\.912,00/)
   assert.doesNotMatch(message, /30\.000/)
 })

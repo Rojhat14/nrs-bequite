@@ -11,11 +11,15 @@ import Image from 'next/image';
 import ProfileHeader from './components/ProfileHeader';
 import OrderHistory from './components/OrderHistory';
 import WishlistGrid from './components/WishlistGrid';
+import { useLocale } from '@/context/LocaleContext'
+import { localePrefix } from '@/lib/i18n/messages'
 
 export default function ProfilePage() {
   const { user, profile, loading } = useAuth();
   const { openDrawer } = useCart();
   const router = useRouter();
+  const { locale, t } = useLocale()
+  const prefix = localePrefix(locale)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -36,9 +40,9 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-nrs-canvas flex">
       {/* LEFT SIDEBAR NAVIGATION - Consistent with Checkout */}
-      <aside className="fixed left-0 top-[var(--nrs-header-height)] bottom-0 w-64 bg-nrs-panel border-r border-nrs-ink/10 hidden md:flex flex-col items-center py-12 px-6 z-50">
+      <aside className="fixed start-0 top-[var(--nrs-header-height)] bottom-0 w-64 bg-nrs-panel border-e border-nrs-ink/10 hidden md:flex flex-col items-center py-12 px-6 z-50">
         <div className="mb-12">
-          <Link href="/" className="flex flex-col items-center gap-1">
+          <Link href={`${prefix}/`} className="flex flex-col items-center gap-1">
             <Image
               src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
               alt="Logo"
@@ -54,25 +58,25 @@ export default function ProfilePage() {
 
         <nav className="flex flex-col gap-8 w-full">
           <Link
-            href="/"
+            href={`${prefix}/`}
             className="flex items-center gap-4 text-nrs-ink/60 hover:text-nrs-ink transition-colors group"
           >
             <Home size={20} className="group-hover:scale-110 transition-transform" />
-            <span className="hidden md:block text-xs uppercase tracking-widest">Home</span>
+            <span className="hidden md:block text-xs uppercase tracking-widest">{t('sidebarHome')}</span>
           </Link>
           <Link
-            href="/profile"
+            href={`${prefix}/profile`}
             className="flex items-center gap-4 text-nrs-ink hover:text-nrs-ink transition-colors group"
           >
             <User size={20} className="group-hover:scale-110 transition-transform" />
-            <span className="hidden md:block text-xs uppercase tracking-widest font-medium">My Account</span>
+            <span className="hidden md:block text-xs uppercase tracking-widest font-medium">{t('sidebarAccount')}</span>
           </Link>
           <button
             onClick={openDrawer}
             className="flex items-center gap-4 text-nrs-ink/60 hover:text-nrs-ink transition-colors group"
           >
             <ShoppingBag size={20} className="group-hover:scale-110 transition-transform" />
-            <span className="hidden md:block text-xs uppercase tracking-widest">Bag</span>
+            <span className="hidden md:block text-xs uppercase tracking-widest">{t('sidebarBag')}</span>
           </button>
         </nav>
 
@@ -82,13 +86,13 @@ export default function ProfilePage() {
             className="hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors"
           >
             <ArrowLeft size={14} />
-            Return to Atelier
+              {t('backToAtelier')}
           </button>
         </div>
       </aside>
 
       {/* MAIN CONTENT - Pushed to the right to make space for sidebar */}
-      <main className="min-w-0 flex-1 md:ml-64 pt-[var(--nrs-header-height)]">
+      <main className="min-w-0 flex-1 md:ms-64 pt-[var(--nrs-header-height)]">
         <div className="max-w-4xl mx-auto py-20 px-8">
           <div className="mb-12">
             <button
@@ -96,10 +100,10 @@ export default function ProfilePage() {
               className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors mb-6 group"
             >
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              Back to Atelier
+              {t('backToAtelier')}
             </button>
-            <h1 className="font-serif text-4xl md:text-5xl mb-3 text-nrs-ink">My Account</h1>
-            <p className="text-nrs-ink/65">Manage your personal details, view orders and your curated wishlist.</p>
+            <h1 className="font-serif text-4xl md:text-5xl mb-3 text-nrs-ink">{t('myAccountTitle')}</h1>
+            <p className="text-nrs-ink/65">{t('myAccountDescription')}</p>
           </div>
 
           <div className="space-y-20">

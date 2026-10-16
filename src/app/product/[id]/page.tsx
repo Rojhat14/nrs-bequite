@@ -3,6 +3,9 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getStorefrontProduct } from '@/lib/products'
 import { buildProductStructuredData } from '@/lib/product-structured-data'
+import { headers } from 'next/headers'
+import { isLocale, languageAlternates, type Locale } from '@/lib/i18n/messages'
+import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -10,20 +13,25 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params: paramsPromise }: ProductPageProps): Promise<Metadata> {
   const params = await paramsPromise
+  const requestHeaders = await headers()
+  const currentLocale = requestHeaders.get('x-nrs-locale')
+  const locale: Locale = isLocale(currentLocale) ? currentLocale : 'tr'
   const product = await getStorefrontProduct(params.id)
   if (!product) return { title: 'Ürün bulunamadı | NRS' }
   return {
     title: `NRS | ${product.name}`,
-    alternates: { canonical: `/product/${encodeURIComponent(product.slug || product.id)}` },
+    alternates: { canonical: `${locale === 'tr' ? '' : `/${locale}`}/product/${encodeURIComponent(product.slug || product.id)}`, languages: languageAlternates(`/product/${encodeURIComponent(product.slug || product.id)}`) },
     description: product.description || `${product.name} ürününü NRS'de keşfedin.`,
   }
 }
 
 export default async function ProductPage({ params: paramsPromise }: ProductPageProps) {
   const params = await paramsPromise
-  const product = await getStorefrontProduct(params.id)
+  const [product, requestHeaders, rate] = await Promise.all([getStorefrontProduct(params.id), headers(), getCurrentUsdTryRate()])
   if (!product) notFound()
-  const structuredData = JSON.stringify(buildProductStructuredData(product)).replace(/</g, '\\u003c')
+  const headerLocale = requestHeaders.get('x-nrs-locale')
+  const locale: Locale = isLocale(headerLocale) ? headerLocale : 'tr'
+  const structuredData = JSON.stringify(buildProductStructuredData(product, locale, rate)).replace(/</g, '\\u003c')
   return <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />
     <ProductDetail product={product} />

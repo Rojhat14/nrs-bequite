@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { canOptimizeImage } from '@/lib/imageOptimization'
 import type { ReactNode } from 'react'
+import { useLocale } from '@/context/LocaleContext'
+import { marketing } from '@/lib/i18n/marketing'
 
 interface CategoryHeroProps {
   title: string
@@ -14,6 +16,7 @@ interface CategoryHeroProps {
 }
 
 export default function CategoryHero({ title, description, image, children }: CategoryHeroProps) {
+  const { locale } = useLocale()
   const [imageUnavailable, setImageUnavailable] = useState(!image)
 
   useEffect(() => {
@@ -31,7 +34,7 @@ export default function CategoryHero({ title, description, image, children }: Ca
           <Image src={image} alt={title} fill sizes="100vw" priority
             unoptimized={!canOptimizeImage(image)}
             onError={() => setImageUnavailable(true)} className="object-cover" />
-        </motion.div> : <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${title} — görsel henüz eklenmedi`} />}
+        </motion.div> : <div className="absolute inset-0 bg-nrs-panel" role="img" aria-label={`${title} — ${marketing(locale, 'missingCategoryImage')}`} />}
       <div className={`${children ? 'relative min-h-[max(60svh,calc(var(--nrs-header-height)+22rem))]' : 'absolute inset-0'} bg-black/40 flex flex-col items-center justify-center text-center text-white px-4 pb-8 pt-[calc(var(--nrs-header-height)+2rem)]`}>
         <motion.h1
           initial={{ opacity: 0, y: 20 }}

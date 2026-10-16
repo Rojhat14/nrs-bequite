@@ -4,8 +4,14 @@ import React from 'react';
 import { m as motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useLocale } from '@/context/LocaleContext'
+import { localePrefix } from '@/lib/i18n/messages'
+import { marketing } from '@/lib/i18n/marketing'
 
 export default function AboutPage() {
+  const { locale } = useLocale()
+  const prefix = localePrefix(locale)
+  const t = (key: Parameters<typeof marketing>[1]) => marketing(locale, key)
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
@@ -21,7 +27,7 @@ export default function AboutPage() {
           >
             <Image
               src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"
-              alt="NRS Modern Zarafet"
+              alt={t('aboutImage1')}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -37,28 +43,24 @@ export default function AboutPage() {
             className="space-y-8"
           >
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">NRS Hakkında</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">{t('aboutEyebrow')}</span>
               <h1 className="text-4xl md:text-6xl font-serif leading-tight">
-                MODERN ZARAFETİN YENİ YORUMU
+                {t('aboutTitle')}
               </h1>
             </div>
 
             <div className="space-y-6 text-nrs-ink/70 font-light text-lg leading-relaxed">
               <p>
-                NRS, modern kadının stilini özgün bir tasarım diliyle ifade etme tutkusundan doğdu.
-                Çağdaş kadın modasını; güçlü silüetler, rafine detaylar ve seçkin kumaşların kusursuz dengesiyle yeniden yorumlayan premium bir kadın giyim markasıyız.
+                {t('aboutP1')}
               </p>
               <p>
-                Bizim için moda, yalnızca sezon trendlerini takip etmek değil; zamansız tasarım anlayışını modern terzilikle buluşturmaktır.
-                Bir giysinin kesimi, dokusu ve hareketi, onu taşıyan kişinin karakterini yansıtan sessiz bir dile dönüşür.
+                {t('aboutP2')}
               </p>
               <p>
-                Tasarım felsefemizin merkezinde &quot;daha fazla&quot; yerine &quot;daha anlamlı&quot; yaklaşımı yer alır.
-                Seçkin kumaşlar ve dengeli oranlar ile hayat verdiğimiz <Link href="/collections" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">koleksiyonlarımız</Link>,
-                yalnızca estetik bir görünüm değil, aynı zamanda kişisel bir ifade biçimi sunar.
+                {t('aboutP3a')}<Link href={`${prefix}/collections`} className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">{t('aboutCollections')}</Link>{t('aboutP3b')}
               </p>
               <p>
-                Modern silüetler ve rafine detaylarla örülü dünyamızda, lüksü gösterişte değil, tasarımın ve işçiliğin detaylarında arıyoruz.
+                {t('aboutP4')}
               </p>
             </div>
           </motion.div>
@@ -75,7 +77,7 @@ export default function AboutPage() {
           >
             <Image
               src="https://images.unsplash.com/photo-1485231183945-fffde7e1ca17?q=80&w=2070&auto=format&fit=crop"
-              alt="NRS Kadını"
+              alt={t('womanImage')}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -91,27 +93,21 @@ export default function AboutPage() {
             className="order-1 md:order-2 space-y-8"
           >
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">NRS Kadını</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">{t('womanEyebrow')}</span>
               <h2 className="text-4xl md:text-6xl font-serif leading-tight">
-                KENDİ TARZININ ÖZNESİ
+                {t('womanTitle')}
               </h2>
             </div>
 
             <div className="space-y-6 text-nrs-ink/70 font-light text-lg leading-relaxed">
               <p>
-                NRS kadını, dikkat çekmek için değil, kendisini ifade etmek için giyinir.
-                Onun için stil, geçici bir görünümden ziyade, dünyaya karşı takındığı bilinçli bir duruş biçimidir.
-                Özgüvenini detayların gücünden alan, başkalarının onayına ihtiyaç duymayan modern bir zarafeti temsil eder.
+                {t('womanP1')}
               </p>
               <p>
-                Günlük hayatın dinamizminde keskin hatlı bir <Link href="/category/ceketler-blazerlar" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">kadın blazer</Link>,
-                özel bir akşamda akışkan bir <Link href="/category/elbiseler" className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">kadın elbise</Link>
-                ya da tesettür stilinde zamansız bir siluet...
-                Her parça, onun hayatının farklı anlarına eşlik eden birer imza niteliğindedir.
+                {t('womanP2a')}<Link href={`${prefix}/category/ceketler-blazerlar`} className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">{t('womanBlazer')}</Link>{t('womanP2b')}<Link href={`${prefix}/category/elbiseler`} className="underline underline-offset-4 decoration-nrs-black/20 hover:decoration-nrs-black transition-colors">{t('womanDress')}</Link>{t('womanP2c')}
               </p>
               <p>
-                Kendi stilini bilen ve detaylara önem veren NRS kadını, zamansız stil anlayışını çağdaş moda ile harmanlayarak özgünlüğünü korur.
-                Güçlü, zarif ve her zaman kendisi.
+                {t('womanP3')}
               </p>
             </div>
           </motion.div>
@@ -128,7 +124,7 @@ export default function AboutPage() {
           >
             <Image
               src="https://images.unsplash.com/photo-1558769132-cb14497891a4?q=80&w=2070&auto=format&fit=crop"
-              alt="NRS Atölye"
+              alt={t('atelierImage')}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -144,27 +140,24 @@ export default function AboutPage() {
             className="space-y-8"
           >
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">Atölye</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">{t('atelierEyebrow')}</span>
               <h2 className="text-4xl md:text-6xl font-serif leading-tight">
-                TASARIMIN DETAYA DÖNÜŞTÜĞÜ YER
+                {t('atelierTitle')}
               </h2>
             </div>
 
             <div className="space-y-6 text-nrs-ink/70 font-light text-lg leading-relaxed">
               <p>
-                NRS Atölyesi, bir fikrin somut bir sanat eserine dönüştüğü, sabrın ve titizliğin ön planda olduğu bir üretim merkezidir.
-                Her tasarım, önce zihinde bir silüet olarak belirir; ardından oranlar, kumaş seçimi ve kesim aşamalarıyla hayat bulur.
+                {t('atelierP1')}
               </p>
               <p>
-                Tasarım sürecimiz; doğru kumaşın seçimiyle başlar, milimetrik kesimlerle devam eder ve usta bir terzilik anlayışıyla son dokunuşuna ulaşır.
-                Dikişlerin her bir hattı, kumaşın her bir kıvrımı, lüksün yalnızca bir etiket değil, bir deneyim olduğu inancıyla işlenir.
+                {t('atelierP2')}
               </p>
               <p>
-                Sınırlı üretim anlayışını benimsediğimiz atölyemizde, gösterişli detaylar yerine rafine ve anlamlı detaylara odaklanırız.
-                Kaliteyi, malzemenin saflığında ve işçiliğin kusursuzluğunda arayan bir yaklaşımla, her parçayı özel bir tasarım objesi olarak ele alırız.
+                {t('atelierP3')}
               </p>
               <p>
-                NRS için gerçek lüks, görünmeyenin içindeki özenle gizlidir.
+                {t('atelierP4')}
               </p>
             </div>
           </motion.div>

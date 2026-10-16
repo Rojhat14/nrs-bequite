@@ -1,9 +1,17 @@
 import type { Metadata } from 'next'
 import HomePageContent from '@/components/HomePageContent'
 import { getStorefrontProducts } from '@/lib/products'
+import { headers } from 'next/headers'
+import { isLocale } from '@/lib/i18n/messages'
 
-export const metadata: Metadata = {
-  alternates: { canonical: '/' },
+export async function generateMetadata(): Promise<Metadata> {
+  const localeHeader = (await headers()).get('x-nrs-locale')
+  const locale = isLocale(localeHeader) ? localeHeader : 'tr'
+  const canonical = `https://nrsbequiteluminous.com${locale === 'tr' ? '' : `/${locale}`}` || 'https://nrsbequiteluminous.com/'
+  return { alternates: { canonical, languages: {
+    tr: 'https://nrsbequiteluminous.com/', en: 'https://nrsbequiteluminous.com/en', ar: 'https://nrsbequiteluminous.com/ar',
+    'x-default': 'https://nrsbequiteluminous.com/',
+  } } }
 }
 
 const siteUrl = 'https://nrsbequiteluminous.com/'

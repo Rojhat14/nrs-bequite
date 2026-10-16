@@ -5,31 +5,37 @@ import { m as motion } from 'framer-motion';
 import Link from 'next/link';
 import EditorialImage from '@/components/EditorialImage'
 import { getCollectionEditorialImage } from '@/lib/editorialImages'
+import { useLocale } from '@/context/LocaleContext'
+import { localePrefix } from '@/lib/i18n/messages'
+import { marketing } from '@/lib/i18n/marketing'
 
 const CategoryMood = () => {
+  const { locale } = useLocale()
+  const prefix = localePrefix(locale)
+  const t = (key: Parameters<typeof marketing>[1]) => marketing(locale, key)
   const moods = [
     {
-      name: 'GÜNDÜZ',
+      name: t('moodDay'),
       collectionSlug: 'gunduz',
-      description: 'Günün zarafeti. Günün her anına eşlik eden sade, modern ve rafine siluetler.',
+      description: t('moodDayBody'),
       href: '/category/ust-giyim'
     },
     {
-      name: 'GECE',
+      name: t('moodNight'),
       collectionSlug: 'gece',
-      description: 'Gecenin kendine özgü hali. Işığı yakalayan dokular ve güçlü siluetlerle akşamın ritmine uyum sağlayan tasarımlar.',
+      description: t('moodNightBody'),
       href: '/category/elbiseler'
     },
     {
-      name: 'TESETTÜR',
+      name: t('moodModest'),
       collectionSlug: 'davet',
-      description: 'Tesettür stiline eşlik eden zarif siluetler ve özenle seçilmiş parçalar.',
+      description: t('moodModestBody'),
       href: '/category/elbiseler'
     },
     {
-      name: 'İMZA',
+      name: t('moodSignature'),
       collectionSlug: 'imza',
-      description: "NRS'nin karakteri. Markanın estetik anlayışını tanımlayan özgün ve zamansız parçalar.",
+      description: t('moodSignatureBody'),
       href: '/collections'
     },
   ];
@@ -44,7 +50,7 @@ const CategoryMood = () => {
             viewport={{ once: true }}
             className="text-4xl md:text-6xl font-serif text-nrs-ink tracking-tight"
           >
-            TARZINI KEŞFET
+            {t('moodTitle')}
           </motion.h2>
           <div className="h-px w-20 bg-nrs-black/20 mx-auto"></div>
         </div>
@@ -59,7 +65,7 @@ const CategoryMood = () => {
               viewport={{ once: true }}
               className="relative group cursor-pointer overflow-hidden aspect-[3/4]"
             >
-              <Link href={mood.href} className="block w-full h-full relative">
+              <Link href={`${prefix}${mood.href}`} className="block w-full h-full relative">
                 <EditorialImage
                   src={getCollectionEditorialImage(mood.collectionSlug)}
                   alt={mood.name}
@@ -80,7 +86,7 @@ const CategoryMood = () => {
                 </div>
 
                 {/* Bottom Line */}
-                <div className="absolute bottom-0 left-0 w-0 h-px bg-white transition-all duration-700 group-hover:w-full"></div>
+                <div className="absolute bottom-0 start-0 w-0 h-px bg-white transition-all duration-700 group-hover:w-full"></div>
               </Link>
             </motion.div>
           ))}

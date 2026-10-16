@@ -7,11 +7,15 @@ import { useAuth } from '@/context/AuthContext';
 import { Package } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 import OrderLegalDocuments from '@/components/legal/OrderLegalDocuments';
+import { useLocale } from '@/context/LocaleContext'
+import { localePrefix } from '@/lib/i18n/messages'
 
 type Order = { id: string; created_at: string; status: string; total_amount: number | string };
 
 export default function OrderHistory() {
   const { user } = useAuth();
+  const { locale, money, t } = useLocale()
+  const prefix = localePrefix(locale)
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -31,7 +35,7 @@ export default function OrderHistory() {
         setOrders(data || []);
       } catch (err) {
         console.error('Error fetching orders:', err);
-        setErrorMessage('Siparişler yüklenemedi. Lütfen sayfayı yenileyerek tekrar deneyin.');
+        setErrorMessage('ordersLoadFailed');
       } finally {
         setLoading(false);
       }
@@ -40,24 +44,24 @@ export default function OrderHistory() {
   useEffect(() => { void fetchOrders(); }, [fetchOrders]);
 
   const statusLabel: Record<string, string> = {
-    pending: 'Bekliyor', payment_pending: 'Ödeme bekleniyor', paid: 'Ödendi', processing: 'Hazırlanıyor',
-    payment_failed: 'Ödeme alınamadı', failed: 'Ödeme alınamadı', shipped: 'Kargoya verildi', delivered: 'Teslim edildi', cancelled: 'İptal edildi', refunded: 'İade edildi',
+    pending: t('orderStatusPending'), payment_pending: t('orderStatusPaymentPending'), paid: t('orderStatusPaid'), processing: t('orderStatusProcessing'),
+    payment_failed: t('orderStatusFailed'), failed: t('orderStatusFailed'), shipped: t('orderStatusShipped'), delivered: t('orderStatusDelivered'), cancelled: t('orderStatusCancelled'), refunded: t('orderStatusRefunded'),
   };
 
   return (
     <div id="orders" className="space-y-8 scroll-mt-32">
       <div className="flex items-center gap-4">
         <Package size={20} className="text-nrs-ink/60" />
-        <h2 className="text-2xl font-serif italic text-nrs-ink">Order History</h2>
+        <h2 className="text-2xl font-serif italic text-nrs-ink">{t('orderHistory')}</h2>
       </div>
 
-      {errorMessage ? <p role="alert" className="text-sm text-red-400">{errorMessage}</p> : loading ? (
+      {errorMessage ? <p role="alert" className="text-sm text-red-400">{t('ordersLoadFailed')}</p> : loading ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-nrs-ink/20 border-t-nrs-ink rounded-full animate-spin" />
         </div>
       ) : orders.length === 0 ? (
         <div className="text-center py-12 px-6 bg-nrs-panel/30 border border-dashed border-nrs-ink/20">
-          <p className="text-sm text-nrs-ink/65 font-light italic">No acquisitions found in your history.</p>
+          <p className="text-sm text-nrs-ink/65 font-light italic">{t('emptyOrderHistory')}</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -70,13 +74,13 @@ export default function OrderHistory() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-nrs-ink/60">Order ID</p>
-                  <p className="text-xs font-mono text-nrs-ink">{order.id.slice(0, 8)}...</p>
+                  <p className="text-[10px] uppercase tracking-widest text-nrs-ink/60">{t('orderIdLabel')}</p>
+                  <p className="text-xs font-mono text-nrs-ink" dir="ltr">{order.id.slice(0, 8)}...</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-widest text-nrs-ink/60">Date</p>
+                  <p className="text-[10px] uppercase tracking-widest text-nrs-ink/60">{t('dateLabel')}</p>
                   <p className="text-xs text-nrs-ink">
-                    {new Date(order.created_at).toLocaleDateString()}
+                    {new Date(order.created_at).toLocaleDateString(locale === 'ar' ? 'ar' : locale)}
                   </p>
                 </div>
               </div>
@@ -86,13 +90,13 @@ export default function OrderHistory() {
                   <div className={`w-1.5 h-1.5 rounded-full ${
                     order.status === 'delivered' ? 'bg-green-500' : 'bg-amber-500'
                   }`} />
-                  <span className="text-xs uppercase tracking-widest text-nrs-ink/60">{statusLabel[order.status] || 'İnceleniyor'}</span>
+                  <span className="text-xs uppercase tracking-widest text-nrs-ink/60">{statusLabel[order.status] || t('orderStatusReviewing')}</span>
                 </div>
                 <span className="text-sm font-serif text-nrs-ink font-medium">
-                  ₺{Number(order.total_amount).toLocaleString('tr-TR')}
+                  {money(Number(order.total_amount))}
                 </span>
               </div>
-              <Link href={`/checkout/verify?orderId=${encodeURIComponent(order.id)}`} className="mt-3 inline-flex min-h-11 items-center text-xs underline text-nrs-ink/65">Ödeme durumu ve sipariş özeti</Link>
+              <Link href={`${prefix}/checkout/verify?orderId=${encodeURIComponent(order.id)}`} className="mt-3 inline-flex min-h-11 items-center text-xs underline text-nrs-ink/65">{t('orderPaymentDetails')}</Link>
               <OrderLegalDocuments orderId={order.id} />
             </motion.div>
           ))}

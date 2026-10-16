@@ -2,11 +2,11 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from '@/context/LocaleContext'
 
 const MIN_CLICK_INTERVAL_MS = 5_000
-const UNCERTAIN_COPY = 'Ödeme sonucu henüz netleşmedi. Lütfen daha sonra tekrar kontrol edin.'
-
 export default function GarantiReconcileAction({ orderId }: { orderId: string }) {
+  const { locale, t } = useLocale()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(false)
@@ -20,7 +20,7 @@ export default function GarantiReconcileAction({ orderId }: { orderId: string })
     setCooldown(true)
     window.setTimeout(() => setCooldown(false), MIN_CLICK_INTERVAL_MS)
     setLoading(true)
-    setMessage(UNCERTAIN_COPY)
+    setMessage(t('paymentPending'))
     try {
       const response = await fetch('/api/account/payments/garanti/reconcile', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -30,17 +30,17 @@ export default function GarantiReconcileAction({ orderId }: { orderId: string })
       if (result?.state === 'unverified_closed' || result?.state === 'failed') {
         router.refresh()
       } else {
-        setMessage(UNCERTAIN_COPY)
+        setMessage(t('paymentPending'))
       }
     } catch {
-      setMessage(UNCERTAIN_COPY)
+      setMessage(t('paymentPending'))
     } finally { setLoading(false) }
   }
 
   return <div className="mt-4">
     <button type="button" onClick={checkStatus} disabled={loading || cooldown}
       className="inline-flex min-h-11 items-center justify-center rounded-sm border border-nrs-ink/20 px-4 text-sm text-nrs-ink hover:bg-nrs-panel disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
-      {loading ? 'Kontrol ediliyor…' : 'Tekrar kontrol et'}
+      {loading ? (locale === 'en' ? 'Checking…' : locale === 'ar' ? 'جارٍ التحقق…' : 'Kontrol ediliyor…') : t('checkAgain')}
     </button>
     {message && <p aria-live="polite" className="mt-2 text-sm text-current/70">{message}</p>}
   </div>

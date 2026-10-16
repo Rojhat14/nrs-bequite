@@ -2,8 +2,11 @@
 
 import React from 'react';
 import { m as motion } from 'framer-motion';
+import { useLocale } from '@/context/LocaleContext';
 
 export default function SizeGuidePage() {
+  const { locale } = useLocale();
+  const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr;
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
@@ -15,22 +18,22 @@ export default function SizeGuidePage() {
               animate={{ opacity: 1, y: 0 }}
               className="text-4xl md:text-6xl font-serif tracking-tight"
             >
-              BEDEN REHBERİ
+              {copy('BEDEN REHBERİ', 'SIZE GUIDE', 'دليل المقاسات')}
             </motion.h1>
             <div className="h-px w-20 bg-nrs-black/20 mx-auto"></div>
             <p className="text-nrs-ink/60 font-sans italic text-sm">
-              Size en uygun parçayı bulmanıza yardımcı olmak için hazırladığımız ölçü tablosu.
+              {copy('Size en uygun parçayı bulmanıza yardımcı olmak için hazırladığımız ölçü tablosu.', 'A measurement chart to help you find the most suitable fit.', 'جدول قياسات لمساعدتك في اختيار القطعة الأنسب.')}
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-start border-collapse">
               <thead>
                 <tr className="border-b border-nrs-ink/10">
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">Beden</th>
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">Göğüs (cm)</th>
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">Bel (cm)</th>
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">Basen (cm)</th>
+                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Beden', 'Size', 'المقاس')}</th>
+                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Göğüs (cm)', 'Bust (cm)', 'الصدر (سم)')}</th>
+                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Bel (cm)', 'Waist (cm)', 'الخصر (سم)')}</th>
+                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Basen (cm)', 'Hip (cm)', 'الأرداف (سم)')}</th>
                 </tr>
               </thead>
               <tbody className="text-sm font-sans text-nrs-ink/70">
@@ -53,9 +56,9 @@ export default function SizeGuidePage() {
           </div>
 
           <div className="bg-nrs-panel p-8 border border-nrs-ink/5 space-y-4">
-            <h3 className="text-sm uppercase tracking-widest font-medium">Nasıl Ölçülür?</h3>
+            <h3 className="text-sm uppercase tracking-widest font-medium">{copy('Nasıl ölçülür?', 'How to measure', 'كيفية أخذ القياسات')}</h3>
             <p className="text-sm text-nrs-ink/60 leading-relaxed font-sans">
-              Mezurayı vücudunuzun en geniş noktalarından geçirerek, çok sıkmadan ve çok gevşek bırakmadan ölçüm yapmanızı öneririz. Eğer iki beden arasındaysanız, daha rahat bir kullanım için bir üst bedeni tercih edebilirsiniz.
+              {copy('Mezurayı vücudunuzun en geniş noktalarından geçirerek, çok sıkmadan ve çok gevşek bırakmadan ölçüm yapmanızı öneririz. Eğer iki beden arasındaysanız, daha rahat bir kullanım için bir üst bedeni tercih edebilirsiniz.', 'Measure around the fullest points without pulling the tape too tightly or leaving it loose. If you are between two sizes, consider the larger size for a more comfortable fit.', 'مرري شريط القياس حول أعرض نقاط الجسم دون شده كثيراً أو تركه مرتخياً. إذا كنتِ بين مقاسين، يمكنك اختيار المقاس الأكبر لملاءمة أكثر راحة.')}
             </p>
           </div>
         </div>

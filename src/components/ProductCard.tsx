@@ -12,7 +12,8 @@ import { lookupWishlist } from '@/lib/wishlistClient';
 import { Product } from '@/data/products';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { discountForUnitMinor, isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign';
+import { discountForUnitMinor, isOpeningCampaignActive } from '@/lib/opening-campaign';
+import { useLocale } from '@/context/LocaleContext';
 
 interface ProductCardProps {
   product: Product;
@@ -25,6 +26,7 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
   const openDrawer = useCart(state => state.openDrawer);
   const router = useRouter();
   const { user } = useAuth();
+  const { locale, money, t, fxAvailable } = useLocale();
   const userId = user?.id;
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
@@ -147,12 +149,14 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
         <h3 className="text-lg font-serif text-nrs-ink group-hover:text-nrs-rosegold transition-colors duration-500 leading-tight">
           <Link href={`/product/${encodeURIComponent(product.slug || product.id)}`}>{product.name}</Link>
         </h3>
-        <p className="text-sm font-sans text-nrs-ink/60 font-light">
-          {product.price}
+          <p className="text-sm font-sans text-nrs-ink/60 font-light">
+          {product.priceAmount == null ? product.price : money(product.priceAmount)}
         </p>
         {isOpeningCampaignActive() && product.priceAmount != null && <p className="text-[11px] font-medium text-nrs-ink/70">
-          Sepette {OPENING_CAMPAIGN.discountLabel} · {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: product.currency || 'TRY' }).format((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}
+          {t('campaignShort')} · {money((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}
         </p>}
+        {locale !== 'tr' && !fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('fxUnavailable')}</p>}
+        {locale !== 'tr' && fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('currencyNote')}</p>}
       </div>
     </div>
   );

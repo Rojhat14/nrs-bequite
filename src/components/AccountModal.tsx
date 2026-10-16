@@ -5,6 +5,7 @@ import { m as motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useDialog } from '@/hooks/useDialog';
+import { useLocale } from '@/context/LocaleContext';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const reduceMotion = useReducedMotion();
+  const { t } = useLocale();
 
   const dialogRef = useDialog(isOpen, onClose);
 
@@ -39,7 +41,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
 
         if (error) throw error;
 
-        setMessage({ type: 'success', text: 'Tekrar hoş geldiniz. Hesabınız açılıyor…' });
+        setMessage({ type: 'success', text: t('loginSuccess') });
         setTimeout(() => {
           onClose();
           window.location.reload(); // Refresh to update navigation state
@@ -48,7 +50,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
       } else {
         // --- Sign Up Logic ---
         if (!firstName || !lastName) {
-          throw new Error('Lütfen adınızı ve soyadınızı girin.');
+          throw new Error(t('nameRequired'));
         }
 
         const { data, error: authError } = await supabase.auth.signUp({
@@ -76,12 +78,12 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
           if (profileError) throw profileError;
 
         }
-        setMessage({ type: 'success', text: data.session ? 'Hesabınız oluşturuldu.' : 'Kaydı tamamlamak için e-postanızı kontrol edin.' });
+        setMessage({ type: 'success', text: data.session ? t('accountCreated') : t('confirmEmail') });
       }
     } catch (error: any) {
       setMessage({
         type: 'error',
-        text: error.message || 'An unexpected error occurred. Please try again.'
+        text: error instanceof Error && error.message === t('nameRequired') ? t('nameRequired') : t('authenticationFailed')
       });
     } finally {
       setLoading(false);
@@ -119,18 +121,18 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Pencereyi kapat"
-                className="absolute right-5 top-5 flex size-10 items-center justify-center text-nrs-ink/60 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
+                aria-label={t('closeDialog')}
+                className="absolute end-5 top-5 flex size-10 items-center justify-center text-nrs-ink/60 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
               >
                 <X size={20} />
               </button>
 
               <div className="mb-8 border-b border-nrs-ink/10 pb-6 text-center">
-                <p className="mb-3 text-[9px] uppercase tracking-[0.28em] text-nrs-ink/60">NRS · HESABIM</p>
+                <p className="mb-3 text-[9px] uppercase tracking-[0.28em] text-nrs-ink/60">NRS · {t('account')}</p>
                 <h2 id="account-modal-title" className="mb-3 font-serif text-3xl">
-                  {isLogin ? 'Tekrar Hoş Geldiniz' : 'NRS Dünyasına Katılın'}
+                  {isLogin ? t('accountWelcome') : t('joinNrs')}
                 </h2>
-                <p className="text-xs leading-5 text-nrs-ink/55">Kişisel seçkinize ve siparişlerinize ulaşın.</p>
+                <p className="text-xs leading-5 text-nrs-ink/55">{t('accountIntro')}</p>
               </div>
 
               {message && (
@@ -146,8 +148,8 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label htmlFor="account-first-name" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
-                          Ad
+                        <label htmlFor="account-first-name" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-start ms-1">
+                          {t('firstName')}
                         </label>
                         <input
                           id="account-first-name"
@@ -155,13 +157,13 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
-                          placeholder="Adınız"
+                          placeholder={t('firstNamePlaceholder')}
                           required
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="account-last-name" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
-                          Soyad
+                        <label htmlFor="account-last-name" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-start ms-1">
+                          {t('lastName')}
                         </label>
                         <input
                           id="account-last-name"
@@ -169,14 +171,14 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
-                          placeholder="Soyadınız"
+                          placeholder={t('lastNamePlaceholder')}
                           required
                         />
                       </div>
                     </div>
                     <div className="space-y-1">
-                        <label htmlFor="account-phone" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
-                          Telefon
+                        <label htmlFor="account-phone" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-start ms-1">
+                          {t('phone')}
                         </label>
                         <input
                           id="account-phone"
@@ -192,8 +194,8 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                 )}
 
                 <div className="space-y-1">
-                  <label htmlFor="account-email" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
-                    E-posta
+                  <label htmlFor="account-email" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-start ms-1">
+                    {t('email')}
                   </label>
                   <input
                     id="account-email"
@@ -201,14 +203,14 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-transparent border-b border-nrs-ink/20 py-2 px-1 focus:border-nrs-ink outline-none transition-all duration-500 font-light text-sm"
-                    placeholder="eposta@ornek.com"
+                    placeholder={t('emailPlaceholder')}
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label htmlFor="account-password" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-left ml-1">
-                    Şifre
+                  <label htmlFor="account-password" className="text-[10px] uppercase tracking-widest text-nrs-ink/65 block text-start ms-1">
+                    {t('passwordLabel')}
                   </label>
                   <input
                     id="account-password"
@@ -228,7 +230,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   disabled={loading}
                   className="mt-4 min-h-12 w-full border border-nrs-ink bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-nrs-ivory transition-colors duration-300 hover:bg-nrs-black/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink disabled:bg-nrs-black/40"
                 >
-                  {loading ? 'İşleniyor…' : (isLogin ? 'Giriş Yap' : 'Hesap Oluştur')}
+                  {loading ? t('processing') : (isLogin ? t('signIn') : t('createAccount'))}
                 </button>
               </form>
 
@@ -241,7 +243,7 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   }}
                   className="min-h-11 px-2 text-[11px] text-nrs-ink/60 underline underline-offset-4 transition-colors hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
                 >
-                  {isLogin ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten hesabınız var mı? Giriş yapın'}
+                  {isLogin ? t('noAccountSignup') : t('hasAccountLogin')}
                 </button>
               </div>
             </motion.div>

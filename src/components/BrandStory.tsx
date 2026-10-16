@@ -4,8 +4,14 @@ import React from 'react';
 import { m as motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useLocale } from '@/context/LocaleContext'
+import { localePrefix } from '@/lib/i18n/messages'
+import { marketing } from '@/lib/i18n/marketing'
 
 const BrandStory = () => {
+  const { locale } = useLocale()
+  const prefix = localePrefix(locale)
+  const t = (key: Parameters<typeof marketing>[1]) => marketing(locale, key)
   return (
     <section className="py-32 bg-nrs-canvas overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
@@ -20,7 +26,7 @@ const BrandStory = () => {
           >
             <Image
               src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"
-              alt="NRS Luxury Fashion"
+              alt={t('aboutImage1')}
               fill
               className="object-cover grayscale hover:grayscale-0 transition-all duration-1000"
               sizes="(max-width: 1024px) 100vw, 50vw"
@@ -37,30 +43,30 @@ const BrandStory = () => {
             className="space-y-16"
           >
             <div className="space-y-6">
-              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">Manifesto</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-nrs-ink/60 font-sans">{t('brandManifesto')}</span>
               <h2 className="text-5xl md:text-7xl font-serif text-nrs-ink leading-tight tracking-tight">
-                NRS KADINI
+                {t('brandTitle')}
               </h2>
               <p className="text-lg md:text-xl text-nrs-ink/70 leading-relaxed font-sans italic">
-                &ldquo;Dikkat çekmek için giyinmez. Kendi duruşunu ifade etmek için giyinir. Kendinden emin, özgün ve rafine. NRS kadını, zarafet ile modernlik arasında kendi çizgisini oluşturur. Onun için stil, başkalarının gördüğü bir görüntüden çok kişisel bir ifade biçimidir.&rdquo;
+                &ldquo;{t('brandQuote')}&rdquo;
               </p>
             </div>
 
             <div className="space-y-6 pt-8 border-t border-nrs-ink/10">
               <h3 className="text-2xl font-serif text-nrs-ink tracking-wide">
-                DAHA AZ. DAHA ÖZEL.
+                {t('brandLess')}
               </h3>
               <p className="text-sm text-nrs-ink/60 leading-relaxed font-sans max-w-lg">
-                Gerçek zarafetin fazlalıkta değil, detaylarda olduğuna inanıyoruz. Bir kumaşın dokusu, bir kesimin dengesi, bir siluetin duruşu ve bir tasarımın üzerinizde yarattığı his. NRS için lüks; yalnızca görünmek değil, hissettirmektir.
+                {t('brandBody')}
               </p>
             </div>
 
             <div className="pt-4">
               <Link
-                href="/about"
+                href={`${prefix}/about`}
                 className="group flex items-center gap-4 text-xs uppercase tracking-[0.3em] text-nrs-ink font-medium"
               >
-                Hakkımızda
+                {t('aboutLink')}
                 <span className="h-px w-0 group-hover:w-12 bg-nrs-ink transition-all duration-500"></span>
               </Link>
             </div>

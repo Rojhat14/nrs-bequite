@@ -5,9 +5,19 @@ import { loadGarantiOrder, claimGarantiHandoff } from '@/lib/payment/garanti/ord
 import { escapeMarkup } from '@/lib/payment/garanti/protocol'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { sameOrigin, unavailable } from '@/lib/payment/http'
+import { localeFromCookieHeader } from '@/lib/i18n/messages'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+function handoffMessage(request: Request, kind: 'unavailable' | 'invalid' | 'notRetried') {
+  const locale = localeFromCookieHeader(request.headers.get('cookie'))
+  const copy = {
+    unavailable: ['Ödeme geçişi kullanılamıyor. Siparişinizin durumunu kontrol edin.', 'The payment handoff is unavailable. Check your order status.', 'تعذر فتح صفحة الدفع. تحققي من حالة طلبك.'],
+    invalid: ['Geçersiz istek.', 'Invalid request.', 'طلب غير صالح.'],
+    notRetried: ['Ödeme tekrar başlatılmadı. Siparişinizin durumunu kontrol edin.', 'Payment was not restarted. Check your order status.', 'لم تتم إعادة بدء الدفع. تحققي من حالة طلبك.'],
+  } as const
+  return copy[kind][locale === 'ar' ? 2 : locale === 'en' ? 1 : 0]
+}
 async function authorized(request: Request) {
   if (!paymentAvailable()) throw new Error('Payment unavailable.')
   const provider = getPaymentProvider()
@@ -23,9 +33,9 @@ async function authorized(request: Request) {
   if (!user || user.id !== order.userId || order.state !== 'pending' || order.redirectUrl !== redirect) throw new Error('Unauthorized handoff.')
   return { provider, order, handoff, redirect }
 }
-function html(body: string, formOrigin: string, script?: { nonce: string; text: string }) {
+function html(body: string, formOrigin: string, script?: { nonce: string; text: string }, locale: 'tr' | 'en' | 'ar' = 'tr') {
   const styles = `:root{color-scheme:light;--canvas:#F7F3EE;--ink:#171512;--muted:#716b64;--line:#e5ded5;--panel:#fffdfa;--accent:#B88970}*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.55 Inter,Arial,sans-serif;-webkit-font-smoothing:antialiased}.shell{min-height:100svh;display:grid;place-items:center;padding:24px}.card{width:min(100%,520px);border:1px solid var(--line);background:var(--panel);padding:clamp(22px,6vw,42px);box-shadow:0 20px 60px #1715120b}.brand{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}h1{font:400 clamp(27px,6vw,36px)/1.15 'Playfair Display',Georgia,serif;margin:12px 0 8px;letter-spacing:.01em}.lead{margin:0;color:var(--muted);font-size:14px}.secure{margin:24px 0 18px;padding:14px 15px;border:1px solid var(--line);background:var(--canvas);font-size:13px;line-height:1.6}.items{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}.items li{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}.items span:first-child{min-width:0;overflow-wrap:anywhere}.items span:last-child{white-space:nowrap}.total{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:18px 0 20px;font-size:14px}.total strong{font:400 26px/1.2 'Playfair Display',Georgia,serif;white-space:nowrap}.actions{display:grid;gap:12px}.primary{display:flex;min-height:52px;align-items:center;justify-content:center;width:100%;border:0;background:#1a1917;color:white;padding:12px 18px;font:500 14px Inter,Arial,sans-serif;cursor:pointer}.primary:hover{background:#302d29}.primary:focus-visible,.secondary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.primary:disabled{opacity:.7;cursor:wait}.secondary{display:inline-flex;min-height:44px;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-underline-offset:4px}.foot{margin:20px 0 0;color:var(--muted);font-size:11px;text-align:center}.spinner{display:inline-block;width:16px;height:16px;margin-right:9px;border:2px solid #ffffff60;border-top-color:white;border-radius:50%;vertical-align:-3px;animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:360px){.shell{padding:12px}.card{padding:20px}.total strong{font-size:23px}}`;
-  return new Response(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#F7F3EE"><title>Güvenli ödeme geçişi · NRS Bequite Luminous</title><style>${styles}</style></head><body>${body}${script ? `<script nonce="${script.nonce}">${script.text}</script>` : ''}</body></html>`, {
+  return new Response(`<!doctype html><html lang="${locale}" dir="${locale === 'ar' ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#F7F3EE"><title>Secure payment · NRS Bequite Luminous</title><style>${styles}html[dir=rtl] body{direction:rtl;font-family:Tahoma,Arial,sans-serif}bdi{unicode-bidi:isolate}</style></head><body>${body}${script ? `<script nonce="${script.nonce}">${script.text}</script>` : ''}</body></html>`, {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
       // no-referrer makes native HTML form POSTs send Origin:null, breaking
       // the required same-origin check. strict-origin keeps the actual origin
@@ -40,26 +50,47 @@ export async function GET(request: Request) {
     // GET never sends a sale or consumes the token; user explicitly posts once.
     const notice = provider.config.observationOnly ? '<div class="secure"><strong>TEST ortamı.</strong> Yalnızca Garanti TEST kartını kullanın. Bu deneme otomatik olarak ödenmiş sayılmaz.</div>' : ''
     const liveNotice = provider.config.liveObservationOnly
-      ? `<div class="secure"><strong>Kontrollü canlı deneme · gerçek tahsilat yapılabilir.</strong><br>Sipariş tutarı ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.amountMinor / 100)}. Tutarı kontrol edin. Sonuç doğrulanana kadar sipariş beklemede kalabilir.</div>` : ''
+      ? `<div class="secure"><strong>Kontrollü canlı deneme · gerçek tahsilat yapılabilir.</strong><br>Sipariş tutarı <bdi dir="ltr">${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.amountMinor / 100)}</bdi>. Tutarı kontrol edin. Sonuç doğrulanana kadar sipariş beklemede kalabilir.</div>` : ''
     const summary = order.legal.order_summary
-    const lines = summary.items.map(item => `<li><span>${escapeMarkup(item.name)}${item.size ? ` · ${escapeMarkup(item.size)}` : ''} · ${item.quantity} adet</span><span>${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.unitPrice * item.quantity)}</span></li>`).join('')
+    const display = summary.display
+    const locale = display?.locale || 'tr'
+    const displayMoney = (minor: number) => new Intl.NumberFormat(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR', {
+      style: 'currency', currency: display?.currency || 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(minor / 100)
+    const lineLabel = (item: typeof summary.items[number], index: number) => display?.itemLineMinor[index] !== undefined
+      ? displayMoney(display.itemLineMinor[index])
+      : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.unitPrice * item.quantity)
+    const lines = summary.items.map((item, index) => `<li><span>${escapeMarkup(item.name)}${item.size ? ` · ${escapeMarkup(item.size)}` : ''} · ${item.quantity} ${locale === 'en' ? 'pcs' : locale === 'ar' ? 'قطع' : 'adet'}</span><span><bdi dir="ltr">${lineLabel(item, index)}</bdi></span></li>`).join('')
     const nonce = randomBytes(18).toString('base64')
     const title = provider.config.observationOnly ? 'TEST ödeme' : provider.config.liveObservationOnly ? 'Kontrollü canlı ödeme' : 'Güvenli ödeme'
-    const body = `<main class="shell"><section class="card" aria-labelledby="handoff-title"><p class="brand">NRS Bequite Luminous</p><h1 id="handoff-title">${title}</h1><p class="lead">Ödeme adımına güvenle devam edin.</p>${notice}${liveNotice}<ul class="items" aria-label="Sipariş özeti">${lines}</ul><div class="total"><span>Sipariş toplamı</span><strong>${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.amountMinor / 100)}</strong></div><p class="secure">Kart bilgileriniz Garanti BBVA’nın güvenli ödeme sayfasında girilir.</p><form id="handoff" method="post" action="${escapeMarkup(redirect)}"><button id="continue" type="submit" class="primary">Güvenli ödemeye devam et</button></form><a class="secondary" href="/checkout/verify?orderId=${encodeURIComponent(order.id)}">Sipariş özetine dön</a><p class="foot">Güvenli ödeme altyapısı · Garanti BBVA</p></section></main>`
-    const script = `document.getElementById('handoff').addEventListener('submit',function(e){const b=document.getElementById('continue');if(b.disabled){e.preventDefault();return}b.disabled=true;b.setAttribute('aria-busy','true');b.textContent='Ödeme sayfasına geçiliyor…'});`
-    return html(body, provider.config.siteOrigin, { nonce, text: script })
-  } catch { return new Response('Ödeme geçişi kullanılamıyor. Siparişinizin durumunu kontrol edin.', { status: 409, headers: { 'Cache-Control': 'no-store' } }) }
+    const totalText = display?.currency === 'USD' && display.totalMinor !== undefined
+      ? `<div class="total"><span>${locale === 'en' ? 'Approximate total' : locale === 'ar' ? 'الإجمالي التقريبي' : 'Yaklaşık toplam'}</span><strong><bdi dir="ltr">${displayMoney(display.totalMinor)}</bdi></strong></div><p class="secure"><bdi dir="ltr">${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.amountMinor / 100)}</bdi> ${locale === 'en' ? 'will be charged in Turkish lira. USD is an approximate conversion.' : locale === 'ar' ? 'سيتم تحصيله بالليرة التركية. قيمة الدولار تقديرية.' : 'Türk lirası olarak tahsil edilecektir. USD tutarı yaklaşık karşılıktır.'}</p>`
+      : `<div class="total"><span>${locale === 'en' ? 'Order total' : locale === 'ar' ? 'إجمالي الطلب' : 'Sipariş toplamı'}</span><strong><bdi dir="ltr">${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(order.amountMinor / 100)}</bdi></strong></div>${locale !== 'tr' ? `<p class="secure">${locale === 'en' ? 'Payment will be collected in Turkish lira.' : 'سيتم تحصيل الدفع بالليرة التركية.'}</p>` : ''}`
+    const titleLocalized = locale === 'en' ? 'Secure payment' : locale === 'ar' ? 'دفع آمن' : title
+    const lead = locale === 'en' ? 'Continue securely to payment.' : locale === 'ar' ? 'تابعي إلى الدفع بأمان.' : 'Ödeme adımına güvenle devam edin.'
+    const secureText = locale === 'en' ? 'Card details are entered on Garanti BBVA’s secure payment page.' : locale === 'ar' ? 'تُدخل بيانات البطاقة في صفحة الدفع الآمنة التابعة لـ Garanti BBVA.' : 'Kart bilgileriniz Garanti BBVA’nın güvenli ödeme sayfasında girilir.'
+    const buttonText = locale === 'en' ? 'Continue to secure payment' : locale === 'ar' ? 'المتابعة إلى الدفع الآمن' : 'Güvenli ödemeye devam et'
+    const backText = locale === 'en' ? 'Back to order summary' : locale === 'ar' ? 'العودة إلى ملخص الطلب' : 'Sipariş özetine dön'
+    const body = `<main class="shell"><section class="card" aria-labelledby="handoff-title"><p class="brand">NRS Bequite Luminous</p><h1 id="handoff-title">${titleLocalized}</h1><p class="lead">${lead}</p>${notice}${liveNotice}<ul class="items" aria-label="${locale === 'en' ? 'Order summary' : locale === 'ar' ? 'ملخص الطلب' : 'Sipariş özeti'}">${lines}</ul>${totalText}<p class="secure">${secureText}</p><form id="handoff" method="post" action="${escapeMarkup(redirect)}"><button id="continue" type="submit" class="primary">${buttonText}</button></form><a class="secondary" href="/checkout/verify?orderId=${encodeURIComponent(order.id)}">${backText}</a><p class="foot">Garanti BBVA</p></section></main>`
+    const script = `document.getElementById('handoff').addEventListener('submit',function(e){const b=document.getElementById('continue');if(b.disabled){e.preventDefault();return}b.disabled=true;b.setAttribute('aria-busy','true');b.textContent=${JSON.stringify(locale === 'en' ? 'Opening payment page…' : locale === 'ar' ? 'جارٍ فتح صفحة الدفع…' : 'Ödeme sayfasına geçiliyor…')};});`
+    return html(body, provider.config.siteOrigin, { nonce, text: script }, locale)
+  } catch { return new Response(handoffMessage(request, 'unavailable'), { status: 409, headers: { 'Cache-Control': 'no-store' } }) }
 }
 export async function POST(request: Request) {
   if (!paymentAvailable()) return unavailable()
-  if (!sameOrigin(request)) return new Response('Geçersiz istek.', { status: 403 })
+  if (!sameOrigin(request)) return new Response(handoffMessage(request, 'invalid'), { status: 403 })
   try {
     const { provider, order, handoff, redirect } = await authorized(request)
     // Construct and validate before consuming. No password, StoreKey or card fields.
     const inputs = Object.entries(provider.fields(order, handoff.ip)).map(([name, value]) => `<input type="hidden" name="${escapeMarkup(name)}" value="${escapeMarkup(value)}">`).join('')
     await claimGarantiHandoff(order, redirect)
     const nonce = randomBytes(18).toString('base64')
-    return html(`<main class="shell"><section class="card" aria-live="polite" aria-busy="true"><p class="brand">NRS Bequite Luminous</p><h1>Güvenli ödeme sayfası açılıyor</h1><p class="lead"><span class="spinner" aria-hidden="true"></span>Garanti BBVA’ya güvenli şekilde aktarılıyorsunuz.</p><p class="foot">Lütfen bu pencereyi kapatmayın.</p><form id="bank" accept-charset="utf-8" method="post" action="${escapeMarkup(provider.config.formUrl)}">${inputs}<button id="bank-submit" class="primary" type="submit">Garanti BBVA’ya devam et</button></form></section></main>`, new URL(provider.config.formUrl).origin,
-      { nonce, text: "(()=>{const f=document.getElementById('bank');const b=document.getElementById('bank-submit');let submitted=false;f.addEventListener('submit',e=>{if(submitted){e.preventDefault();return}submitted=true;b.disabled=true;b.textContent='Garanti BBVA’ya aktarılıyor…'});if(!submitted){submitted=true;b.disabled=true;b.textContent='Garanti BBVA’ya aktarılıyor…';f.submit()}})()" })
-  } catch { return new Response('Ödeme tekrar başlatılmadı. Siparişinizin durumunu kontrol edin.', { status: 409, headers: { 'Cache-Control': 'no-store' } }) }
+    const locale = order.legal.order_summary.display?.locale || 'tr'
+    const progress = locale === 'en' ? 'Opening secure payment page' : locale === 'ar' ? 'جارٍ فتح صفحة الدفع الآمنة' : 'Güvenli ödeme sayfası açılıyor'
+    const transfer = locale === 'en' ? 'You are being securely redirected to Garanti BBVA.' : locale === 'ar' ? 'يتم تحويلك بأمان إلى Garanti BBVA.' : 'Garanti BBVA’ya güvenli şekilde aktarılıyorsunuz.'
+    const submit = locale === 'en' ? 'Continue to Garanti BBVA' : locale === 'ar' ? 'المتابعة إلى Garanti BBVA' : 'Garanti BBVA’ya devam et'
+    const waiting = locale === 'en' ? 'Please keep this window open.' : locale === 'ar' ? 'يرجى إبقاء هذه النافذة مفتوحة.' : 'Lütfen bu pencereyi kapatmayın.'
+    return html(`<main class="shell"><section class="card" aria-live="polite" aria-busy="true"><p class="brand">NRS Bequite Luminous</p><h1>${progress}</h1><p class="lead"><span class="spinner" aria-hidden="true"></span>${transfer}</p><p class="foot">${waiting}</p><form id="bank" accept-charset="utf-8" method="post" action="${escapeMarkup(provider.config.formUrl)}">${inputs}<button id="bank-submit" class="primary" type="submit">${submit}</button></form></section></main>`, new URL(provider.config.formUrl).origin,
+      { nonce, text: `(()=>{const f=document.getElementById('bank');const b=document.getElementById('bank-submit');let submitted=false;f.addEventListener('submit',e=>{if(submitted){e.preventDefault();return}submitted=true;b.disabled=true;b.textContent=${JSON.stringify(locale === 'en' ? 'Redirecting to Garanti BBVA…' : locale === 'ar' ? 'جارٍ التحويل إلى Garanti BBVA…' : 'Garanti BBVA’ya aktarılıyor…')};});if(!submitted){submitted=true;b.disabled=true;b.textContent=${JSON.stringify(locale === 'en' ? 'Redirecting to Garanti BBVA…' : locale === 'ar' ? 'جارٍ التحويل إلى Garanti BBVA…' : 'Garanti BBVA’ya aktarılıyor…')};f.submit()}})()` }, locale)
+  } catch { return new Response(handoffMessage(request, 'notRetried'), { status: 409, headers: { 'Cache-Control': 'no-store' } }) }
 }

@@ -23,6 +23,7 @@ const config: Config = {
       fontFamily: {
         serif: ['var(--font-serif)', 'Playfair Display', 'serif'],
         sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
+        arabic: ['var(--font-arabic)', 'Noto Naskh Arabic', 'sans-serif'],
       },
     },
   },

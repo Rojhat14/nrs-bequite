@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useCart } from '@/store/useCart'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useLocale } from '@/context/LocaleContext'
 
 export default function CartPriceSync() {
   const items = useCart(state => state.items)
   const syncCatalogPrices = useCart(state => state.syncCatalogPrices)
   const setCatalogPricesSynced = useCart(state => state.setCatalogPricesSynced)
+  const { locale } = useLocale()
   const lastRequested = useRef<string | null>(null)
   const productIds = useMemo(() => Array.from(new Set(items.map(item => item.id))).sort(), [items])
-  const signature = productIds.join('|')
+  const signature = `${locale}:${productIds.join('|')}`
 
   useEffect(() => {
     if (signature === lastRequested.current) return
@@ -24,25 +25,17 @@ export default function CartPriceSync() {
     let current = true
     void (async () => {
       try {
-        const supabase = createSupabaseBrowserClient()
-        const { data, error } = await supabase.from('products')
-          .select('id,price_amount,compare_at_price')
-          .in('id', productIds)
-          .eq('status', 'active')
-          .eq('payment_test_only', false)
-        if (error) throw error
-        if (current) syncCatalogPrices((data ?? []).map(row => ({
-          id: row.id,
-          price: Number(row.price_amount),
-          compareAtPrice: row.compare_at_price == null ? null : Number(row.compare_at_price),
-        })))
+        const response = await fetch('/api/storefront/cart-products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: productIds }), cache: 'no-store' })
+        if (!response.ok) throw new Error('CART_CATALOG_UNAVAILABLE')
+        const result = await response.json() as { products: Array<{ id: string; title: string; price: number; compareAtPrice: number | null }> }
+        if (current) syncCatalogPrices(result.products)
       } catch {
         if (current) setCatalogPricesSynced(false)
       }
     })()
 
     return () => { current = false }
-  }, [productIds, setCatalogPricesSynced, signature, syncCatalogPrices])
+  }, [locale, productIds, setCatalogPricesSynced, signature, syncCatalogPrices])
 
   return null
 }

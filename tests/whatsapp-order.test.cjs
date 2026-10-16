@@ -13,8 +13,8 @@ test('Product links use public slugs and old carts fall back to supported produc
     { id: 'id-1', slug: 'ipek-şal', name: 'Şal', unitPrice: 50, quantity: 1 },
     { id: 'old-id', name: 'Eski sepet ürünü', unitPrice: 100, quantity: 1 },
   ]);
-  assert.ok(message.includes('Ürün Linki: https://nrsbequiteluminous.com/product/ipek-%C5%9Fal'));
-  assert.ok(message.includes('Ürün Linki: https://nrsbequiteluminous.com/product/old-id'));
+  assert.ok(message.includes('Ürün bağlantısı: https://nrsbequiteluminous.com/product/ipek-%C5%9Fal'));
+  assert.ok(message.includes('Ürün bağlantısı: https://nrsbequiteluminous.com/product/old-id'));
 });
 
 test('Required sizes block WhatsApp requests, sizeless products work, and stock is respected', () => {
@@ -32,10 +32,10 @@ test('All cart variants and decimal prices are preserved with the shared automat
     { id: 'p1', name: 'İpek & Şık', size: 'L', unitPrice: 99.9, quantity: 1 },
   ], 399.6);
   assert.match(message, /Beden: M/); assert.match(message, /Beden: L/);
-  assert.match(message, /Adet: 3/); assert.match(message, /Ara toplam: 299,7 TL/);
-  assert.match(message, /Ürünler toplamı: 399,6 TL/);
-  assert.match(message, /Açılışa Özel %20 İndirim: −79,92 TL/);
-  assert.match(message, /Ödenecek toplam: 319,68 TL/);
+  assert.match(message, /Adet: 3/); assert.match(message, /Ara toplam: ₺299,70/);
+  assert.match(message, /Ürünler toplamı: ₺399,60/);
+  assert.match(message, /Açılışa Özel %20 İndirim: −₺79,92/);
+  assert.match(message, /Ödenecek toplam: ₺319,68/);
   assert.match(message, /Ödeme yöntemi: Havale \/ EFT/);
   assert.doesNotMatch(message, /başarıyla|ödendi|Sipariş numarası/i);
   assert.equal(buildWhatsappOrderMessage([]), null);

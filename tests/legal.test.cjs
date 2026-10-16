@@ -17,6 +17,22 @@ function loader(mocks = {}) {
     const standardRequire = loaded.require.bind(loaded);
     loaded.require = name => {
       if (Object.hasOwn(mocks, name)) return mocks[name];
+      if (name === '@/context/LocaleContext') return { useLocale: () => ({ locale: 'tr', rate: null, fxAvailable: false,
+        t: key => ({ campaign: 'Açılışa özel tüm ürünlerde sepette %20 indirim.', campaignShort: 'Sepette %20 indirim', checkout: 'Ödemeye geç',
+          categories: 'Kategoriler', collections: 'Koleksiyonlar', all: 'Tümünü gör', bag: 'Alışveriş çantası', wishlist: 'Favorilerim',
+          menu: 'Menüyü aç', closeMenu: 'Menüyü kapat', search: 'Ürün ara', account: 'Hesabım', favorites: 'Favoriler', cart: 'Sepet',
+          productTotal: 'Ürünler toplamı', discount: 'Açılış indirimi', shipping: 'Kargo', total: 'Ödenecek toplam',
+          currencyNote: 'USD tutarları güncel kura göre yaklaşık karşılıktır. Ödeme Türk lirası olarak alınır.',
+          fxUnavailable: 'Güncel kur bilgisi alınamadı; fiyatlar Türk lirası olarak gösteriliyor.', paymentTry: 'Ödeme Türk lirası olarak alınacaktır.',
+          goToBank: 'Garanti BBVA ödeme sayfasına geç', bankRedirecting: 'Garanti BBVA’ya yönlendiriliyorsunuz…',
+          cardPayment: 'Kartla Ödeme Yap', saveTransferRequest: 'Havale / WhatsApp sipariş talebini kaydet',
+          resumeTestOrder: 'Bekleyen test siparişine devam et', checkingCartPrices: 'Sepet fiyatları kontrol ediliyor…',
+          measurementRequired: 'zorunlu', measurementOptional: 'isteğe bağlı', measurementValidationError: 'Ölçüleri tamamlayıp kontrol edin.',
+          checkoutQuoteError: 'Sipariş özeti doğrulanamadı.', checkoutSaveError: 'Sipariş talebi kaydedilemedi.',
+          checkoutConsentError: 'Sipariş özetini yeniden inceleyip sözleşmeleri kabul edin.', checkoutPaymentError: 'Ödeme başlatılamadı; sipariş özetini yeniden doğrulayın.' })[key] || key,
+        money: amount => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount),
+        minorMoney: minor => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(minor / 100),
+      }), LocaleProvider: ({ children }) => children };
       if (name === 'server-only') return {};
       if (name.startsWith('@/') || name.startsWith('./')) {
         const base = name.startsWith('@/') ? path.resolve('src', name.slice(2)) : path.resolve(path.dirname(filename), name);
@@ -118,7 +134,7 @@ function checkoutHarness(enabled, confirmed = false) {
   let cursor = 0;
   const cart = { items: [{ id: 'product', title: 'Test Ürün', price: '₺99,90', size: 'M', variantId: orderId, quantity: 2, measurements: {chest:92,waist:72,hips:98,height:168} }],
     subtotalAmount: 240, discountAmount: 40.2, shippingAmount: 0, totalAmount: 199.8, openDrawer() {} };
-  const fakeReact = { ...React, useEffect() {}, useState(initial) {
+  const fakeReact = { ...React, useEffect(effect) { effect(); }, useState(initial) {
     const index = cursor++;
     if (!(index in slots)) {
       const customer = { firstName: 'Test', lastName: 'Alıcı', email: 'test@example.com', phone: '905551234567', address: 'Beytepe', city: 'Ankara', district: 'Çankaya', postalCode: '06800', orderNote: '' };

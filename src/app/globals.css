@@ -59,9 +59,17 @@ h1, h2, h3, h4, .font-serif {
   letter-spacing: 0.02em;
 }
 
-p, span, div, .font-sans {
+.font-sans {
   font-family: var(--font-sans), 'Inter', sans-serif;
 }
+
+.font-arabic {
+  font-family: var(--font-arabic), 'Noto Naskh Arabic', sans-serif;
+}
+
+html[dir='rtl'] { text-align: start; }
+html[dir='rtl'] body { direction: rtl; }
+bdi, [dir='ltr'] { unicode-bidi: isolate; }
 
 /* Luxury interactive transitions */
 a, button {

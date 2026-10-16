@@ -37,7 +37,7 @@ function productHarness({ stock = 2, inStock = true, variants = true } = {}) {
 test('Product checkout entry stays visible while unavailable and requires a stocked variant and valid quantity', () => {
   const h = productHarness();
   let tree = h.render();
-  const checkout = () => find(tree, node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe Geç');
+  const checkout = () => find(tree, node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç');
   assert.equal(checkout().props.disabled, true);
   checkout().props.onClick();
   assert.equal(h.additions.length, 0);
@@ -53,16 +53,16 @@ test('Product checkout entry stays visible while unavailable and requires a stoc
   assert.equal(h.additions[0][0].id, 'product-1');
   assert.equal(h.additions[0][1], 2);
   assert.deepEqual(h.routes, ['/checkout']); assert.equal(h.drawers.length, 0);
-  assert.ok(find(tree, node => node.type === 'button' && node.props['aria-label'] === "Test Ürün için WhatsApp'tan sipariş ver"));
+  assert.ok(find(tree, node => node.type === 'button' && node.props['aria-label'] === 'WhatsApp üzerinden Test Ürün için sipariş ver'));
 });
 
 test('Out-of-stock products cannot enter checkout; sizeless products use the same cart path', () => {
   const unavailable = productHarness({ inStock: false });
-  const button = find(unavailable.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe Geç');
+  const button = find(unavailable.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç');
   assert.equal(button.props.disabled, true); button.props.onClick();
   assert.equal(unavailable.additions.length, 0);
   const sizeless = productHarness({ variants: false });
-  find(sizeless.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe Geç').props.onClick();
+  find(sizeless.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç').props.onClick();
   assert.equal(sizeless.additions[0][0].variantId, undefined);
   assert.deepEqual(sizeless.routes, ['/checkout']);
 });

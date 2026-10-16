@@ -16,7 +16,8 @@ import BankTransferInfo from '@/components/BankTransferInfo';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { useRouter } from 'next/navigation';
 import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
-import { discountForUnitMinor, isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign';
+import { discountForUnitMinor, isOpeningCampaignActive } from '@/lib/opening-campaign';
+import { useLocale } from '@/context/LocaleContext';
 
 interface ProductDetailProps {
   product: Product;
@@ -27,6 +28,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const addItem = useCart(state => state.addItem);
   const openDrawer = useCart(state => state.openDrawer);
   const { user } = useAuth();
+  const { locale, rate, money, t, fxAvailable } = useLocale();
+  const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr
   const userId = user?.id;
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -58,7 +61,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const toggleWishlist = async () => {
     if (wishlistBusy) return;
     if (!user) {
-      alert('Lütfen favorilerinize eklemek için giriş yapın.');
+      alert(copy('Lütfen favorilerinize eklemek için giriş yapın.', 'Please sign in to add this item to your favorites.', 'يُرجى تسجيل الدخول لإضافة المنتج إلى المفضلة.'));
       return;
     }
 
@@ -97,13 +100,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   function addSelection(checkout = false) {
     if (!product.inStock) return;
     if (variants.length > 0 && !selectedVariant) {
-      setOrderError('Lütfen bir beden seçin.'); return;
+      setOrderError(copy('Lütfen bir beden seçin.', 'Please select a size.', 'يُرجى اختيار المقاس.')); return;
     }
     if (!Number.isSafeInteger(quantity) || quantity < 1) {
-      setOrderError('Lütfen geçerli bir adet seçin.'); return;
+      setOrderError(copy('Lütfen geçerli bir adet seçin.', 'Please enter a valid quantity.', 'يُرجى إدخال كمية صالحة.')); return;
     }
     if (selectedVariant && quantity > selectedVariant.stock) {
-      setOrderError('Seçilen adet için yeterli stok bulunmuyor.'); return;
+      setOrderError(copy('Seçilen adet için yeterli stok bulunmuyor.', 'There is not enough stock for the selected quantity.', 'الكمية المختارة غير متوفرة في المخزون.')); return;
     }
     addItem({
       id: product.id, slug: product.slug, title: product.name,
@@ -152,7 +155,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               transition={{ duration: 0.8 }}
               className={`product-gallery relative grid gap-3 ${galleryImages.length > 1 ? 'grid-cols-[3rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
               role="region"
-              aria-label="Ürün görsel galerisi"
+              aria-label={copy('Ürün görsel galerisi', 'Product image gallery', 'معرض صور المنتج')}
               tabIndex={galleryImages.length > 1 ? 0 : undefined}
               onKeyDown={handleGalleryKeyDown}
             >
@@ -179,13 +182,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   onError={() => markImageBroken(activeImageIndex)}
                 />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" role="img" aria-label="Görsel yüklenemedi" />
+                <div className="absolute inset-0 bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" role="img" aria-label={copy('Görsel yüklenemedi', 'Image could not be loaded', 'تعذر تحميل الصورة')} />
               )}
               {galleryImages.length > 1 && <>
                 <button
                   type="button"
                   onClick={() => moveImage(-1)}
-                  aria-label="Önceki ürün görseli"
+                  aria-label={copy('Önceki ürün görseli', 'Previous product image', 'الصورة السابقة للمنتج')}
                   className="absolute left-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
                 >
                   <ArrowLeft size={18} strokeWidth={1.4} />
@@ -193,7 +196,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 <button
                   type="button"
                   onClick={() => moveImage(1)}
-                  aria-label="Sonraki ürün görseli"
+                  aria-label={copy('Sonraki ürün görseli', 'Next product image', 'الصورة التالية للمنتج')}
                   className="absolute right-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
                 >
                   <ArrowRight size={18} strokeWidth={1.4} />
@@ -216,7 +219,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     type="button"
                     key={`${image.sortOrder}-${image.url}-${index}`}
                     onClick={() => setActiveImageIndex(index)}
-                    aria-label={`${index + 1}. ürün görselini göster`}
+                    aria-label={copy(`${index + 1}. ürün görselini göster`, `Show product image ${index + 1}`, `عرض صورة المنتج ${index + 1}`)}
                     aria-pressed={activeImageIndex === index}
                     className={`relative h-12 w-12 shrink-0 sm:h-20 sm:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-ink opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
                   >
@@ -249,19 +252,20 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   {product.name}
                 </h1>
                 <div className="flex items-baseline gap-3">
-                  <p className="text-2xl font-serif text-nrs-ink/80">{product.price}</p>
-                  {!isOpeningCampaignActive() && product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{product.currency === 'TRY' || !product.currency ? '₺' : `${product.currency} `}{product.compareAtPrice.toLocaleString('en-US')}</del>}
+                  <p className="text-2xl font-serif text-nrs-ink/80">{product.priceAmount == null ? product.price : money(product.priceAmount)}</p>
+                  {!isOpeningCampaignActive() && product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{money(product.compareAtPrice)}</del>}
                 </div>
                 {isOpeningCampaignActive() && product.priceAmount != null && <div className="space-y-1 text-sm">
-                  <p className="font-medium">Açılışa özel sepette: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: product.currency || 'TRY' }).format((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}</p>
-                  <p className="text-xs text-nrs-ink/60">Sepette {OPENING_CAMPAIGN.discountLabel} otomatik uygulanır.</p>
+                  <p className="font-medium">{locale === 'en' ? 'Opening offer at checkout' : locale === 'ar' ? 'سعر عرض الافتتاح عند إتمام الطلب' : 'Açılışa özel sepette'}: {money((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}</p>
+                  <p className="text-xs text-nrs-ink/60">{locale === 'en' ? 'The discount is applied automatically in your bag.' : locale === 'ar' ? 'يُطبّق الخصم تلقائياً في حقيبة التسوق.' : 'Sepette indirim otomatik uygulanır.'}</p>
                 </div>}
+                {locale !== 'tr' && <p className="max-w-md text-xs text-nrs-ink/55">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
               </div>
 
               <div className="space-y-8 py-10 border-y border-nrs-ink/10">
                 <div className="space-y-5">
                   {variants.length > 0 && <>
-                  <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">Beden Seçin</p>
+                  <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
                   <div className="flex flex-wrap gap-3">
                     {variants.map((variant) => (
                       <button
@@ -285,7 +289,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
                 <div className="flex flex-col gap-4 pt-4">
                   <label className="flex items-center justify-between gap-4 text-xs text-nrs-ink/65">
-                    Adet
+                    {copy('Adet', 'Quantity', 'الكمية')}
                     <input type="number" min={1} value={quantity}
                       onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
                       className="min-h-12 w-20 border border-nrs-ink/20 bg-transparent px-3 text-nrs-ink" />
@@ -296,17 +300,17 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans enabled:hover:bg-white enabled:hover:text-nrs-ink transition-all duration-700 flex items-center justify-center gap-3"
                   >
                     <ShoppingBag size={18} />
-                    Sepete Ekle
+                    {t('addToBag')}
                   </button>
                   <button type="button" onClick={() => addSelection(true)}
                     disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
                     className="flex min-h-12 w-full items-center justify-center border border-nrs-ink/25 px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ink enabled:hover:bg-nrs-ink enabled:hover:text-nrs-canvas disabled:cursor-not-allowed disabled:opacity-40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
-                    Ödeme / Siparişe Geç
+                    {copy('Ödeme / Siparişe geç', 'Continue to checkout', 'المتابعة إلى الدفع')}
                   </button>
                   <CardPaymentNotice id="product-card-payment-status" />
-                  <p className="mt-3 text-sm leading-6">Bütün kıyafetler özel dikilir; gerekli beden ölçüleri sipariş kesinleştirilmeden önce alınır. {DELIVERY_TERMS}</p>
+                  <p className="mt-3 text-sm leading-6">{copy('Gerekli beden ölçüleri sipariş kesinleştirilmeden önce alınır.', 'Required body measurements are collected before the order is confirmed.', 'تُجمع قياسات الجسم المطلوبة قبل تأكيد الطلب.')} {locale === 'tr' ? DELIVERY_TERMS : copy('Türkiye genelinde ücretsiz kargo. Sipariş onayından itibaren özel dikim üretimi ve kargo taşımacılığı dahil toplam 7–10 iş günü içerisinde teslimat.', 'Free shipping within Türkiye. Delivery takes a total of 7–10 business days from order approval, including made-to-measure production and shipping.', 'الشحن مجاني داخل تركيا. يستغرق التوصيل من تاريخ تأكيد الطلب من 7 إلى 10 أيام عمل، شاملاً تجهيز القطعة حسب المقاس والشحن.')}</p>
                   <button type="button" disabled={!product.inStock || !whatsappNumber}
-                    aria-label={`${product.name} için WhatsApp'tan sipariş ver`}
+                    aria-label={copy(`WhatsApp üzerinden ${product.name} için sipariş ver`, `Request ${product.name} on WhatsApp`, `اطلبي ${product.name} عبر واتساب`)}
                     aria-describedby={orderError ? 'whatsapp-order-error' : undefined}
                     onClick={() => {
                       const variant = selectedVariant || variants.find(variant => !variant.size);
@@ -316,13 +320,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       const message = buildWhatsappOrderMessage([{
                         id: product.id, slug: product.slug, name: product.name, size: variant?.size || undefined, quantity,
                         unitPrice: product.priceAmount ?? parsePrice(product.price), compareAtPrice: product.compareAtPrice, currency: product.currency,
-                      }]);
+                      }], undefined, undefined, { locale, rate });
                       const href = whatsappUrl(message || undefined);
                       if (href) { setOrderError(''); window.open(href, '_blank', 'noopener,noreferrer'); }
                     }}
                     className="flex min-h-12 w-full items-center justify-center gap-3 bg-[#25D366] px-4 py-5 uppercase tracking-widest text-xs text-nrs-ink enabled:hover:bg-[#20bd5a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                     <WhatsAppIcon />
-                    WhatsApp&apos;tan Sipariş Ver
+                    {copy('WhatsApp ile sipariş talebi', 'Request via WhatsApp', 'طلب عبر واتساب')}
                   </button>
                   {orderError && <p id="whatsapp-order-error" role="alert" className="text-sm text-red-700">{orderError}</p>}
                   <BankTransferInfo />
@@ -331,7 +335,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <h3 className="text-xs uppercase tracking-widest text-nrs-ink font-medium">Ürün Hikayesi</h3>
+                  <h3 className="text-xs uppercase tracking-widest text-nrs-ink font-medium">{copy('Ürün hikayesi', 'Product story', 'قصة المنتج')}</h3>
                   <p className="text-nrs-ink/60 leading-relaxed font-sans italic">
                     {product.description}
                   </p>
@@ -339,22 +343,22 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">Detaylar</h4>
+                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{t('details')}</h4>
                     <ul className="text-sm font-sans text-nrs-ink/70 space-y-2">
                       {product.details.fabric && <li>{product.details.fabric}</li>}
                       {product.category && <li>{product.category}</li>}
                     </ul>
                   </div>
                   <div className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">Kalıp & Bakım</h4>
-                    <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || 'Bakım bilgisi yakında eklenecektir.'}</p>
+                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{copy('Kalıp ve bakım', 'Fit and care', 'القصة والعناية')}</h4>
+                    <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || copy('Bakım bilgisi yakında eklenecektir.', 'Care information will be added soon.', 'ستُضاف معلومات العناية قريباً.')}</p>
                   </div>
                 </div>
 
                 <div className="pt-8 space-y-4">
-                  <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">Stil Önerisi</h4>
+                  <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{copy('Stil önerisi', 'Style notes', 'اقتراحات التنسيق')}</h4>
                   <p className="text-sm font-sans text-nrs-ink/70 italic leading-relaxed">
-                    Ton sür ton bir pantolonla tamamlayarak güçlü bir takım görünümü yaratabilir veya sade bir elbisenin üzerine taşıyarak daha sofistike bir akşam görünümü elde edebilirsiniz.
+                    {copy('Ton sür ton bir pantolonla tamamlayarak güçlü bir takım görünümü yaratabilir veya sade bir elbisenin üzerine taşıyarak daha sofistike bir akşam görünümü elde edebilirsiniz.', 'Pair it with coordinating trousers for a composed look, or layer it over a simple dress for a more refined evening outfit.', 'نسّقيه مع بنطال بدرجات متقاربة لإطلالة متناسقة، أو ارتديه فوق فستان بسيط لإطلالة مسائية أكثر أناقة.')}
                   </p>
                 </div>
               </div>
