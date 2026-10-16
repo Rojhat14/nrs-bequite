@@ -1,8 +1,18 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { loader } = require('./source-loader.cjs')
 const load = loader()
 const campaign = load('src/lib/opening-campaign.ts')
+
+test('Storefront renders the campaign as its only top announcement', () => {
+  const navigation = fs.readFileSync(path.join(__dirname, '../src/components/Navigation.tsx'), 'utf8')
+  const shell = fs.readFileSync(path.join(__dirname, '../src/components/StorefrontShell.tsx'), 'utf8')
+  assert.doesNotMatch(navigation, /Kargo ve Teslimat Bilgileri Sipariş Teyidinde Paylaşılır/)
+  assert.match(navigation, /openingCampaign\.announcement/)
+  assert.doesNotMatch(shell, /getOpeningCampaign|role="status"/)
+})
 
 function moneyPair(lines) {
   const result = campaign.calculateOpeningTotals(lines.map(([price, quantity]) => ({ unitPriceMinor: price * 100, quantity })))

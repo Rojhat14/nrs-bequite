@@ -14,6 +14,7 @@ import { useStorefrontCatalog } from '@/context/StorefrontCatalogContext';
 import { getCollectionPresentation } from '@/lib/collectionPresentation';
 import { isHomeCategory, HOME_CATEGORY_IMAGE, HOME_CATEGORY_THUMBNAIL } from '@/lib/home-category';
 import { canOptimizeImage } from '@/lib/imageOptimization';
+import { getOpeningCampaign } from '@/lib/opening-campaign';
 
 // Navigation Mode Definition for Adaptive UI
 type NavigationMode = 'transparent' | 'solid' | 'dark' | 'adaptive';
@@ -239,6 +240,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
   const logoOpacity = shouldShowLogo() ? 'opacity-100' : 'opacity-0';
 
   const styles = getNavStyles();
+  const openingCampaign = getOpeningCampaign();
 
   return (
     <header
@@ -247,9 +249,9 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     >
       <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} />
 
-      <div className={`${styles.announcement} py-2 text-center text-[9px] uppercase tracking-[0.3em] font-sans transition-colors duration-500`}>
-        Kargo ve Teslimat Bilgileri Sipariş Teyidinde Paylaşılır
-      </div>
+      {openingCampaign && <div role="status" className="flex min-h-9 items-center justify-center bg-nrs-ink px-4 py-2 text-center text-[11px] tracking-wide text-nrs-canvas sm:text-xs">
+        {openingCampaign.announcement}
+      </div>}
 
       <nav className={`transition-all duration-500 ease-in-out ${styles.container}`}>
         <div className="max-w-7xl mx-auto px-6 md:px-12">
