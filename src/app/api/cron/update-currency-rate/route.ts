@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { revalidateTag } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { USD_TRY_RATE_POLICY } from '@/lib/i18n/rate-policy'
 import { ECB_PROVIDER, parseEcbRate } from '@/lib/i18n/ecb'
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
       provider: ECB_PROVIDER, fetched_at: fetchedAt,
     }, { onConflict: 'base_currency,quote_currency,rate_date' })
     if (error) throw new Error('RATE_STORE_FAILED')
+    revalidateTag('currency-reference-rate')
     return NextResponse.json({ state: 'updated', base: 'USD', quote: 'TRY', fetchedAt, rateDate }, { headers: noCache })
   } catch {
     return NextResponse.json({ state: 'unavailable' }, { status: 503, headers: noCache })
