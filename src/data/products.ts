@@ -1,4 +1,5 @@
 export type Category = string;
+export type ProductFulfillmentMode = 'stock' | 'made_to_order';
 
 export type ProductGalleryImage = {
   url: string;
@@ -22,6 +23,7 @@ export type Product = {
   hoverImage?: string;
   price: string;
   inStock: boolean;
+  fulfillmentMode?: ProductFulfillmentMode;
   slug?: string;
   currency?: string;
   priceAmount?: number;

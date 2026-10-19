@@ -16,6 +16,7 @@ export const NUMERIC_DRESS_PRODUCT_IDS = new Set([
 ])
 
 export const NUMERIC_DRESS_SIZES = ['32', '34', '36', '38', '40', '42', '44'] as const
+export const MADE_TO_ORDER_DRESS_IDS = NUMERIC_DRESS_PRODUCT_IDS
 
 export function isNumericDressProduct(product: { id: string; category: string }) {
   // Product ID is authoritative here because category labels are localized in
@@ -25,6 +26,13 @@ export function isNumericDressProduct(product: { id: string; category: string })
 }
 
 export type DressVariantOption = { id: string; label: string; size?: string; stock: number }
+
+export function isMadeToOrderDressVariant(productId: string, fulfillmentMode: unknown, size: unknown) {
+  return fulfillmentMode === 'made_to_order'
+    && MADE_TO_ORDER_DRESS_IDS.has(productId)
+    && typeof size === 'string'
+    && NUMERIC_DRESS_SIZES.includes(size as (typeof NUMERIC_DRESS_SIZES)[number])
+}
 
 const ALPHA_SIZE_ORDER = ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
 

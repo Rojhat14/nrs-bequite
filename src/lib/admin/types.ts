@@ -13,6 +13,7 @@ export interface ProductRow {
   status: ProductStatus
   payment_test_only: boolean
   in_stock: boolean
+  fulfillment_mode?: 'stock' | 'made_to_order'
   fabric: string | null
   care: string | null
   created_at: string

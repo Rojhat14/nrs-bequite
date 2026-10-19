@@ -94,6 +94,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
   const actualVariants = (product.variants ?? []).map((variant) => ({ id: variant.id, label: variant.size ?? 'Tek beden', size: variant.size ?? undefined, stock: variant.stock_quantity }))
   const numericDress = isNumericDressProduct(product)
+  const madeToOrderDress = product.fulfillmentMode === 'made_to_order' && numericDress
   const variants = sortActualVariantOptions(numericDress ? numericDressVariantOptions(actualVariants) ?? actualVariants : actualVariants)
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
   const hasRealVariantInventory = actualVariants.length > 0
@@ -105,7 +106,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     if (!Number.isSafeInteger(quantity) || quantity < 1) {
       setOrderError(copy('Lütfen geçerli bir adet seçin.', 'Please enter a valid quantity.', 'يُرجى إدخال كمية صالحة.')); return;
     }
-    if (!selectedVariant?.id || selectedVariant.stock < 1 || quantity > selectedVariant.stock) {
+    if (!selectedVariant?.id || (!madeToOrderDress && (selectedVariant.stock < 1 || quantity > selectedVariant.stock))) {
       setOrderError(copy('Seçilen adet için yeterli stok bulunmuyor.', 'There is not enough stock for the selected quantity.', 'الكمية المختارة غير متوفرة في المخزون.')); return;
     }
     addItem({
@@ -271,7 +272,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       <button
                         key={variant.label}
                         type="button"
-                        disabled={!variant.id || variant.stock < 1}
+                        disabled={!variant.id || (!madeToOrderDress && variant.stock < 1)}
                         onClick={() => { setSelectedVariantId(variant.id); setOrderError(''); setQuantity(1); }}
                         aria-pressed={selectedVariantId === variant.id}
                         className={`min-w-12 h-12 px-3 text-xs font-sans transition-all duration-500 border disabled:cursor-not-allowed disabled:opacity-35 ${
@@ -316,7 +317,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     onClick={() => {
                       const variant = selectedVariant || variants.find(variant => !variant.size);
                       const error = whatsappSelectionError({ requiresSize: variants.some(variant => Boolean(variant.size)),
-                        selected: Boolean(selectedVariant), stock: variant?.stock, quantity });
+                        selected: Boolean(selectedVariant), stock: madeToOrderDress ? undefined : variant?.stock, quantity });
                       if (error) { setOrderError(error); return; }
                       const message = buildWhatsappOrderMessage([{
                         id: product.id, slug: product.slug, name: product.name, size: variant?.size || undefined, quantity,

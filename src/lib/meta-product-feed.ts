@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getProductImageUrl } from '@/lib/storage/products'
 import type { ProductImageRow } from '@/lib/admin/types'
 
-const PRODUCT_COLUMNS = 'id,name,slug,description,price_amount,currency,compare_at_price,in_stock,payment_test_only'
+const PRODUCT_COLUMNS = 'id,name,slug,description,price_amount,currency,compare_at_price,in_stock,payment_test_only,fulfillment_mode'
 const IMAGE_COLUMNS = 'id,product_id,provider,storage_key,url,sort_order,is_primary,created_at'
 const VARIANT_COLUMNS = 'id,product_id,sku,stock_quantity,is_active'
 const PAGE_SIZE = 500
@@ -13,7 +13,7 @@ const HEADERS = ['id', 'title', 'description', 'availability', 'condition', 'pri
 
 interface FeedProduct {
   id: string; name: string; slug: string; description: string | null
-  price_amount: number | string; currency: string; compare_at_price: number | string | null; in_stock: boolean; payment_test_only: boolean
+  price_amount: number | string; currency: string; compare_at_price: number | string | null; in_stock: boolean; payment_test_only: boolean; fulfillment_mode?: string
 }
 interface FeedVariant { id: string; product_id: string; sku: string | null; stock_quantity: number; is_active: boolean }
 
@@ -117,7 +117,8 @@ export async function createMetaProductFeed(client: SupabaseClient) {
         if (activeVariants.some(variant => !Number.isInteger(variant.stock_quantity) || variant.stock_quantity < 0)) {
           throw new MetaFeedError(`Invalid variant stock for product ${id}.`)
         }
-        const inStock = activeVariants.length ? activeVariants.some(variant => variant.stock_quantity > 0) : product.in_stock
+        const inStock = product.fulfillment_mode === 'made_to_order'
+          || (activeVariants.length ? activeVariants.some(variant => variant.stock_quantity > 0) : product.in_stock)
         const sku = activeVariants.find(variant => variant.sku?.trim())?.sku?.trim() || ''
         // price_amount is the current selling price, not minor units. Do not
         // reinterpret compare_at_price as the selling price or invent sale dates.
