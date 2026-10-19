@@ -16,7 +16,9 @@ export function parseCheckoutInput(value: unknown): { items: CheckoutItem[]; cus
       || typeof item.quantity !== 'number' || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100
       || seen.has(item.variantId)) throw new Error('Ürün/beden/adet doğrulanamadı.')
     seen.add(item.variantId)
-    return { productId: item.productId, variantId: item.variantId, quantity: item.quantity, measurements: parseMeasurements(item.measurements) }
+    const measurements = parseMeasurements(item.measurements)
+    return { productId: item.productId, variantId: item.variantId, quantity: item.quantity,
+      ...(Object.keys(measurements).length ? { measurements } : {}) }
   })
   if (!body.customer || typeof body.customer !== 'object') throw new Error('Müşteri bilgileri eksik.')
   const customer = {} as Buyer

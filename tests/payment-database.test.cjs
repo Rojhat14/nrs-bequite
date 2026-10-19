@@ -93,6 +93,7 @@ $$;
  CREATE TABLE public.garanti_live_single_finalize_evidence(order_id uuid,signature_verified boolean);
  CREATE TABLE public.garanti_live_single_finalize_failures(order_id uuid,callback_signature_verified boolean);`);
  await db.exec(fs.readFileSync('supabase/migrations/20261014170000_garanti_expired_no_record_close.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261019120000_optional_personal_measurements.sql','utf8'));
 });
 test.after(async()=>{ await db.close() });
 test('Local PostgreSQL: atomic creation saves one order, items, legal snapshot and stock reservation',async()=>{

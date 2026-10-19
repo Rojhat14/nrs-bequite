@@ -1,5 +1,4 @@
 'use client'
-import { DELIVERY_TERMS } from '@/lib/delivery-policy'
 
 import React, { useState, useEffect, useRef } from 'react';
 import { m as motion } from 'framer-motion';
@@ -18,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
 import { discountForUnitMinor, isOpeningCampaignActive } from '@/lib/opening-campaign';
 import { useLocale } from '@/context/LocaleContext';
+import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOptions } from '@/lib/dress-sizes'
 
 interface ProductDetailProps {
   product: Product;
@@ -42,6 +42,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   });
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
   const touchStartX = useRef<number | null>(null);
+  useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1) }, [product.id])
   useEffect(() => {
     let active = true;
     const checkWishlist = async () => {
@@ -91,12 +92,11 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     }
   };
 
-  const variants = product.variants?.length
-    ? product.variants.map((variant) => ({ id: variant.id, label: variant.size ?? 'Tek beden', size: variant.size, stock: variant.stock_quantity }))
-    : product.catalogSource === 'legacy-fallback'
-      ? ['XS', 'S', 'M', 'L', 'XL'].map((size) => ({ id: `legacy-${size}`, label: size, size, stock: product.inStock ? 1 : 0 }))
-      : []
+  const actualVariants = (product.variants ?? []).map((variant) => ({ id: variant.id, label: variant.size ?? 'Tek beden', size: variant.size ?? undefined, stock: variant.stock_quantity }))
+  const numericDress = isNumericDressProduct(product)
+  const variants = sortActualVariantOptions(numericDress ? numericDressVariantOptions(actualVariants) ?? actualVariants : actualVariants)
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
+  const hasRealVariantInventory = actualVariants.length > 0
   function addSelection(checkout = false) {
     if (!product.inStock) return;
     if (variants.length > 0 && !selectedVariant) {
@@ -105,7 +105,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     if (!Number.isSafeInteger(quantity) || quantity < 1) {
       setOrderError(copy('Lütfen geçerli bir adet seçin.', 'Please enter a valid quantity.', 'يُرجى إدخال كمية صالحة.')); return;
     }
-    if (selectedVariant && quantity > selectedVariant.stock) {
+    if (!selectedVariant?.id || selectedVariant.stock < 1 || quantity > selectedVariant.stock) {
       setOrderError(copy('Seçilen adet için yeterli stok bulunmuyor.', 'There is not enough stock for the selected quantity.', 'الكمية المختارة غير متوفرة في المخزون.')); return;
     }
     addItem({
@@ -266,12 +266,12 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 <div className="space-y-5">
                   {variants.length > 0 && <>
                   <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
-                  <div className="flex flex-wrap gap-3">
+                  <div role="group" aria-label={copy('Beden seçin', 'Select a size', 'اختاري المقاس')} aria-describedby={orderError ? 'product-size-error' : undefined} className="flex flex-wrap gap-3">
                     {variants.map((variant) => (
                       <button
-                        key={variant.id}
+                        key={variant.label}
                         type="button"
-                        disabled={variant.stock < 1}
+                        disabled={!variant.id || variant.stock < 1}
                         onClick={() => { setSelectedVariantId(variant.id); setOrderError(''); setQuantity(1); }}
                         aria-pressed={selectedVariantId === variant.id}
                         className={`min-w-12 h-12 px-3 text-xs font-sans transition-all duration-500 border disabled:cursor-not-allowed disabled:opacity-35 ${
@@ -284,6 +284,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       </button>
                     ))}
                   </div>
+                  {orderError && <p id="product-size-error" role="alert" className="text-sm text-red-700">{orderError}</p>}
                   </>}
                 </div>
 
@@ -296,22 +297,22 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   </label>
                   <button
                     onClick={() => addSelection()}
-                    disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
+                    disabled={!product.inStock || !hasRealVariantInventory}
                     className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans enabled:hover:bg-white enabled:hover:text-nrs-ink transition-all duration-700 flex items-center justify-center gap-3"
                   >
                     <ShoppingBag size={18} />
                     {t('addToBag')}
                   </button>
                   <button type="button" onClick={() => addSelection(true)}
-                    disabled={!product.inStock || (variants.length > 0 && !selectedVariant)}
+                    disabled={!product.inStock || !hasRealVariantInventory}
                     className="flex min-h-12 w-full items-center justify-center border border-nrs-ink/25 px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ink enabled:hover:bg-nrs-ink enabled:hover:text-nrs-canvas disabled:cursor-not-allowed disabled:opacity-40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                     {copy('Ödeme / Siparişe geç', 'Continue to checkout', 'المتابعة إلى الدفع')}
                   </button>
                   <CardPaymentNotice id="product-card-payment-status" />
-                  <p className="mt-3 text-sm leading-6">{copy('Gerekli beden ölçüleri sipariş kesinleştirilmeden önce alınır.', 'Required body measurements are collected before the order is confirmed.', 'تُجمع قياسات الجسم المطلوبة قبل تأكيد الطلب.')} {locale === 'tr' ? DELIVERY_TERMS : copy('Türkiye genelinde ücretsiz kargo. Sipariş onayından itibaren özel dikim üretimi ve kargo taşımacılığı dahil toplam 7–10 iş günü içerisinde teslimat.', 'Free shipping within Türkiye. Delivery takes a total of 7–10 business days from order approval, including made-to-measure production and shipping.', 'الشحن مجاني داخل تركيا. يستغرق التوصيل من تاريخ تأكيد الطلب من 7 إلى 10 أيام عمل، شاملاً تجهيز القطعة حسب المقاس والشحن.')}</p>
-                  <button type="button" disabled={!product.inStock || !whatsappNumber}
+                  <p className="mt-3 text-sm leading-6">{copy('Kişisel ölçüler isteğe bağlıdır; seçtiğiniz bedenle devam edebilirsiniz.', 'Personal measurements are optional; you can continue with your selected size.', 'القياسات الشخصية اختيارية؛ يمكنك المتابعة بالمقاس الذي اخترته.')} {t('deliveryPromise')}</p>
+                  <button type="button" disabled={!product.inStock || !hasRealVariantInventory || !whatsappNumber}
                     aria-label={copy(`WhatsApp üzerinden ${product.name} için sipariş ver`, `Request ${product.name} on WhatsApp`, `اطلبي ${product.name} عبر واتساب`)}
-                    aria-describedby={orderError ? 'whatsapp-order-error' : undefined}
+                    aria-describedby={orderError ? 'product-size-error' : undefined}
                     onClick={() => {
                       const variant = selectedVariant || variants.find(variant => !variant.size);
                       const error = whatsappSelectionError({ requiresSize: variants.some(variant => Boolean(variant.size)),
@@ -328,7 +329,6 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     <WhatsAppIcon />
                     {copy('WhatsApp ile sipariş talebi', 'Request via WhatsApp', 'طلب عبر واتساب')}
                   </button>
-                  {orderError && <p id="whatsapp-order-error" role="alert" className="text-sm text-red-700">{orderError}</p>}
                   <BankTransferInfo />
                 </div>
               </div>

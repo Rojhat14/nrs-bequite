@@ -34,13 +34,16 @@ function productHarness({ stock = 2, inStock = true, variants = true } = {}) {
   return { additions, routes, drawers, render() { cursor = 0; return Detail({ product }); } };
 }
 
-test('Product checkout entry stays visible while unavailable and requires a stocked variant and valid quantity', () => {
+test('Product checkout entry reports a missing size beside the picker and requires a real stocked variant and valid quantity', () => {
   const h = productHarness();
   let tree = h.render();
   const checkout = () => find(tree, node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç');
-  assert.equal(checkout().props.disabled, true);
+  assert.equal(checkout().props.disabled, false);
   checkout().props.onClick();
   assert.equal(h.additions.length, 0);
+  tree = h.render();
+  assert.ok(find(tree, node => node.type === 'p' && node.props.id === 'product-size-error'));
+  assert.equal(find(tree, node => node.type === 'p' && node.props.id === 'whatsapp-order-error'), null);
   find(tree, node => node.type === 'button' && node.props.children === 'M').props.onClick();
   tree = h.render();
   assert.equal(checkout().props.disabled, false);
@@ -56,15 +59,42 @@ test('Product checkout entry stays visible while unavailable and requires a stoc
   assert.ok(find(tree, node => node.type === 'button' && node.props['aria-label'] === 'WhatsApp üzerinden Test Ürün için sipariş ver'));
 });
 
-test('Out-of-stock products cannot enter checkout; sizeless products use the same cart path', () => {
+test('Out-of-stock and variantless products cannot enter checkout; no synthetic variant is created', () => {
   const unavailable = productHarness({ inStock: false });
   const button = find(unavailable.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç');
   assert.equal(button.props.disabled, true); button.props.onClick();
   assert.equal(unavailable.additions.length, 0);
   const sizeless = productHarness({ variants: false });
-  find(sizeless.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç').props.onClick();
-  assert.equal(sizeless.additions[0][0].variantId, undefined);
-  assert.deepEqual(sizeless.routes, ['/checkout']);
+  const unavailableSize = find(sizeless.render(), node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç');
+  assert.equal(unavailableSize.props.disabled, true);
+  unavailableSize.props.onClick();
+  assert.equal(sizeless.additions.length, 0);
+  assert.deepEqual(sizeless.routes, []);
+});
+
+test('real dresses offer sorted 32–44 only from real variant IDs and never invent stock', () => {
+  const sizes = loader()('src/lib/dress-sizes.ts');
+  assert.equal(sizes.NUMERIC_DRESS_PRODUCT_IDS.size, 11);
+  assert.equal(sizes.isNumericDressProduct({ id: 'noir-crystal-collar-saten-elbise', category: 'فساتين' }), true);
+  assert.equal(sizes.isNumericDressProduct({ id: 'jade-desenli-ipeksi-tulum', category: 'Elbiseler' }), false);
+  assert.equal(sizes.isNumericDressProduct({ id: 'nocturne-boncuk-islemeli-lacivert-tul-kimono', category: 'Elbiseler' }), false);
+  const actual = ['32', '34', '36', '38', '40', '42', '44'].map((size, index) => ({
+    id: `variant-${size}`, label: size, size, stock: size === '36' ? 2 : size === '40' ? 0 : index + 1,
+  }));
+  const options = sizes.numericDressVariantOptions(actual);
+  assert.deepEqual(options.map(option => option.size), ['32','34','36','38','40','42','44']);
+  assert.equal(options[2].id, 'variant-36'); assert.equal(options[2].stock, 2);
+  assert.equal(options[4].id, 'variant-40'); assert.equal(options[4].stock, 0);
+  assert.equal(options.length, 7);
+  assert.equal(sizes.numericDressVariantOptions(actual.slice(0, 1)), null);
+  assert.equal(sizes.numericDressVariantOptions([{ id: 'legacy-m', label: 'M', size: 'M', stock: 2 }]), null);
+  assert.deepEqual(sizes.sortActualVariantOptions([
+    { id: 'l', label: 'L', size: 'L', stock: 1 }, { id: 's', label: 'S', size: 'S', stock: 1 },
+    { id: 'm', label: 'M', size: 'M', stock: 1 }, { id: 'xl', label: 'XL', size: 'XL', stock: 1 },
+  ]).map(option => option.size), ['S', 'M', 'L', 'XL']);
+  assert.deepEqual(sizes.sortActualVariantOptions([
+    { id: '40', label: '40', size: '40', stock: 1 }, { id: '32', label: '32', size: '32', stock: 1 },
+  ]).map(option => option.size), ['32', '40']);
 });
 
 test('Cart drawer checkout preserves the cart and keeps compact WhatsApp access', () => {
@@ -94,4 +124,28 @@ test('Cart drawer checkout preserves the cart and keeps compact WhatsApp access'
   assert.match(html, /Sepetiniz/); assert.match(html, /2 ürün/); assert.match(html, /₺200/);
   assert.doesNotMatch(html, /Ödeme yöntemi|IBAN bilgisi|kesin sipariş onayı değildir/);
   assert.equal(find(tree, node => node.type === 'button' && node.props.children === 'Ölçülerle Sipariş Oluştur'), null);
+});
+
+test('Localized checkout shell uses a compact header and only the necessary short links', () => {
+  const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) };
+  const image = { __esModule: true, default: ({ priority, ...props }) => React.createElement('img', props) };
+  const Shell = loader({
+    'next/navigation': { usePathname: () => '/ar/checkout' },
+    'next/link': link,
+    'next/image': image,
+    'lucide-react': { ArrowLeft: () => React.createElement('span', null, 'back') },
+    '@/components/CartPriceSync': { __esModule: true, default: () => null },
+    '@/components/Navigation': { __esModule: true, default: () => React.createElement('nav', null, 'full navigation') },
+    '@/components/Newsletter': { __esModule: true, default: () => React.createElement('aside', null, 'newsletter') },
+    '@/components/CartDrawer': { __esModule: true, default: () => React.createElement('aside', null, 'cart drawer') },
+    '@/context/StorefrontCatalogContext': { StorefrontCatalogProvider: ({ children }) => children },
+    '@/context/LocaleContext': { useLocale: () => ({ locale: 'ar', t: key => ({ cart: 'السلة', language: 'اللغة', privacyNotice: 'إشعار البيانات الشخصية', privacyPolicy: 'سياسة الخصوصية', delivery: 'التوصيل' })[key] || key }) },
+  })('src/components/StorefrontShell.tsx').default;
+  const html = renderToStaticMarkup(React.createElement(Shell, { categories: [], collections: [], footer: React.createElement('footer', null, 'long footer'), children: React.createElement('main', null, 'checkout form') }));
+  assert.match(html, /NRS Bequite Luminous/);
+  assert.match(html, /checkout form/);
+  assert.match(html, /href="\/ar\/cart"/);
+  assert.match(html, /href="\/ar\/kvkk"/);
+  assert.match(html, /href="\/ar\/gizlilik-politikasi"/);
+  assert.doesNotMatch(html, /full navigation|newsletter|cart drawer|long footer/);
 });

@@ -6,8 +6,8 @@ const variantId = '55555555-5555-4555-8555-555555555555'
 const orderId = '11111111-1111-4111-8111-111111111111'
 const request = productId => ({
   contractAccepted: true,
-  contractVersion: 'v1.4',
-  preInformationVersion: 'v1.4',
+  contractVersion: 'v1.5',
+  preInformationVersion: 'v1.5',
   idempotencyKey: '22222222-2222-4222-8222-222222222222',
   quoteHash: 'a'.repeat(64),
   items: [{ productId, variantId, quantity: 1 }],
@@ -25,7 +25,7 @@ test('single-finalize allowance accepts only the private trial or exact public d
     '@/lib/payment/garanti/adapter': { GarantiProvider: class GarantiProvider {} },
     '@/lib/legal/payment-preflight': { prepareOrderLegalRecord: () => ({}) },
     '@/lib/delivery-policy': { SHIPPING_MINOR: 0, DELIVERY_TERMS: '' },
-    '@/lib/order-measurements': { measurementKind: () => 'accessory', validateRequiredMeasurements: () => ({}) },
+    '@/lib/order-measurements': { measurementKind: () => 'accessory', validateOptionalMeasurements: () => ({}) },
     '@/lib/storage/products': { getProductImageUrl: () => '' },
     '@/lib/legal/order-summary': { assertFinalLegalOrderSummary() {} },
     '@/lib/supabase/server': { createSupabaseServerClient: async () => ({}) },

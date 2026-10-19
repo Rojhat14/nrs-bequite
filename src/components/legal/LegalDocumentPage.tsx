@@ -4,6 +4,7 @@ import { getLegalDocument, LEGAL_DOCUMENT_ARCHIVE, LEGAL_DOCUMENT_VERSIONS } fro
 import { getRequestLocale } from '@/lib/i18n/request-locale'
 import { localePrefix } from '@/lib/i18n/messages'
 import { LEGAL_TRANSLATION_NOTICE, localizeLegalDocument } from '@/lib/legal/translations-v1-4'
+import { localizeLegalDocumentV1_5 } from '@/lib/legal/translations-v1-5'
 import LegalDocumentContent from './LegalDocumentContent'
 
 const labels = {
@@ -19,9 +20,11 @@ export default async function LegalDocumentPage({ slug, version = LEGAL_DOCUMENT
   const archive = LEGAL_DOCUMENT_ARCHIVE[version as keyof typeof LEGAL_DOCUMENT_ARCHIVE]
   const seller = archive.seller
   const labelsForLocale = labels[locale]
-  const localized = version === 'v1.4'
-    ? localizeLegalDocument(slug, document, LEGAL_DOCUMENT_ARCHIVE['v1.4'].documents, locale)
-    : { document, complete: false, sourceVersion: version }
+  const localized = version === 'v1.5'
+    ? localizeLegalDocumentV1_5(slug, document, locale)
+    : version === 'v1.4'
+      ? localizeLegalDocument(slug, document, LEGAL_DOCUMENT_ARCHIVE['v1.4'].documents, locale)
+      : { document, complete: false, sourceVersion: version }
   const displayDocument = localized.document
   return <main className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content" lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
     <article className="mx-auto max-w-3xl px-6 pt-10 sm:pt-12 pb-24 space-y-10">
@@ -30,7 +33,7 @@ export default async function LegalDocumentPage({ slug, version = LEGAL_DOCUMENT
         <h1 className="font-serif text-3xl sm:text-5xl leading-tight">{displayDocument.title}</h1>
         <div className="mx-auto h-px w-20 bg-nrs-ink/20" />
         <p className="text-xs text-nrs-ink/60" dir="auto">{labelsForLocale.version}: {version} · {labelsForLocale.published}: {archive.publishedAt}</p>
-        {locale !== 'tr' && localized.complete && version === 'v1.4' && <p className="text-xs text-nrs-ink/60">{LEGAL_TRANSLATION_NOTICE[locale]}</p>}
+        {locale !== 'tr' && localized.complete && (version === 'v1.4' || version === 'v1.5') && <p className="text-xs text-nrs-ink/60">{LEGAL_TRANSLATION_NOTICE[locale]}</p>}
         {locale !== 'tr' && !localized.complete && <p className="text-sm text-amber-900" role="status">{labelsForLocale.archive}</p>}
       </header>
       <LegalDocumentContent document={displayDocument} />

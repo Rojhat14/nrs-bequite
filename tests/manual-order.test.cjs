@@ -24,6 +24,7 @@ async function setup() {
  await db.exec('GRANT SELECT,UPDATE ON public.products,public.product_variants TO service_role');
  await db.exec(fs.readFileSync('supabase/migrations/20261010130000_manual_order_details.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261015120000_opening_campaign_checkout.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261019120000_optional_personal_measurements.sql','utf8'));
  return db;
 }
 async function create(db,changes={}) {
@@ -50,7 +51,7 @@ test('Real SQL: service-only atomic unpaid order preserves address, sizes, measu
  await db.exec('RESET ROLE');
  const order=(await db.query('SELECT * FROM public.orders')).rows[0]; assert.equal(order.status,'pending'); assert.equal(order.shipping_address,'Beytepe'); assert.equal(Number(order.total_amount),100);
  const record=(await db.query('SELECT * FROM public.order_legal_records')).rows[0];
- assert.equal(record.contract_version,'v1.4'); assert.ok(record.accepted_at); assert.deepEqual(record.order_summary.items[0].measurements,items[0].measurements); assert.equal(record.order_summary.items[0].size,'M');
+ assert.equal(record.contract_version,'v1.5'); assert.ok(record.accepted_at); assert.deepEqual(record.order_summary.items[0].measurements,items[0].measurements); assert.equal(record.order_summary.items[0].size,'M');
  assert.equal((await db.query('SELECT count(*)::int n FROM public.order_items')).rows[0].n,1);
  assert.equal((await db.query('SELECT count(*)::int n FROM public.payment_orders')).rows[0].n,0);
  assert.equal((await db.query('SELECT stock_quantity FROM public.product_variants')).rows[0].stock_quantity,1);
@@ -120,24 +121,30 @@ test('Actual create endpoint binds authenticated owner and consent to the real S
  } finally {if(saved===undefined)delete process.env.ORDER_DATABASE_VERIFIED;else process.env.ORDER_DATABASE_VERIFIED=saved;await db.close()}
 });
 
-test('Mandatory dress, trousers, tops and suit measurements reject omissions, implausible values and standard size alone',()=>{
- const {validateRequiredMeasurements,requiredMeasurements}=load('src/lib/order-measurements.ts');
- for(const kind of ['dress','trousers','top','suit']) {
-   assert.throws(()=>validateRequiredMeasurements({},kind),/zorunludur/);
-   const values={chest:92,waist:72,hips:98,height:168,shoulder:38,sleeve:58,length:110,inseam:75};
-   for(const field of requiredMeasurements(kind)) {const missing={...values};delete missing[field];assert.throws(()=>validateRequiredMeasurements(missing,kind),/zorunludur/)}
-   assert.ok(validateRequiredMeasurements(values,kind));
+test('Personal measurements are optional for every garment; every supplied value remains validated',()=>{
+ const {validateOptionalMeasurements}=load('src/lib/order-measurements.ts');
+ const {parseCheckoutInput}=load('src/lib/payment/request.ts');
+ for(const item of [{productId:'product',variantId,quantity:1},{productId:'product',variantId,quantity:1,measurements:{}}]) {
+  const parsed=parseCheckoutInput({items:[item],customer});
+  assert.equal(Object.hasOwn(parsed.items[0],'measurements'),false);
  }
- for(const value of [-1,0,10,999,NaN,Infinity]) assert.throws(()=>validateRequiredMeasurements({...items[0].measurements,chest:value},'dress'));
+ for(const value of [undefined,{}, {chest:92}, {waist:72,hips:98}, {length:110,inseam:75}]) assert.doesNotThrow(()=>validateOptionalMeasurements(value));
+ for(const value of [-1,0,10,999,NaN,Infinity,'92',null]) assert.throws(()=>validateOptionalMeasurements({chest:value}));
+ assert.throws(()=>validateOptionalMeasurements({unknown:12}));
 });
-test('Real SQL rejects a current order with missing measurements and leaves no records',async()=>{
+test('Real SQL accepts a current order with omitted/partial personal measurements and still rejects invalid values',async()=>{
  const db=await setup();try {
   const legal=prepareOrderLegalRecord(fixture.orderId,createLegalAcceptance(true),summary);
   legal.order_summary=structuredClone(legal.order_summary);
-  delete legal.order_summary.items[0].measurements.height;
-  const malformed=structuredClone(items);delete malformed[0].measurements.height;
-  await assert.rejects(()=>create(db,{items:malformed,legal}),/required measurements missing/);
-  assert.equal((await db.query('SELECT count(*)::int n FROM public.orders')).rows[0].n,0);
+  delete legal.order_summary.items[0].measurements;
+  const omitted=structuredClone(items);delete omitted[0].measurements;
+  await db.exec('SET ROLE service_role');
+  assert.equal((await create(db,{items:omitted,legal})).rows[0].result.created,true);
+  await db.exec('RESET ROLE');
+  const invalidDb=await setup();
+  const invalidLegal=structuredClone(legal); invalidLegal.order_summary.items[0].measurements={chest:999}
+  try { await assert.rejects(()=>create(invalidDb,{items:[{...items[0],measurements:{chest:999}}],legal:invalidLegal}),/invalid measurement range/); assert.equal((await invalidDb.query('SELECT count(*)::int n FROM public.orders')).rows[0].n,0) }
+  finally { await invalidDb.close() }
  }finally{await db.close()}
 });
 test('Real SQL manual transfer needs active admin, exact money and a real reference; replay is safe and browser cannot call it',async()=>{
@@ -219,7 +226,7 @@ for(const [name,indexes]of [['single product',[0]],['two products added in rever
  const legal=(await h.db.query('SELECT * FROM public.order_legal_records')).rows[0];
  assert.deepEqual(legal.order_summary,sent.p_legal.order_summary);
  const commercial=s=>{const {orderedAt,...rest}=s;return rest};assert.deepEqual(commercial(legal.order_summary),commercial(quote.summary));
- assert.equal(legal.contract_version,'v1.4');assert.equal(legal.pre_information_version,'v1.4');
+ assert.equal(legal.contract_version,'v1.5');assert.equal(legal.pre_information_version,'v1.5');
  const crypto=require('node:crypto');assert.equal(legal.summary_hash,crypto.createHash('sha256').update(JSON.stringify(sent.p_legal.order_summary)).digest('hex'));
  assert.equal(legal.document_hash,prepareOrderLegalRecord(sent.p_order_id,createLegalAcceptance(true),quote.summary).document_hash);
  const rows=(await h.db.query('SELECT product_id,quantity,price_at_purchase FROM public.order_items')).rows;

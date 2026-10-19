@@ -50,6 +50,11 @@ export function validateRequiredMeasurements(value: unknown, kind: MeasurementKi
   for (const field of requiredMeasurements(kind)) if (result[field] === undefined) throw new Error(`${MEASUREMENT_LABELS[field]} zorunludur.`)
   return result
 }
+/** Personal measurements are optional. Any value the customer supplies is still
+ * parsed and range-checked before it reaches a quote or immutable order record. */
+export function validateOptionalMeasurements(value: unknown): Measurements {
+  return parseMeasurements(value)
+}
 export function formatMeasurements(value: Measurements) {
   return Object.entries(value).map(([key, cm]) => `${MEASUREMENT_LABELS[key as keyof Measurements]}: ${cm} cm`).join(' · ')
 }

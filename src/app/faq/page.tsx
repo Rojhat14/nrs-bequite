@@ -16,7 +16,7 @@ export default function FAQPage() {
     },
     {
       q: 'İade süreci nasıl işliyor?',
-      a: 'Kıyafetler müşterinin ölçülerine göre özel dikilir. Cayma hakkı istisnası yalnızca mevzuattaki koşullar oluştuğunda uygulanır; ayıplı ürün hakları korunur. Cayma hakkının geçerli olduğu ürünlerde teslimden itibaren 14 gün içinde bildirim yapılabilir. İletişim ve ayrıntılar İade ve Değişim Koşulları sayfasındadır.'
+      a: 'Ürün sayfasında sunulan beden seçeneklerinden biriyle sipariş verebilirsiniz; kişisel ölçü paylaşmak isteğe bağlıdır. Standart beden seçimi tek başına kişiye özel üretim veya cayma hakkı istisnası oluşturmaz. Ayıplı ürün hakları korunur. Cayma hakkının geçerli olduğu ürünlerde teslimden itibaren 14 gün içinde bildirim yapılabilir. Ayrıntılar İade ve Değişim Koşulları sayfasındadır.'
     },
     {
       q: 'Ödeme yöntemleriniz nelerdir?',
@@ -26,21 +26,21 @@ export default function FAQPage() {
     },
     {
       q: 'Kişiye özel ölçü ile üretim yapıyor musunuz?',
-      a: 'Bütün kıyafetler ürün bazında ilettiğiniz zorunlu beden ölçülerine göre özel dikilir.'
+      a: 'Ürün sayfasında sunulan beden seçeneklerinden biriyle sipariş verebilirsiniz. Kişisel ölçü paylaşmak isteğe bağlıdır; yalnızca bildiğiniz ölçüleri girebilirsiniz.'
     },
   ];
   const faqs = locale === 'tr' ? faqsTr : locale === 'en' ? [
     { q: 'What are the shipping cost and delivery time?', a: 'Shipping is free within Türkiye. Delivery takes a total of 7–10 business days from order approval, including made-to-measure production and shipping. No additional shipping time is added.' },
     { q: 'How can I track my order?', a: 'A carrier has not yet been selected; no carrier or tracking service is promised. You can ask about delivery status at the company contact email.' },
-    { q: 'How do returns work?', a: 'Garments are made to the customer’s measurements. An exception to the right of withdrawal applies only when legal conditions are met; rights for defective goods remain protected. For products eligible for withdrawal, notice may be given within 14 days of delivery. See the Returns and Exchanges Terms for contact details and more information.' },
+    { q: 'How do returns work?', a: 'Choose a size offered on the product page; sharing personal measurements is optional. A standard size alone does not mean an item is individually customised or create an exception to the right of withdrawal. Rights for defective goods remain protected. For products eligible for withdrawal, notice may be given within 14 days of delivery. See the Returns and Exchanges Terms for details.' },
     { q: 'Which payment methods are available?', a: ENABLE_CARD_PAYMENT ? 'Availability of online payment is shown at checkout. Bank transfer details are shared when the order is confirmed.' : 'You can send an order request via WhatsApp. Bank transfer and IBAN details are shared when the order is confirmed.' },
-    { q: 'Are garments made to personal measurements?', a: 'Garments are made to the required body measurements provided for each product.' },
+    { q: 'Are personal measurements required?', a: 'No. You can select a size shown on the product page. Personal measurements are optional, and you may provide only the ones you know.' },
   ] : [
     { q: 'ما تكلفة الشحن ومدة التوصيل؟', a: 'الشحن مجاني داخل تركيا. يستغرق التوصيل من تاريخ تأكيد الطلب 7 إلى 10 أيام عمل إجمالاً، شاملاً تجهيز القطعة حسب المقاس والشحن. لا تُضاف مدة شحن أخرى.' },
     { q: 'كيف يمكنني متابعة طلبي؟', a: 'لم يتم تحديد شركة الشحن بعد؛ ولا يوجد وعد بناقل معين أو خدمة تتبع. يمكنك الاستفسار عن حالة التوصيل عبر البريد الإلكتروني للشركة.' },
-    { q: 'كيف تتم عمليات الإرجاع؟', a: 'تُجهز الملابس وفق قياسات العميل. لا يُطبق استثناء حق العدول إلا عند تحقق الشروط القانونية، وتظل حقوق المنتجات المعيبة محفوظة. بالنسبة إلى المنتجات التي يسري عليها حق العدول، يمكن تقديم الإخطار خلال 14 يوماً من التسليم. راجعي شروط الإرجاع والاستبدال للتواصل والتفاصيل.' },
+    { q: 'كيف تتم عمليات الإرجاع؟', a: 'اختاري أحد المقاسات المعروضة في صفحة المنتج؛ وتقديم القياسات الشخصية اختياري. اختيار المقاس القياسي وحده لا يعني أن المنتج صُنع خصيصاً للفرد ولا ينشئ استثناءً من حق العدول. وتظل حقوق المنتجات المعيبة محفوظة. بالنسبة إلى المنتجات التي يسري عليها حق العدول، يمكن تقديم الإخطار خلال 14 يوماً من التسليم. راجعي شروط الإرجاع والاستبدال للتفاصيل.' },
     { q: 'ما طرق الدفع المتاحة؟', a: ENABLE_CARD_PAYMENT ? 'تظهر إمكانية الدفع الإلكتروني في صفحة إتمام الطلب. وتُشارك معلومات التحويل البنكي عند تأكيد الطلب.' : 'يمكنك إرسال طلب شراء عبر واتساب. وتُشارك معلومات التحويل البنكي ورقم الآيبان عند تأكيد الطلب.' },
-    { q: 'هل تُجهز الملابس وفق القياسات الشخصية؟', a: 'تُجهز الملابس وفق قياسات الجسم المطلوبة المرسلة لكل منتج.' },
+    { q: 'هل القياسات الشخصية مطلوبة؟', a: 'لا. يمكنك اختيار مقاس معروض في صفحة المنتج. القياسات الشخصية اختيارية، ويمكنك تقديم القياسات التي تعرفينها فقط.' },
   ];
   const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr;
 

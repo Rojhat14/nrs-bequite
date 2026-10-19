@@ -1,5 +1,5 @@
 import { SHIPPING_MINOR, DELIVERY_TERMS } from '@/lib/delivery-policy'
-import { measurementKind, validateRequiredMeasurements } from '@/lib/order-measurements'
+import { measurementKind, validateOptionalMeasurements } from '@/lib/order-measurements'
 import { getProductImageUrl } from '@/lib/storage/products'
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
@@ -16,6 +16,7 @@ import { cookies } from 'next/headers'
 import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
+import { CheckoutVariantUnavailableError } from './variant-unavailable'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 import { discountForUnitMinor, getOpeningCampaign } from '@/lib/opening-campaign'
 import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
@@ -233,8 +234,9 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       const lines = sorted.map(item => {
         const product = products.data.find(p => p.id === item.productId)
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
-        if (!product || product.status !== 'active' || product.currency !== 'TRY'
-          || variant?.is_active !== true || !Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity) throw new Error('Ürün veya seçilen beden stokta yok.')
+        if (!product || product.status !== 'active' || product.currency !== 'TRY') throw new Error('Ürün veya seçilen beden stokta yok.')
+        if (!variant || variant.is_active !== true) throw new CheckoutVariantUnavailableError(item.productId)
+        if (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity) throw new Error('Ürün veya seçilen beden stokta yok.')
         const translation = translationsByProduct.get(product.id)
         const localized = translation?.source_hash === productSourceHash(product) ? translation.payload : null
         const displayName = typeof localized?.name === 'string' ? localized.name : product.name
@@ -251,10 +253,11 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         saleMinor += payableUnitMinor * item.quantity
         const category = Array.isArray(product.categories) ? product.categories[0] : product.categories
         const kind = measurementKind(`${product.name} ${category?.name || ''} ${category?.slug || ''}`)
-        const measurements = validateRequiredMeasurements(item.measurements, kind)
+        const measurements = validateOptionalMeasurements(item.measurements)
         const images = product.product_images || []
         const image = images.find((row: { is_primary?: boolean }) => row.is_primary) || images[0]
-        return { measurementKind: kind, ...(image ? { image: getProductImageUrl(db, image) || undefined } : {}), productId: item.productId, variantId: item.variantId, measurements, name: displayName, description: displayDescription,
+        return { measurementKind: kind, ...(image ? { image: getProductImageUrl(db, image) || undefined } : {}), productId: item.productId, variantId: item.variantId,
+          ...(Object.keys(measurements).length ? { measurements } : {}), name: displayName, description: displayDescription,
           ...(variant.size ? { size: variant.size } : {}), quantity: item.quantity, unitPrice: payableUnitMinor / 100,
           ...(openingCampaign ? { normalUnitPrice: priceMinor / 100, discountAmount: lineDiscountMinor / 100 } : {}) }
       })

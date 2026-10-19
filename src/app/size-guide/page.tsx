@@ -22,37 +22,12 @@ export default function SizeGuidePage() {
             </motion.h1>
             <div className="h-px w-20 bg-nrs-black/20 mx-auto"></div>
             <p className="text-nrs-ink/60 font-sans italic text-sm">
-              {copy('Size en uygun parçayı bulmanıza yardımcı olmak için hazırladığımız ölçü tablosu.', 'A measurement chart to help you find the most suitable fit.', 'جدول قياسات لمساعدتك في اختيار القطعة الأنسب.')}
+              {copy('Beden seçenekleri her ürünün sayfasında gösterilir. Kişisel ölçü paylaşmak isteğe bağlıdır.', 'Size options are shown on each product page. Sharing personal measurements is optional.', 'تظهر خيارات المقاس في صفحة كل منتج. تقديم القياسات الشخصية اختياري.')}
             </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-start border-collapse">
-              <thead>
-                <tr className="border-b border-nrs-ink/10">
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Beden', 'Size', 'المقاس')}</th>
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Göğüs (cm)', 'Bust (cm)', 'الصدر (سم)')}</th>
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Bel (cm)', 'Waist (cm)', 'الخصر (سم)')}</th>
-                  <th className="py-4 px-4 text-xs uppercase tracking-widest font-medium">{copy('Basen (cm)', 'Hip (cm)', 'الأرداف (سم)')}</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm font-sans text-nrs-ink/70">
-                {[
-                  { size: 'XS', chest: '82-85', waist: '62-65', hip: '88-91' },
-                  { size: 'S', chest: '86-89', waist: '66-69', hip: '92-95' },
-                  { size: 'M', chest: '90-93', waist: '70-73', hip: '96-99' },
-                  { size: 'L', chest: '94-97', waist: '74-77', hip: '100-103' },
-                  { size: 'XL', chest: '98-101', waist: '78-81', hip: '104-107' },
-                ].map((row) => (
-                  <tr key={row.size} className="border-b border-nrs-ink/5 hover:bg-nrs-black/5 transition-colors">
-                    <td className="py-4 px-4 font-medium">{row.size}</td>
-                    <td className="py-4 px-4">{row.chest}</td>
-                    <td className="py-4 px-4">{row.waist}</td>
-                    <td className="py-4 px-4">{row.hip}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="border border-nrs-ink/10 bg-nrs-panel p-6 text-sm leading-7 text-nrs-ink/70">
+            {copy('Doğrulanmış santimetre ölçü tablosu bulunmuyor. Ürün sayfasındaki beden seçeneklerinden uygun olanı seçebilirsiniz; kişisel ölçü alanları sipariş için zorunlu değildir.', 'A verified centimetre measurement chart is not available. Select from the options shown on the product page; personal measurement fields are not required to place an order.', 'لا يتوفر جدول قياسات موثّق بالسنتيمتر. اختاري من الخيارات المعروضة في صفحة المنتج؛ ولا تُطلب القياسات الشخصية لإتمام الطلب.')}
           </div>
 
           <div className="bg-nrs-panel p-8 border border-nrs-ink/5 space-y-4">

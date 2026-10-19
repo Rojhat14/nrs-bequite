@@ -1,10 +1,11 @@
 import LegalDocumentPage from '@/components/legal/LegalDocumentPage'
 import { legalPageMetadata } from '@/lib/legal/page-metadata'
+import { LEGAL_DOCUMENT_VERSIONS } from '@/lib/legal/documents'
 
 export async function generateMetadata() { return legalPageMetadata('gizlilik-politikasi') }
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ version?: string | string[] }> }) {
   const params = await searchParams
-  const version = typeof params.version === 'string' ? params.version : 'v1.4'
+  const version = typeof params.version === 'string' ? params.version : LEGAL_DOCUMENT_VERSIONS.contract
   return await LegalDocumentPage({ slug: 'gizlilik-politikasi', version })
 }
