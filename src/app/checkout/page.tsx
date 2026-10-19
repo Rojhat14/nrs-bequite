@@ -7,29 +7,29 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ShoppingBag, User, Check } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import AccountModal from '@/components/AccountModal'
 import CartWhatsappOrder from '@/components/CartWhatsappOrder'
 import { useCardPaymentEnabled } from '@/lib/feature-flags'
 import CheckoutLegalConsent from '@/components/legal/CheckoutLegalConsent'
 import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
-import LegalDocumentContent from '@/components/legal/LegalDocumentContent'
 import CardPaymentNotice, { CARD_PAYMENT_COMING_SOON } from '@/components/payment/CardPaymentNotice'
-import { getLegalDocument, LEGAL_DOCUMENT_VERSIONS } from '@/lib/legal/documents'
 import { withLegalAcceptance } from '@/lib/legal/acceptance'
 import type { Quote } from '@/lib/payment/types'
 import type { LegalOrderSummary as OrderSummary } from '@/lib/legal/order-summary'
 
-import { MEASUREMENT_RANGES, measurementFields, measurementKind, requiredMeasurements, validateRequiredMeasurements, type Measurements } from '@/lib/order-measurements'
+import { MEASUREMENT_RANGES, measurementFields, validateOptionalMeasurements, type Measurements } from '@/lib/order-measurements'
 import { discountForUnitMinor, getOpeningCampaign, isOpeningCampaignActive } from '@/lib/opening-campaign'
 import { useLocale } from '@/context/LocaleContext'
 import { formatMinor } from '@/lib/i18n/money'
 import { formatLocalizedMeasurements, measurementHelp, measurementLabel } from '@/lib/i18n/measurements'
+import { localePrefix } from '@/lib/i18n/messages'
 
 export default function Checkout() {
   const { locale, money, t, fxAvailable } = useLocale()
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
-  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, catalogPricesSynced, priceUpdateNotice } = useCart()
+  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, removeItem, catalogPricesSynced, priceUpdateNotice } = useCart()
   const { user, profile } = useAuth()
   const [step, setStep] = useState(1) // 1: Auth Choice, 2: Shipping, 3: Payment
   const router = useRouter()
@@ -43,6 +43,9 @@ export default function Checkout() {
   const [quoteKey, setQuoteKey] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [measurements, setMeasurements] = useState<Record<string, Measurements>>(() => Object.fromEntries(items.map(item => [getCartItemId(item), item.measurements || {}])))
+  const [showMeasurements, setShowMeasurements] = useState(false)
+  const [measurementErrorId, setMeasurementErrorId] = useState<string | null>(null)
+  const [invalidVariantProductId, setInvalidVariantProductId] = useState<string | null>(null)
   const [savedOrder, setSavedOrder] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => { setHydrated(true) }, [])
@@ -69,7 +72,11 @@ export default function Checkout() {
   const openingCampaign = getOpeningCampaign()
   const confirmedQuote = quoteKey === inputKey ? quote : null
   const snapshotKey = JSON.stringify({ inputKey, quoteHash: confirmedQuote?.hash })
-  const checkoutInput = () => ({ items: items.map(item => ({ productId: item.id, variantId: item.variantId, quantity: item.quantity, measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {} })), customer: formData })
+  const checkoutInput = () => ({ items: items.map(item => {
+    const itemMeasurements = measurements[getCartItemId(item)] ?? item.measurements ?? {}
+    return { productId: item.id, variantId: item.variantId, quantity: item.quantity,
+      ...(Object.keys(itemMeasurements).length ? { measurements: itemMeasurements } : {}) }
+  }), customer: formData })
   const contractAccepted = acceptedSnapshot === snapshotKey
   const updateCustomer = (field: keyof typeof formData, value: string) => {
     setFormData(current => ({ ...current, [field]: value }))
@@ -81,7 +88,9 @@ export default function Checkout() {
       const discountMinor = isOpeningCampaignActive() ? discountForUnitMinor(normalMinor) * item.quantity : 0
       return { productId: item.id, name: item.title,
       description: 'Temel özellikler ürün sayfasında yer alır; varsa özel üretim koşulları sipariş teyidinde bildirilir.',
-      ...(item.size ? { size: item.size } : {}), measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {}, quantity: item.quantity,
+      ...(item.size ? { size: item.size } : {}),
+      ...((measurements[getCartItemId(item)] ?? item.measurements) && Object.keys(measurements[getCartItemId(item)] ?? item.measurements ?? {}).length
+        ? { measurements: measurements[getCartItemId(item)] ?? item.measurements } : {}), quantity: item.quantity,
       unitPrice: (normalMinor - (isOpeningCampaignActive() ? discountForUnitMinor(normalMinor) : 0)) / 100,
       ...(isOpeningCampaignActive() ? { normalUnitPrice: normalMinor / 100, discountAmount: discountMinor / 100 } : {})
     }}),
@@ -96,6 +105,7 @@ export default function Checkout() {
   }
 
   const orderSummary = confirmedQuote?.summary ?? previewSummary
+  const invalidVariantItem = items.find(item => item.id === invalidVariantProductId)
   const summaryDisplay = orderSummary.display
   const summaryRate = summaryDisplay?.currency === 'USD' && summaryDisplay.exchangeRate !== null && summaryDisplay.exchangeRateAt
     ? { usdTry: summaryDisplay.exchangeRate, fetchedAt: summaryDisplay.exchangeRateAt, rateDate: summaryDisplay.exchangeRateDate ?? undefined } : null
@@ -120,14 +130,28 @@ export default function Checkout() {
       document.getElementById(`checkout-${Object.keys(errors)[0]}`)?.focus()
       return
     }
-    try { for (const item of items) validateRequiredMeasurements(measurements[getCartItemId(item)] || item.measurements, measurementKind((item.category || '') + ' ' + item.title)) } catch { setLegalError(t('measurementValidationError')); return }
+    for (const item of items) {
+      const itemId = getCartItemId(item)
+      try { validateOptionalMeasurements(measurements[itemId] ?? item.measurements) }
+      catch {
+        setShowMeasurements(true)
+        setMeasurementErrorId(itemId)
+        setLegalError('')
+        requestAnimationFrame(() => document.getElementById(`checkout-measurements-${encodeURIComponent(itemId)}`)?.focus())
+        return
+      }
+    }
     setSavedOrder(null)
     setBusy(true)
     setLegalError('')
     try {
       const response = await fetch(ENABLE_CARD_PAYMENT ? '/api/payment/quote' : '/api/orders/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkoutInput()) })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Sipariş özeti doğrulanamadı.')
+      if (!response.ok) {
+        if (data.code === 'VARIANT_UNAVAILABLE' && typeof data.productId === 'string') setInvalidVariantProductId(data.productId)
+        throw new Error(data.error || 'Sipariş özeti doğrulanamadı.')
+      }
+      setInvalidVariantProductId(null)
       setQuote(data); setQuoteKey(inputKey); setAcceptedSnapshot(null)
       if (!idempotencyKey || quoteKey !== inputKey) setIdempotencyKey(crypto.randomUUID())
       setStep(3)
@@ -211,7 +235,7 @@ export default function Checkout() {
             <h1 className="mb-2 font-serif text-3xl text-nrs-ink sm:text-4xl">{ENABLE_CARD_PAYMENT ? t('checkoutTitle') : t('orderRequest')}</h1>
             <p className="text-sm text-nrs-ink/60">{t('chosenItemsReady')}</p>
             </div>
-            <ol aria-label="Sipariş adımları" className="flex items-center gap-2 pt-1 text-xs text-nrs-ink/55 sm:gap-3">
+            <ol aria-label={t('orderSteps')} className="flex items-center gap-2 pt-1 text-xs text-nrs-ink/55 sm:gap-3">
               {[t('stepInformation'), t('stepSummary'), t('stepApproval')].map((label, index) => <li key={label} className="flex items-center gap-2">
                 <span className={`flex h-7 w-7 items-center justify-center rounded-full border ${step >= index + 1 ? 'border-nrs-ink bg-nrs-ink text-nrs-ivory' : 'border-nrs-ink/20'}`}>{step > index + 1 ? <Check size={14} /> : index + 1}</span>
                 <span className="hidden sm:inline">{label}</span>
@@ -342,22 +366,34 @@ export default function Checkout() {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <label className="block text-sm">{t('orderNoteOptional')}
-                    <textarea value={formData.orderNote} maxLength={2000} onChange={e => setFormData({ ...formData, orderNote: e.target.value })} className="mt-2 w-full border border-nrs-ink/20 bg-transparent p-3" />
-                  </label>
-                  <h3 className="font-serif text-xl">{t('measurementsTitle')}</h3>
-                  <p className="text-sm text-nrs-ink/65">{t('measurementsHelp')}</p>
-                  {items.map(item => <fieldset key={getCartItemId(item)} className="border border-nrs-ink/15 p-4">
-                    <legend>{item.title} · Beden: {item.size || 'Belirtilmedi'}</legend>
-                    <div className="grid min-w-0 grid-cols-2 gap-3">{measurementFields((item.category || '') + ' ' + item.title).map(field => <label key={field} className="min-w-0 break-words text-sm">{measurementLabel(locale, field)} ({locale === 'ar' ? 'سم' : 'cm'}){requiredMeasurements(measurementKind((item.category || '') + ' ' + item.title)).includes(field) ? ' *' : ` (${t('measurementOptional')})`}
-                      <input type="number" required={requiredMeasurements(measurementKind((item.category || '') + ' ' + item.title)).includes(field)} min={MEASUREMENT_RANGES[field][0]} max={MEASUREMENT_RANGES[field][1]} step="0.1" value={(measurements[getCartItemId(item)] ?? item.measurements)?.[field] ?? ''} onChange={e => {
-                        const values = { ...(measurements[getCartItemId(item)] ?? item.measurements) }; if (e.target.value === '') delete values[field]; else values[field] = Number(e.target.value)
-                        setMeasurements({ ...measurements, [getCartItemId(item)]: values }); updateMeasurements(getCartItemId(item), values)
-                      }} className="mt-1 w-full min-w-0 border border-nrs-ink/20 bg-transparent p-2" />
-                      <span className="block text-xs text-nrs-ink/60">{measurementHelp(locale, field)}</span>
-                    </label>)}</div>
-                  </fieldset>)}
-                  <Link href="/kvkk" className="text-sm underline">{t('privacyNotice')}</Link>
+                  <details className="rounded-sm border border-nrs-ink/15 px-4 py-3">
+                    <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium underline underline-offset-4">{t('orderNoteOptional')}</summary>
+                    <label className="mt-2 block text-sm" htmlFor="checkout-order-note">{t('orderNoteOptional')}
+                      <textarea id="checkout-order-note" value={formData.orderNote} maxLength={2000} onChange={e => setFormData({ ...formData, orderNote: e.target.value })} className="mt-2 min-h-24 w-full border border-nrs-ink/20 bg-transparent p-3" />
+                    </label>
+                  </details>
+                  <details open={showMeasurements} onToggle={event => setShowMeasurements(event.currentTarget.open)} className="rounded-sm border border-nrs-ink/15 px-4 py-3">
+                    <summary id="checkout-measurements-summary" tabIndex={-1} className="min-h-11 cursor-pointer py-2 text-sm font-medium underline underline-offset-4">{t('measurementsTitle')}</summary>
+                    <p className="pb-3 text-sm leading-6 text-nrs-ink/65">{t('measurementsHelp')}</p>
+                    <div className="space-y-3">{items.map(item => {
+                      const itemId = getCartItemId(item)
+                      const itemMeasurements = measurements[itemId] ?? item.measurements ?? {}
+                      return <fieldset key={itemId} className="min-w-0 border border-nrs-ink/15 p-4">
+                        <legend className="max-w-full break-words px-1 text-sm">{item.title} · {t('sizeLabel')} {item.size || '—'}</legend>
+                        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{measurementFields((item.category || '') + ' ' + item.title).map(field => <label key={field} className="min-w-0 break-words text-sm">{measurementLabel(locale, field)} ({locale === 'ar' ? 'سم' : 'cm'}) <span className="text-xs text-nrs-ink/55">({t('measurementOptional')})</span>
+                          <input type="number" min={MEASUREMENT_RANGES[field][0]} max={MEASUREMENT_RANGES[field][1]} step="0.1" value={itemMeasurements[field] ?? ''} aria-invalid={measurementErrorId === itemId} onChange={event => {
+                            const values = { ...itemMeasurements }
+                            if (event.target.value === '') delete values[field]; else values[field] = Number(event.target.value)
+                            setMeasurements(current => ({ ...current, [itemId]: values }))
+                            try { const safeValues = validateOptionalMeasurements(values); updateMeasurements(itemId, safeValues); setMeasurementErrorId(null) }
+                            catch { setMeasurementErrorId(itemId) }
+                          }} className="mt-1 min-h-11 w-full min-w-0 rounded-sm border border-nrs-ink/20 bg-transparent px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" />
+                          <span className="block text-xs leading-5 text-nrs-ink/60">{measurementHelp(locale, field)}</span>
+                        </label>)}</div>
+                        {measurementErrorId === itemId && <p id={`checkout-measurements-${encodeURIComponent(itemId)}`} tabIndex={-1} role="alert" className="mt-3 text-sm text-red-700">{t('measurementValidationError')}</p>}
+                      </fieldset>
+                    })}</div>
+                  </details>
                 </div>
                 <button
                   onClick={() => void reviewPayment()} disabled={busy || !catalogPricesSynced}
@@ -366,6 +402,13 @@ export default function Checkout() {
                   {busy ? t('reviewingQuote') : !catalogPricesSynced ? t('checkingCartPrices') : t('reviewSummary')}
                 </button>
                 {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">{t('cartUpdated')}</p>}
+                {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
+                  <p>{t('cartSizeInvalid')}</p>
+                  <button type="button" onClick={() => {
+                    const href = `${localePrefix(locale)}/product/${encodeURIComponent(invalidVariantItem.slug || invalidVariantItem.id)}`
+                    removeItem(getCartItemId(invalidVariantItem)); setInvalidVariantProductId(null); router.push(href)
+                  }} className="inline-flex min-h-11 items-center underline underline-offset-4">{t('removeAndReselectSize')}</button>
+                </div>}
                 {legalError && <p role="alert" className="text-sm text-rose-700">{legalError}</p>}
               </motion.div>
             )}
@@ -383,19 +426,6 @@ export default function Checkout() {
                     <LegalOrderSummary summary={orderSummary} preview={!confirmedQuote} />
                   </div>
                 </details>}
-                <div className="space-y-3">
-                  {(['contract', 'preInformation'] as const).map(kind => {
-                    const slug = kind === 'contract' ? 'mesafeli-satis-sozlesmesi' : 'on-bilgilendirme-formu'
-                    const document = getLegalDocument(slug, LEGAL_DOCUMENT_VERSIONS[kind])!
-                    return <div key={kind} className="min-w-0 border border-nrs-ink/15 p-4 sm:p-6">
-                      <details>
-                        <summary className="min-h-11 cursor-pointer font-serif text-lg">{document.title} · {LEGAL_DOCUMENT_VERSIONS[kind]} {t('documentVersion')}</summary>
-                        <div className="pt-4"><LegalDocumentContent document={document} /></div>
-                      </details>
-                      <Link href={`/${slug}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-11 items-center text-sm underline underline-offset-4">{document.title} · {t('openLegal')}</Link>
-                    </div>
-                  })}
-                </div>
                 {ENABLE_CARD_PAYMENT && <div className="space-y-4">
                   <CheckoutLegalConsent accepted={contractAccepted} onChange={value => {
                     setAcceptedSnapshot(value ? snapshotKey : null); setLegalError(''); setPaymentMessage('')
@@ -424,18 +454,46 @@ export default function Checkout() {
 
 
           </section>
-          <aside aria-label="Sipariş özeti" className="order-first min-w-0 lg:order-none lg:sticky lg:top-[calc(var(--nrs-header-height)+1.5rem)]">
-            <section className="rounded-sm border border-nrs-ink/10 bg-nrs-panel/70 p-4 sm:p-5">
+          <aside aria-label={t('orderSummary')} className="order-first min-w-0 lg:order-none lg:sticky lg:top-[calc(var(--nrs-header-height)+1.5rem)]">
+            <details className="rounded-sm border border-nrs-ink/10 bg-nrs-panel/70 p-4 lg:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3">
+                <span className="text-sm font-medium">{t('orderSummary')}</span>
+                <span className="font-serif text-xl tabular-nums">{summaryDisplay ? formatMinor(summaryDisplay.totalMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.total)}</span>
+              </summary>
+              <div className="pt-3">
+                <ul className="divide-y divide-nrs-ink/10">
+                  {orderSummary.items.map((item, index) => <li key={`mobile-${item.productId}-${index}`} className="flex min-w-0 items-center justify-between gap-3 py-3">
+                    {item.image ? <Image src={item.image} alt="" width={56} height={70} unoptimized className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas object-cover" /> : <span aria-hidden="true" className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas" />}
+                    <div className="min-w-0">
+                      <p className="break-words text-sm leading-5">{item.name}</p>
+                      <p className="mt-1 text-xs text-nrs-ink/55">{item.size ? <>{t('sizeLabel')} <bdi dir="ltr">{item.size}</bdi> · </> : ''}{item.quantity} {t('pieces')}</p>
+                    </div>
+                    <span className="shrink-0 text-sm tabular-nums">{summaryDisplay?.itemLineMinor[index] !== undefined ? formatMinor(summaryDisplay.itemLineMinor[index], summaryDisplay.locale, summaryRate) : displaySummaryMoney(item.unitPrice * item.quantity)}</span>
+                  </li>)}
+                </ul>
+                <dl className="space-y-2 border-t border-nrs-ink/10 pt-3 text-sm">
+                  <div className="flex justify-between gap-3"><dt>{t('productTotal')}</dt><dd>{summaryDisplay ? formatMinor(summaryDisplay.subtotalMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.subtotal)}</dd></div>
+                  {orderSummary.discount > 0 && <div className="flex justify-between gap-3"><dt>{t('discount')}</dt><dd>−{summaryDisplay ? formatMinor(summaryDisplay.discountMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.discount)}</dd></div>}
+                  <div className="flex justify-between gap-3"><dt>{t('shipping')}</dt><dd>{orderSummary.shipping === null ? t('shippingConfirmed') : orderSummary.shipping === 0 ? t('free') : summaryDisplay ? formatMinor(summaryDisplay.shippingMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.shipping)}</dd></div>
+                  <div className="flex justify-between gap-3 border-t border-nrs-ink/10 pt-2 font-medium"><dt>{t('total')}</dt><dd>{summaryDisplay ? formatMinor(summaryDisplay.totalMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.total)}</dd></div>
+                </dl>
+                <p className="mt-3 text-xs leading-5 text-nrs-ink/60">{t('deliveryPromise')}</p>
+                {locale !== 'tr' && <p className="mt-2 text-xs leading-5 text-nrs-ink/60">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
+                {ENABLE_CARD_PAYMENT && confirmedQuote && <p className="mt-2 text-xs leading-5 text-nrs-ink/70">{t('paymentTry')} <bdi dir="ltr">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(orderSummary.total)}</bdi></p>}
+              </div>
+            </details>
+            <section className="hidden rounded-sm border border-nrs-ink/10 bg-nrs-panel/70 p-4 sm:p-5 lg:block">
               <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="font-serif text-xl text-nrs-ink">{t('orderSummary')}</h2>
                 <span className="text-xs text-nrs-ink/55">{orderSummary.items.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}</span>
               </div>
               <ul className="divide-y divide-nrs-ink/10">
-                {orderSummary.items.map((item, index) => <li key={`${item.productId}-${index}`} className="flex min-w-0 justify-between gap-3 py-3">
+                {orderSummary.items.map((item, index) => <li key={`${item.productId}-${index}`} className="flex min-w-0 items-center justify-between gap-3 py-3">
+                  {item.image ? <Image src={item.image} alt="" width={56} height={70} unoptimized className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas object-cover" /> : <span aria-hidden="true" className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas" />}
                   <div className="min-w-0">
                     <p className="break-words text-sm leading-5 text-nrs-ink">{item.name}</p>
                     <p className="mt-1 text-xs text-nrs-ink/55">{item.size ? <>{t('sizeLabel')} <bdi dir="ltr">{item.size}</bdi> · </> : ''}{item.quantity} {t('pieces')}</p>
-                    {item.measurements && <details className="mt-1 min-w-0">
+                    {item.measurements && Object.keys(item.measurements).length > 0 && <details className="mt-1 min-w-0">
                       <summary className="inline-flex min-h-8 cursor-pointer items-center text-xs text-nrs-ink/60 underline underline-offset-2">{t('customMeasurements')}</summary>
                       <p className="break-words pb-1 text-xs leading-5 text-nrs-ink/60">{formatLocalizedMeasurements(item.measurements, locale) || t('measurementsUnspecified')}</p>
                     </details>}
@@ -449,12 +507,16 @@ export default function Checkout() {
                 <div className="flex justify-between gap-3 text-nrs-ink/65"><dt>{t('shipping')}</dt><dd>{orderSummary.shipping === null ? t('shippingConfirmed') : orderSummary.shipping === 0 ? t('free') : summaryDisplay ? formatMinor(summaryDisplay.shippingMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.shipping)}</dd></div>
                 <div className="flex items-baseline justify-between gap-3 border-t border-nrs-ink/10 pt-3 font-medium text-nrs-ink"><dt>{t('total')}</dt><dd className="font-serif text-2xl tabular-nums">{summaryDisplay ? formatMinor(summaryDisplay.totalMinor, summaryDisplay.locale, summaryRate) : displaySummaryMoney(orderSummary.total)}</dd></div>
               </dl>
+              <p className="mt-3 text-xs leading-5 text-nrs-ink/60">{t('deliveryPromise')}</p>
               {locale !== 'tr' && <p className="mt-2 text-xs leading-5 text-nrs-ink/60">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
               {ENABLE_CARD_PAYMENT && confirmedQuote && <p className="mt-2 border-t border-nrs-ink/10 pt-2 text-xs leading-5 text-nrs-ink/70">{t('paymentTry')} <bdi dir="ltr">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(orderSummary.total)}</bdi></p>}
               {!confirmedQuote && <p className="mt-3 text-xs leading-5 text-nrs-ink/55">{t('quotePending')}</p>}
             </section>
             <div className="mt-3">
-              <CartWhatsappOrder items={items.map(item => ({ ...item, measurements: measurements[getCartItemId(item)] ?? item.measurements ?? {} }))} total={orderSummary.total} customer={{ ...formData, orderId: confirmedQuote ? savedOrder || undefined : undefined }} compact />
+              <CartWhatsappOrder items={items.map(item => {
+                const itemMeasurements = measurements[getCartItemId(item)] ?? item.measurements ?? {}
+                return { ...item, measurements: Object.keys(itemMeasurements).length ? itemMeasurements : undefined }
+              })} total={orderSummary.total} customer={{ ...formData, orderId: confirmedQuote ? savedOrder || undefined : undefined }} compact />
             </div>
           </aside>
         </div>

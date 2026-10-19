@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
-import { LEGAL_DOCUMENT_ARCHIVE } from './documents'
+import { LEGAL_DOCUMENT_ARCHIVE, LEGAL_DOCUMENT_VERSIONS } from './documents'
 import { getRequestLocale } from '@/lib/i18n/request-locale'
 import { languageAlternates, localePrefix } from '@/lib/i18n/messages'
 import { localizedLegalTitle } from './translation-titles'
 
 export async function legalPageMetadata(slug: string): Promise<Metadata> {
   const locale = await getRequestLocale()
-  const source = LEGAL_DOCUMENT_ARCHIVE['v1.4'].documents[slug]
+  const source = LEGAL_DOCUMENT_ARCHIVE[LEGAL_DOCUMENT_VERSIONS.contract].documents[slug]
   const title = localizedLegalTitle(slug, locale) || source?.title || 'Legal information'
   const titlePrefix = locale === 'tr' ? '' : 'NRS | '
   const description = locale === 'ar'

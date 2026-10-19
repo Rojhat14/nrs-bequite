@@ -25,7 +25,7 @@ function loader(mocks = {}) {
           currencyNote: 'USD tutarları güncel kura göre yaklaşık karşılıktır. Ödeme Türk lirası olarak alınır.',
           fxUnavailable: 'Güncel kur bilgisi alınamadı; fiyatlar Türk lirası olarak gösteriliyor.', paymentTry: 'Ödeme Türk lirası olarak alınacaktır.',
           goToBank: 'Garanti BBVA ödeme sayfasına geç', bankRedirecting: 'Garanti BBVA’ya yönlendiriliyorsunuz…',
-          cardPayment: 'Kartla Ödeme Yap', saveTransferRequest: 'Havale / WhatsApp sipariş talebini kaydet',
+          reviewSummary: 'Özeti incele', cardPayment: 'Kartla Ödeme Yap', saveTransferRequest: 'Havale / WhatsApp sipariş talebini kaydet',
           resumeTestOrder: 'Bekleyen test siparişine devam et', checkingCartPrices: 'Sepet fiyatları kontrol ediliyor…',
           measurementRequired: 'zorunlu', measurementOptional: 'isteğe bağlı', measurementValidationError: 'Ölçüleri tamamlayıp kontrol edin.',
           checkoutQuoteError: 'Sipariş özeti doğrulanamadı.', checkoutSaveError: 'Sipariş talebi kaydedilemedi.',
@@ -78,8 +78,8 @@ test('B/C: accepted current versions bind to payload and server-dated immutable 
   const record = preflight.prepareOrderLegalRecord(orderId, payload, { ...summary, ip: 'forged', userAgent: 'forged' });
   assert.equal(record.order_id, orderId);
   assert.equal(record.contract_accepted, true);
-  assert.equal(record.contract_version, 'v1.4');
-  assert.equal(record.pre_information_version, 'v1.4');
+  assert.equal(record.contract_version, 'v1.5');
+  assert.equal(record.pre_information_version, 'v1.5');
   assert.notEqual(record.accepted_at, 'forged');
   assert.ok(Math.abs(Date.now() - Date.parse(record.accepted_at)) < 2000);
   assert.match(record.document_hash, /^[0-9a-f]{64}$/);
@@ -89,7 +89,7 @@ test('B/C: accepted current versions bind to payload and server-dated immutable 
   const changed = preflight.prepareOrderLegalRecord(orderId, payload, { ...summary, buyer: { ...summary.buyer, name: 'Başka Alıcı' } });
   assert.notEqual(record.summary_hash, changed.summary_hash);
   assert.equal(record.document_hash, changed.document_hash);
-  const current=documents.LEGAL_DOCUMENT_ARCHIVE['v1.4'];
+  const current=documents.LEGAL_DOCUMENT_ARCHIVE['v1.5'];
   assert.equal(record.document_hash,require('node:crypto').createHash('sha256').update(JSON.stringify({seller:current.seller,contract:current.documents['mesafeli-satis-sozlesmesi'],preInformation:current.documents['on-bilgilendirme-formu']})).digest('hex'));
   // Pin the accepted text archive: changing published v1.0 requires a NEW version.
   const archive = documents.LEGAL_DOCUMENT_ARCHIVE['v1.0'];
@@ -121,7 +121,7 @@ test('E: eight legal pages and every footer legal/service link render; invalid a
     assert.ok(footer.includes(`href="${route}"`));
     assert.match(html, /NRS BOUTQUE LUMINOUS/);
     assert.match(html, /rojhat1maman@gmail.com/);
-    assert.match(html, /v1.4/);
+    assert.match(html, /v1.5/);
   }
   assert.equal(documents.getLegalDocument('mesafeli-satis-sozlesmesi', 'v999'), null);
   assert.equal(documents.getLegalDocument('__proto__'), null);
@@ -129,18 +129,18 @@ test('E: eight legal pages and every footer legal/service link render; invalid a
   assert.throws(() => uiLoad('src/app/shipping/page.tsx').default(), /REDIRECT \/kargo-ve-teslimat/);
 });
 
-function checkoutHarness(enabled, confirmed = false) {
+function checkoutHarness(enabled, confirmed = false, { initialStep = 3, itemMeasurements = {chest:92,waist:72,hips:98,height:168} } = {}) {
   const slots = [];
   let cursor = 0;
-  const cart = { items: [{ id: 'product', title: 'Test Ürün', price: '₺99,90', size: 'M', variantId: orderId, quantity: 2, measurements: {chest:92,waist:72,hips:98,height:168} }],
-    subtotalAmount: 240, discountAmount: 40.2, shippingAmount: 0, totalAmount: 199.8, openDrawer() {} };
+  const cart = { items: [{ id: 'product', title: 'Test Ürün', price: '₺99,90', size: 'M', variantId: orderId, quantity: 2, measurements: itemMeasurements }],
+    subtotalAmount: 240, discountAmount: 40.2, shippingAmount: 0, totalAmount: 199.8, catalogPricesSynced: true, openDrawer() {}, updateMeasurements() {}, removeItem() {} };
   const fakeReact = { ...React, useEffect(effect) { effect(); }, useState(initial) {
     const index = cursor++;
     if (!(index in slots)) {
       const customer = { firstName: 'Test', lastName: 'Alıcı', email: 'test@example.com', phone: '905551234567', address: 'Beytepe', city: 'Ankara', district: 'Çankaya', postalCode: '06800', orderNote: '' };
       const inputKey = JSON.stringify({ items: cart.items, measurements: { ['product::'+orderId]: cart.items[0].measurements }, formData: customer, subtotalAmount: cart.subtotalAmount, discountAmount: cart.discountAmount, shippingAmount: cart.shippingAmount, totalAmount: cart.totalAmount });
-      slots[index] = index === 0 ? 3 : index === 2 ? true : confirmed && index === 7 ? { summary, hash: 'a'.repeat(64) }
-        : confirmed && index === 8 ? inputKey : confirmed && index === 9 ? orderId : confirmed && index === 13 ? customer : typeof initial === 'function' ? initial() : initial;
+      slots[index] = index === 0 ? initialStep : index === 2 ? true : confirmed && index === 7 ? { summary, hash: 'a'.repeat(64) }
+        : confirmed && index === 8 ? inputKey : confirmed && index === 9 ? orderId : index === 16 ? customer : typeof initial === 'function' ? initial() : initial;
     }
     return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
   } };
@@ -187,8 +187,8 @@ test('A/B/F: real checkout handler blocks unticked acceptance without fetch; tic
     assert.match(html, /type="checkbox"/);
     assert.match(html, /required=""/);
     assert.match(html, /for="checkout-contract"/);
-    assert.match(html, /href="\/mesafeli-satis-sozlesmesi"/);
-    assert.match(html, /href="\/on-bilgilendirme-formu"/);
+    assert.match(html, /href="\/mesafeli-satis-sozlesmesi\?version=v1\.5"/);
+    assert.match(html, /href="\/on-bilgilendirme-formu\?version=v1\.5"/);
     assert.match(html, /min-h-11/);
     assert.match(html, /min-w-0/);
     assert.doesNotMatch(html, /KVKK.*kabul ediyorum/);
@@ -206,8 +206,30 @@ test('Payment flag remains false and WhatsApp does not require card consent', ()
   assert.ok(cardButton);
   assert.equal(cardButton.props.disabled, true);
   assert.equal(cardButton.props.onClick, undefined);
-  assert.match(renderToStaticMarkup(tree), /Kartla ödeme, banka onayının ardından kullanıma açılacaktır\. Siparişinizi WhatsApp üzerinden tamamlayabilirsiniz\./);
+  assert.match(renderToStaticMarkup(tree), /Kartla ödeme şu anda kullanılamıyor\. Sipariş talebinizi WhatsApp üzerinden iletebilirsiniz\./);
   assert.ok(findElement(tree, node => node.type?.name === 'CartWhatsappOrder'));
+});
+
+test('Checkout requests a server quote with no personal measurements and keeps them optional', async () => {
+  const harness = checkoutHarness(false, false, { initialStep: 2, itemMeasurements: {} });
+  let request;
+  const oldFetch = global.fetch;
+  global.fetch = async (url, options) => {
+    request = { url, body: JSON.parse(options.body) };
+    return { ok: true, json: async () => ({ summary, hash: 'b'.repeat(64) }) };
+  };
+  try {
+    const tree = harness.render();
+    const measurements = findElement(tree, node => node.type === 'details' && node.props.children?.[0]?.props?.id === 'checkout-measurements-summary');
+    assert.ok(measurements);
+    assert.notEqual(measurements.props.open, true);
+    const review = findElement(tree, node => node.type === 'button' && node.props.children === 'Özeti incele');
+    review.props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(request.url, '/api/orders/quote');
+    assert.equal(Object.hasOwn(request.body.items[0], 'measurements'), false);
+    assert.equal(harness.cart.items[0].measurements && Object.keys(harness.cart.items[0].measurements).length, 0);
+  } finally { global.fetch = oldFetch; }
 });
 
 test('Unavailable card payment keeps customer fields and verified manual-order consent available', () => {
@@ -260,8 +282,8 @@ test('Account documents use saved summary/version, not live product data, with o
   assert.match(result.html, /Test Alıcı/);
   assert.match(result.html, /Pamuklu standart ürün/);
   assert.match(result.html, /Kabul zamanı/);
-  assert.match(result.html, /mesafeli-satis-sozlesmesi\?version=v1.4/);
-  assert.match(result.html, /on-bilgilendirme-formu\?version=v1.4/);
+  assert.match(result.html, /mesafeli-satis-sozlesmesi\?version=v1.5/);
+  assert.match(result.html, /on-bilgilendirme-formu\?version=v1.5/);
 });
 
 test('Legacy orders and missing migration preserve history and never invent contract acceptance', async () => {
@@ -297,7 +319,7 @@ test('Real checkout sends only IDs/quantities and versioned consent after confir
     tree = harness.render(); findButton(tree).props.onClick();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(calls.length, 1); assert.equal(calls[0].url, '/api/payment/create');
-    assert.equal(calls[0].body.contractAccepted, true); assert.equal(calls[0].body.contractVersion, 'v1.4');
+    assert.equal(calls[0].body.contractAccepted, true); assert.equal(calls[0].body.contractVersion, 'v1.5');
     assert.equal(calls[0].body.quoteHash, 'a'.repeat(64));
     assert.equal(calls[0].body.totalAmount, undefined); assert.equal(calls[0].body.items[0].price, undefined);
   } finally { global.fetch = oldFetch; }
