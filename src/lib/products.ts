@@ -15,9 +15,9 @@ import { getHomeCategoryCover } from '@/lib/storage/category-covers'
 export type StorefrontCategory = Pick<CategoryRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'> & { imageUrl?: string }
 export type StorefrontCollection = Pick<CollectionRow, 'id' | 'name' | 'slug' | 'description' | 'sort_order'>
 
-type CatalogProductRow = Pick<ProductRow, 'id' | 'slug' | 'name' | 'category_id' | 'description' | 'price_amount' | 'currency' | 'compare_at_price' | 'in_stock' | 'fabric' | 'care' | 'payment_test_only'>
+type CatalogProductRow = Pick<ProductRow, 'id' | 'slug' | 'name' | 'category_id' | 'description' | 'price_amount' | 'currency' | 'compare_at_price' | 'in_stock' | 'fabric' | 'care' | 'payment_test_only' | 'fulfillment_mode'>
 type CatalogVariantRow = Pick<ProductVariantRow, 'id' | 'product_id' | 'size' | 'stock_quantity' | 'is_active'>
-const PRODUCT_COLUMNS = 'id,slug,name,category_id,description,price_amount,currency,compare_at_price,in_stock,fabric,care,payment_test_only'
+const PRODUCT_COLUMNS = 'id,slug,name,category_id,description,price_amount,currency,compare_at_price,in_stock,fabric,care,payment_test_only,fulfillment_mode'
 const CATEGORY_COLUMNS = 'id,name,slug,description,sort_order'
 const COLLECTION_COLUMNS = 'id,name,slug,description,sort_order'
 const HOME_CATEGORY: StorefrontCategory = {
@@ -134,8 +134,9 @@ function toStorefrontProduct(
     price: formatPrice(Number(row.price_amount), row.currency),
     priceAmount: Number(row.price_amount),
     inStock: availableInVariants
-      ? activeVariants.some((variant) => variant.stock_quantity > 0)
+      ? row.fulfillment_mode === 'made_to_order' || activeVariants.some((variant) => variant.stock_quantity > 0)
       : row.in_stock,
+    fulfillmentMode: row.fulfillment_mode ?? 'stock',
     currency: row.currency,
     compareAtPrice: row.compare_at_price === null ? null : Number(row.compare_at_price),
     galleryImages,

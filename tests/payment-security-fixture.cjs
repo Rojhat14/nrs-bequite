@@ -48,7 +48,7 @@ $$;
  CREATE TABLE public.orders(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,total_amount numeric NOT NULL,status text DEFAULT 'pending' CHECK(status IN('pending','payment_pending','paid','payment_failed','processing','shipped','delivered','cancelled','refunded')),customer_name text,customer_email text,customer_phone text,shipping_address text,shipping_city text,shipping_district text,shipping_postal_code text${manualOrderColumns},created_at timestamptz NOT NULL DEFAULT now());
  CREATE TABLE public.order_items(id uuid primary key default gen_random_uuid(),order_id uuid NOT NULL references public.orders(id),product_id text NOT NULL,quantity integer NOT NULL,price_at_purchase numeric NOT NULL);
  CREATE TABLE public.products(id text primary key,name text NOT NULL,description text,price_amount numeric NOT NULL,compare_at_price numeric,currency text NOT NULL,status text NOT NULL,in_stock boolean NOT NULL);
- CREATE TABLE public.product_variants(id uuid PRIMARY KEY,product_id text REFERENCES public.products(id),size text,stock_quantity integer NOT NULL CHECK(stock_quantity>=0),is_active boolean NOT NULL);
+ CREATE TABLE public.product_variants(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),product_id text REFERENCES public.products(id),size text,stock_quantity integer NOT NULL CHECK(stock_quantity>=0),is_active boolean NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(product_id,size));
  INSERT INTO public.products VALUES('product','Test Ürün','Pamuk',100,120,'TRY','active',true);
  INSERT INTO public.product_variants VALUES('${variantId}','product','M',1,true);
  ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;

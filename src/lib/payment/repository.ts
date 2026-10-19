@@ -17,6 +17,7 @@ import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObse
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
 import { CheckoutVariantUnavailableError } from './variant-unavailable'
+import { isMadeToOrderDressVariant } from '@/lib/dress-sizes'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 import { discountForUnitMinor, getOpeningCampaign } from '@/lib/opening-campaign'
 import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
@@ -215,7 +216,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
     async quote(items: CheckoutItem[], customer: Buyer, userId?: string | null, display: CheckoutDisplayContext = { locale: 'tr', rate: null }): Promise<Quote> {
       const sorted = canonicalCheckoutItems(items)
       const [products, variants] = await Promise.all([
-        db.from('products').select('id,name,description,fabric,care,price_amount,compare_at_price,currency,status,in_stock,payment_test_only,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
+        db.from('products').select('id,name,description,fabric,care,price_amount,compare_at_price,currency,status,in_stock,payment_test_only,fulfillment_mode,categories(name,slug),product_images(*)').in('id', sorted.map(i => i.productId)),
         db.from('product_variants').select('id,product_id,size,stock_quantity,is_active').in('id', sorted.map(i => i.variantId)),
       ])
       if (products.error || variants.error) throw new PaymentStartError('START_FAILED', 'quote', 'Ürün bilgileri doğrulanamadı.', (products.error || variants.error)?.code)
@@ -236,7 +237,9 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
         if (!product || product.status !== 'active' || product.currency !== 'TRY') throw new Error('Ürün veya seçilen beden stokta yok.')
         if (!variant || variant.is_active !== true) throw new CheckoutVariantUnavailableError(item.productId)
-        if (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity) throw new Error('Ürün veya seçilen beden stokta yok.')
+        const madeToOrderDress = isMadeToOrderDressVariant(product.id, product.fulfillment_mode, variant.size)
+        if (product.fulfillment_mode === 'made_to_order' && !madeToOrderDress) throw new CheckoutVariantUnavailableError(item.productId)
+        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) throw new Error('Ürün veya seçilen beden stokta yok.')
         const translation = translationsByProduct.get(product.id)
         const localized = translation?.source_hash === productSourceHash(product) ? translation.payload : null
         const displayName = typeof localized?.name === 'string' ? localized.name : product.name
