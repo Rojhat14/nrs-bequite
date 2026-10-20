@@ -3,6 +3,13 @@ import type { Buyer, CheckoutItem, CheckoutRequest } from './types'
 import { validateLegalAcceptance } from '@/lib/legal/acceptance'
 import { canonicalCheckoutItems } from './items'
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export class CheckoutCustomerFieldError extends Error {
+  readonly code = 'CUSTOMER_FIELD_INVALID'
+  constructor(readonly field: string, readonly reason: 'required' | 'format') {
+    super('Checkout customer field needs attention.')
+    this.name = 'CheckoutCustomerFieldError'
+  }
+}
 export function parseCheckoutInput(value: unknown): { items: CheckoutItem[]; customer: Buyer } {
   if (!value || typeof value !== 'object') throw new Error('Geçersiz sepet.')
   const body = value as Record<string, unknown>
@@ -24,15 +31,17 @@ export function parseCheckoutInput(value: unknown): { items: CheckoutItem[]; cus
   const customer = {} as Buyer
   for (const field of ['firstName', 'lastName', 'email', 'phone', 'address', 'city', 'district', 'postalCode'] as const) {
     const text = (body.customer as Record<string, unknown>)[field]
-    if (typeof text !== 'string' || text.length > 500 || (field !== 'postalCode' && !text.trim())) throw new Error('Müşteri/teslimat bilgileri eksik.')
+    if (typeof text !== 'string') throw new CheckoutCustomerFieldError(field, 'required')
+    if (text.length > 500) throw new CheckoutCustomerFieldError(field, 'format')
+    if (field !== 'postalCode' && !text.trim()) throw new CheckoutCustomerFieldError(field, 'required')
     customer[field] = text.trim()
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) throw new Error('Geçerli e-posta girin.')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) throw new CheckoutCustomerFieldError('email', 'format')
   const note = (body.customer as Record<string, unknown>).orderNote
   if (note !== undefined && (typeof note !== 'string' || note.length > 2000)) throw new Error('Sipariş notu çok uzun.')
   if (typeof note === 'string') customer.orderNote = note.trim()
-  if (!/^[+()\d\s-]{10,25}$/.test(customer.phone)) throw new Error('Geçerli telefon girin.')
-  if (!/^\d{5}$/.test(customer.postalCode)) throw new Error('Beş haneli posta kodu girin.')
+  if (!/^[+()\d\s-]{10,25}$/.test(customer.phone)) throw new CheckoutCustomerFieldError('phone', 'format')
+  if (!/^\d{5}$/.test(customer.postalCode)) throw new CheckoutCustomerFieldError('postalCode', 'format')
   return { items: canonicalCheckoutItems(items), customer }
 }
 export function parsePaymentRequest(value: unknown): CheckoutRequest {

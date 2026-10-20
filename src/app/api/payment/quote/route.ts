@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { paymentAvailable, paymentAvailableForUser, getPaymentProvider } from '@/lib/payment/provider'
 import { createPaymentRepository } from '@/lib/payment/repository'
-import { parseCheckoutInput } from '@/lib/payment/request'
+import { CheckoutCustomerFieldError, parseCheckoutInput } from '@/lib/payment/request'
 import { boundedJson, sameOrigin, unavailable } from '@/lib/payment/http'
 import { localeFromCookieHeader } from '@/lib/i18n/messages'
 import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json(quote, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof CheckoutVariantUnavailableError) return NextResponse.json({ code: error.code, productId: error.productId, error: 'Sepetinizdeki beden artık kullanılamıyor. Bu ürünü kaldırıp güncel bedenlerden yeniden seçin.' }, { status: 409 })
+    if (error instanceof CheckoutCustomerFieldError) return NextResponse.json({ code: error.code, field: error.field, reason: error.reason }, { status: 422 })
     return NextResponse.json({ error: 'Ürün, stok veya teslimat bilgileri doğrulanamadı.' }, { status: 409 })
   }
 }

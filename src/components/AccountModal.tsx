@@ -10,9 +10,10 @@ import { useLocale } from '@/context/LocaleContext';
 interface AccountModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAuthenticated?: () => void;
 }
 
-export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
+export default function AccountModal({ isOpen, onClose, onAuthenticated }: AccountModalProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,18 +35,25 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
     try {
       if (isLogin) {
         // --- Login Logic ---
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) throw error;
-
-        setMessage({ type: 'success', text: t('loginSuccess') });
-        setTimeout(() => {
-          onClose();
-          window.location.reload(); // Refresh to update navigation state
-        }, 1500);
+        if (!data.session) throw new Error('SESSION_NOT_READY')
+        const { data: currentSession, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError || currentSession.session?.user.id !== data.session.user.id) throw new Error('SESSION_NOT_READY')
+        if (onAuthenticated) {
+          onClose()
+          onAuthenticated()
+        } else {
+          setMessage({ type: 'success', text: t('loginSuccess') });
+          setTimeout(() => {
+            onClose();
+            window.location.reload(); // Refresh to update navigation state
+          }, 1500);
+        }
 
       } else {
         // --- Sign Up Logic ---
@@ -68,15 +76,21 @@ export default function AccountModal({ isOpen, onClose }: AccountModalProps) {
             .upsert([
               {
                 id: data.user.id,
-                first_name: firstName,
-                last_name: lastName,
-                phone: phone,
-                email: email
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                phone: phone.trim(),
+                email: email.trim()
               },
             ], { onConflict: 'id', ignoreDuplicates: true });
 
           if (profileError) throw profileError;
-
+          if (onAuthenticated) {
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+            if (sessionError || sessionData.session?.user.id !== data.user.id) throw new Error('SESSION_NOT_READY')
+            onClose()
+            onAuthenticated()
+            return
+          }
         }
         setMessage({ type: 'success', text: data.session ? t('accountCreated') : t('confirmEmail') });
       }

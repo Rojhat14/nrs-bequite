@@ -185,6 +185,20 @@ test('Real cart persistence keeps separate product measurements through reload a
  }finally{if(previous===undefined)delete global.localStorage;else global.localStorage=previous;if(previousWindow===undefined)delete global.window;else global.window=previousWindow}
 });
 
+test('A pre-auth cart with a retired variant fails quote validation; exact-size refresh lets the same line quote without re-adding it',async()=>{
+ const h=await orderedOrderHarness();try{
+  const replacement='77777777-7777-4777-8777-777777777777';
+  await h.db.exec(`RESET ROLE; UPDATE public.product_variants SET is_active=false,size='S' WHERE id='${variantId}';
+    INSERT INTO public.product_variants(id,product_id,size,stock_quantity,is_active) VALUES('${replacement}','product','M',10,true)`);
+  const repository=h.repository.createPaymentRepository(true);
+  await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:1}],customer),error=>error.code==='VARIANT_UNAVAILABLE'&&error.productId==='product');
+  const sameSelection=await repository.quote([{productId:'product',variantId:replacement,quantity:1,measurements:{chest:92}}],customer);
+  assert.equal(sameSelection.summary.items[0].variantId,replacement);
+  assert.equal(sameSelection.summary.items[0].size,'M');
+  assert.deepEqual(sameSelection.summary.items[0].measurements,{chest:92});
+ }finally{await h.close()}
+});
+
 // Exercise real quote/parser/create code against the real, unchanged manual RPC.
 async function orderedOrderHarness() {
  const db=await setup();

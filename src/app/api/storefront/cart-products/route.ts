@@ -17,10 +17,14 @@ export async function POST(request: Request) {
     if (!ids.length) return NextResponse.json({ products: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
     const locale = localeFromCookieHeader(request.headers.get('cookie'))
     const db = await createSupabaseServerClient()
-    const { data, error } = await db.from('products').select('id,name,description,fabric,care,price_amount,compare_at_price')
+    const { data, error } = await db.from('products').select('id,name,description,fabric,care,price_amount,compare_at_price,fulfillment_mode')
       .in('id', ids).eq('status', 'active').eq('payment_test_only', false)
     if (error) throw new Error('CATALOG_READ_FAILED')
     const rows = data ?? []
+    const { data: variantRows, error: variantError } = rows.length
+      ? await db.from('product_variants').select('id,product_id,size,stock_quantity').in('product_id', rows.map(row => row.id)).eq('is_active', true)
+      : { data: [], error: null }
+    if (variantError) throw new Error('CART_VARIANTS_READ_FAILED')
     let translations: { entity_id: string; source_hash: string; payload: Record<string, unknown> }[] = []
     if (locale !== 'tr' && rows.length) {
       const result = await db.from('storefront_translations').select('entity_id,source_hash,payload')
@@ -29,11 +33,16 @@ export async function POST(request: Request) {
       translations = (result.data ?? []) as typeof translations
     }
     const byId = new Map(translations.map(row => [row.entity_id, row]))
+    const productsById = new Map(rows.map(row => [row.id, row]))
+    const selectableVariants = (variantRows ?? []).filter(variant => {
+      const product = productsById.get(variant.product_id)
+      return product?.fulfillment_mode === 'made_to_order' || (Number.isSafeInteger(variant.stock_quantity) && variant.stock_quantity > 0)
+    })
     return NextResponse.json({ products: rows.map(row => {
       const translation = byId.get(row.id)
       const payload = translation?.source_hash === productSourceHash(row) ? translation.payload : null
       return { id: row.id, title: typeof payload?.name === 'string' ? payload.name : row.name,
         price: Number(row.price_amount), compareAtPrice: row.compare_at_price == null ? null : Number(row.compare_at_price) }
-    }) }, { headers: { 'Cache-Control': 'private, no-store' } })
+    }), variants: selectableVariants.map(row => ({ id: row.id, productId: row.product_id, size: row.size })) }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'Catalog unavailable.' }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } }) }
 }

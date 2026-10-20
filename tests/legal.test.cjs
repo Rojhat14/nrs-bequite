@@ -133,7 +133,9 @@ function checkoutHarness(enabled, confirmed = false, { initialStep = 3, itemMeas
   const slots = [];
   let cursor = 0;
   const cart = { items: [{ id: 'product', title: 'Test Ürün', price: '₺99,90', size: 'M', variantId: orderId, quantity: 2, measurements: itemMeasurements }],
-    subtotalAmount: 240, discountAmount: 40.2, shippingAmount: 0, totalAmount: 199.8, catalogPricesSynced: true, openDrawer() {}, updateMeasurements() {}, removeItem() {} };
+    subtotalAmount: 240, discountAmount: 40.2, shippingAmount: 0, totalAmount: 199.8, catalogPricesSynced: true,
+    catalogPricesSyncedFor: `tr:${orderId}:product`, activeCartVariants: [{ id: '22222222-2222-4222-8222-222222222222', productId: 'product', size: '36' }], openDrawer() {}, updateMeasurements() {}, removeItem() {},
+    replaceItemVariant(cartItemId, variantId, size) { cart.items[0] = { ...cart.items[0], variantId, size }; return true } };
   const fakeReact = { ...React, useEffect(effect) { effect(); }, useState(initial) {
     const index = cursor++;
     if (!(index in slots)) {
@@ -147,7 +149,7 @@ function checkoutHarness(enabled, confirmed = false, { initialStep = 3, itemMeas
   const checkoutLoad = loader({ react: fakeReact, 'next/link': linkMock, 'next/image': imageMock,
     'framer-motion': animationMock, 'next/navigation': { useRouter: () => ({ push() {} }) },
     '@/lib/feature-flags': { useCardPaymentEnabled: () => enabled },
-    '@/context/AuthContext': { useAuth: () => ({ user: { id: orderId }, profile: null }) },
+    '@/context/AuthContext': { useAuth: () => ({ user: { id: orderId, email: 'test@example.com', user_metadata: {} }, profile: null, loading: false, profileLoading: false }) },
     '@/components/AccountModal': { __esModule: true, default: () => null },
     '@/store/useCart': { getCartItemId: item => item.id + '::' + item.variantId, useCart: () => cart, parsePrice: price => Number(price.replace('₺', '').replace(',', '.')) } });
   const Checkout = checkoutLoad('src/app/checkout/page.tsx').default;
@@ -229,6 +231,27 @@ test('Checkout requests a server quote with no personal measurements and keeps t
     assert.equal(request.url, '/api/orders/quote');
     assert.equal(Object.hasOwn(request.body.items[0], 'measurements'), false);
     assert.equal(harness.cart.items[0].measurements && Object.keys(harness.cart.items[0].measurements).length, 0);
+  } finally { global.fetch = oldFetch; }
+});
+
+test('A stale pre-auth variant asks for only a new size and keeps the same cart line and optional measurements', async () => {
+  const itemMeasurements = { chest: 92, waist: 72 };
+  const harness = checkoutHarness(false, false, { initialStep: 2, itemMeasurements });
+  const oldFetch = global.fetch;
+  global.fetch = async () => ({ ok: false, status: 409, json: async () => ({ code: 'VARIANT_UNAVAILABLE', productId: 'product' }) });
+  try {
+    findElement(harness.render(), node => node.type === 'button' && node.props.children === 'Özeti incele').props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    const tree = harness.render();
+    const selector = findElement(tree, node => node.type === 'select');
+    assert.ok(selector);
+    selector.props.onChange({ target: { value: '22222222-2222-4222-8222-222222222222' } });
+    assert.equal(harness.cart.items.length, 1);
+    assert.equal(harness.cart.items[0].variantId, '22222222-2222-4222-8222-222222222222');
+    assert.equal(harness.cart.items[0].size, '36');
+    assert.equal(harness.cart.items[0].quantity, 2);
+    assert.deepEqual(harness.cart.items[0].measurements, itemMeasurements);
+    assert.equal(findElement(harness.render(), node => node.type === 'div' && node.props.role === 'alert' && node.props.className?.includes('amber')), null);
   } finally { global.fetch = oldFetch; }
 });
 

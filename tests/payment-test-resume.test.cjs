@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),{createHash
 const {loader}=require('./source-loader.cjs');
 const id='11111111-1111-4111-8111-111111111111',origin='https://nrs-bequite-garanti-test.vercel.app';
 const input={contractAccepted:true,contractVersion:'v1.5',preInformationVersion:'v1.5',idempotencyKey:'22222222-2222-4222-8222-222222222222',quoteHash:'a'.repeat(64),
- items:[{productId:'test',variantId:id,quantity:1,measurements:{}}],customer:{firstName:'Test',lastName:'Buyer',email:'test@example.com',phone:'905551234567',address:'Test',city:'Ankara',district:'Test',postalCode:'06000'}};
+ items:[{productId:'test',variantId:id,quantity:1}],customer:{firstName:'Test',lastName:'Buyer',email:'test@example.com',phone:'905551234567',address:'Test',city:'Ankara',district:'Test',postalCode:'06000'}};
 const digest=createHash('sha256').update(JSON.stringify({items:input.items,customer:input.customer,quoteHash:input.quoteHash,contractVersion:input.contractVersion,preInformationVersion:input.preInformationVersion})).digest('hex');
 function fixture(observation=true, sameKey=false){
  let order={id,userId:'owner',merchantReference:id,state:'pending',redirectUrl:origin+'/api/payment/garanti/handoff?token=old',amountMinor:100,currency:'TRY',legal:{}};

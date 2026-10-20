@@ -24,13 +24,13 @@ import { discountForUnitMinor, getOpeningCampaign, isOpeningCampaignActive } fro
 import { useLocale } from '@/context/LocaleContext'
 import { formatMinor } from '@/lib/i18n/money'
 import { formatLocalizedMeasurements, measurementHelp, measurementLabel } from '@/lib/i18n/measurements'
-import { localePrefix } from '@/lib/i18n/messages'
+import { cartCatalogSyncScope } from '@/lib/cart-catalog-sync'
 
 export default function Checkout() {
   const { locale, money, t, fxAvailable } = useLocale()
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
-  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, removeItem, catalogPricesSynced, priceUpdateNotice } = useCart()
-  const { user, profile } = useAuth()
+  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, priceUpdateNotice } = useCart()
+  const { user, profile, loading: authLoading, profileLoading } = useAuth()
   const [step, setStep] = useState(1) // 1: Auth Choice, 2: Shipping, 3: Payment
   const router = useRouter()
   const [authOpen, setAuthOpen] = useState(false)
@@ -64,9 +64,20 @@ export default function Checkout() {
   const [pendingOrderUrl, setPendingOrderUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!profile) return
-    setFormData(current => ({ ...current, firstName: current.firstName || profile.first_name || '', lastName: current.lastName || profile.last_name || '', email: current.email || profile.email || '', phone: current.phone || profile.phone || '' }))
-  }, [profile])
+    if (!user || authLoading) return
+    const metadata = user.user_metadata ?? {}
+    setFormData(current => ({
+      ...current,
+      firstName: current.firstName || profile?.first_name || (typeof metadata.first_name === 'string' ? metadata.first_name : ''),
+      lastName: current.lastName || profile?.last_name || (typeof metadata.last_name === 'string' ? metadata.last_name : ''),
+      email: current.email || profile?.email || user.email || '',
+      phone: current.phone || profile?.phone || (typeof metadata.phone === 'string' ? metadata.phone : ''),
+    }))
+  }, [authLoading, profile, user])
+
+  useEffect(() => {
+    if (ENABLE_CARD_PAYMENT && !authLoading && user && step === 1) setStep(2)
+  }, [ENABLE_CARD_PAYMENT, authLoading, step, user])
 
   const inputKey = JSON.stringify({ items, measurements, formData, subtotalAmount, discountAmount, shippingAmount, totalAmount })
   const openingCampaign = getOpeningCampaign()
@@ -78,6 +89,18 @@ export default function Checkout() {
       ...(Object.keys(itemMeasurements).length ? { measurements: itemMeasurements } : {}) }
   }), customer: formData })
   const contractAccepted = acceptedSnapshot === snapshotKey
+  const cartSyncScope = cartCatalogSyncScope(locale, user?.id ?? null, items.map(item => item.id))
+  const cartReady = catalogPricesSynced && catalogPricesSyncedFor === cartSyncScope
+  const customerFieldError = (field: string, reason: string) => {
+    const labels: Record<string, string> = { firstName: t('firstName'), lastName: t('lastName'), email: t('email'), phone: t('phone'), address: t('address'), city: t('city'), district: t('district'), postalCode: t('postalCode') }
+    if (field === 'email' && reason === 'format') return locale === 'en' ? 'Enter a valid email address.' : locale === 'ar' ? 'أدخلي بريداً إلكترونياً صالحاً.' : 'Geçerli bir e-posta adresi girin.'
+    if (field === 'phone' && reason === 'format') return locale === 'en' ? 'Enter a valid phone number.' : locale === 'ar' ? 'أدخلي رقم هاتف صالحاً.' : 'Geçerli bir telefon numarası girin.'
+    if (field === 'postalCode' && reason === 'format') return locale === 'en' ? 'Enter a 5-digit postal code.' : locale === 'ar' ? 'أدخلي رمزاً بريدياً من 5 أرقام.' : '5 haneli posta kodu girin.'
+    const label = labels[field] || t('customerDelivery')
+    return reason === 'required'
+      ? (locale === 'en' ? `${label} is required.` : locale === 'ar' ? `${label} مطلوب.` : `${label} girmeniz gerekir.`)
+      : (locale === 'en' ? `Check ${label.toLowerCase()}.` : locale === 'ar' ? `تحققي من ${label}.` : `${label} bilgisini kontrol edin.`)
+  }
   const updateCustomer = (field: keyof typeof formData, value: string) => {
     setFormData(current => ({ ...current, [field]: value }))
     setFieldErrors(current => ({ ...current, [field]: '' }))
@@ -114,12 +137,13 @@ export default function Checkout() {
     : money(amountTry)
   async function reviewPayment() {
     if (busy) return
+    if (authLoading || profileLoading || !cartReady) return
     if (!user) { setAuthOpen(true); return }
     const errors: Record<string, string> = {}
     if (!formData.firstName.trim()) errors.firstName = `${t('firstName')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
     if (!formData.lastName.trim()) errors.lastName = `${t('lastName')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = locale === 'en' ? 'Enter a valid email address.' : locale === 'ar' ? 'أدخلي بريداً إلكترونياً صالحاً.' : 'Geçerli bir e-posta adresi girin.'
-    if (!formData.phone.trim()) errors.phone = `${t('phone')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
+    if (!/^[+()\d\s-]{10,25}$/.test(formData.phone.trim())) errors.phone = customerFieldError('phone', formData.phone.trim() ? 'format' : 'required')
     if (!formData.address.trim()) errors.address = `${t('address')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
     if (!formData.city.trim()) errors.city = `${t('city')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوبة.' : 'bilgisini girin.'}`
     if (!formData.district.trim()) errors.district = `${t('district')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوبة.' : 'bilgisini girin.'}`
@@ -148,7 +172,20 @@ export default function Checkout() {
       const response = await fetch(ENABLE_CARD_PAYMENT ? '/api/payment/quote' : '/api/orders/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkoutInput()) })
       const data = await response.json()
       if (!response.ok) {
-        if (data.code === 'VARIANT_UNAVAILABLE' && typeof data.productId === 'string') setInvalidVariantProductId(data.productId)
+        if (data.code === 'VARIANT_UNAVAILABLE' && typeof data.productId === 'string') {
+          setInvalidVariantProductId(data.productId)
+          setLegalError(t('cartSizeInvalid'))
+          return
+        }
+        if (data.code === 'CUSTOMER_FIELD_INVALID' && typeof data.field === 'string') {
+          const fields = ['firstName', 'lastName', 'email', 'phone', 'address', 'city', 'district', 'postalCode']
+          if (fields.includes(data.field)) {
+            setFieldErrors(current => ({ ...current, [data.field]: customerFieldError(data.field, data.reason) }))
+            setLegalError('')
+            document.getElementById(`checkout-${data.field}`)?.focus()
+            return
+          }
+        }
         throw new Error(data.error || 'Sipariş özeti doğrulanamadı.')
       }
       setInvalidVariantProductId(null)
@@ -218,7 +255,15 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-nrs-canvas">
-      <AccountModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      <AccountModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onAuthenticated={() => {
+        setAuthOpen(false)
+        setStep(2)
+        setQuote(null)
+        setQuoteKey('')
+        setAcceptedSnapshot(null)
+        setFieldErrors({})
+        setLegalError('')
+      }} />
       <main className="min-w-0 pt-[calc(var(--nrs-header-height)+1.5rem)] pb-12 sm:pt-[calc(var(--nrs-header-height)+2.5rem)]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mb-7 flex flex-wrap items-start justify-between gap-4 sm:mb-9">
@@ -250,8 +295,9 @@ export default function Checkout() {
                 <h2 className="font-serif text-2xl text-nrs-ink">{t('continueWithAccount')}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <button
+                    disabled={authLoading}
                     onClick={() => { if (!user) { setAuthOpen(true); return; } setStep(2); }}
-                    className="p-8 border border-nrs-ink/10 hover:border-nrs-ink transition-all group flex flex-col items-center gap-4 text-center bg-nrs-panel"
+                    className="p-8 border border-nrs-ink/10 hover:border-nrs-ink transition-all group flex flex-col items-center gap-4 text-center bg-nrs-panel disabled:opacity-50"
                   >
                     <User size={32} className="text-nrs-ink group-hover:scale-110 transition-transform" />
                     <div>
@@ -396,18 +442,33 @@ export default function Checkout() {
                   </details>
                 </div>
                 <button
-                  onClick={() => void reviewPayment()} disabled={busy || !catalogPricesSynced}
+                  onClick={() => void reviewPayment()} disabled={busy || authLoading || profileLoading || !cartReady}
                   className="mt-12 w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black/90 transition-all"
                 >
-                  {busy ? t('reviewingQuote') : !catalogPricesSynced ? t('checkingCartPrices') : t('reviewSummary')}
+                  {busy ? t('reviewingQuote') : (!cartReady || profileLoading) ? t('checkingCartPrices') : t('reviewSummary')}
                 </button>
-                {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">{t('cartUpdated')}</p>}
+                {cartReady && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">{t('cartUpdated')}</p>}
                 {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
                   <p>{t('cartSizeInvalid')}</p>
-                  <button type="button" onClick={() => {
-                    const href = `${localePrefix(locale)}/product/${encodeURIComponent(invalidVariantItem.slug || invalidVariantItem.id)}`
-                    removeItem(getCartItemId(invalidVariantItem)); setInvalidVariantProductId(null); router.push(href)
-                  }} className="inline-flex min-h-11 items-center underline underline-offset-4">{t('removeAndReselectSize')}</button>
+                  {(() => {
+                    const options = activeCartVariants.filter(variant => variant.productId === invalidVariantItem.id
+                      && !items.some(item => item !== invalidVariantItem && item.id === invalidVariantItem.id && item.variantId === variant.id))
+                    return options.length ? <label className="block max-w-sm">
+                      <span className="mb-1 block text-xs">{t('sizeLabel')}</span>
+                      <select defaultValue="" onChange={event => {
+                        const selected = options.find(option => option.id === event.target.value)
+                        if (!selected) return
+                        const updated = replaceItemVariant(getCartItemId(invalidVariantItem), selected.id, selected.size || undefined)
+                        if (updated) {
+                          setInvalidVariantProductId(null)
+                          setQuote(null); setQuoteKey(''); setAcceptedSnapshot(null); setLegalError('')
+                        }
+                      }} className="min-h-11 w-full border border-nrs-ink/20 bg-white px-3">
+                        <option value="" disabled>{t('removeAndReselectSize')}</option>
+                        {options.map(option => <option key={option.id} value={option.id}>{option.size || t('sizeLabel')}</option>)}
+                      </select>
+                    </label> : <p className="text-xs text-nrs-ink/65">{t('noAvailableSizes')}</p>
+                  })()}
                 </div>}
                 {legalError && <p role="alert" className="text-sm text-rose-700">{legalError}</p>}
               </motion.div>

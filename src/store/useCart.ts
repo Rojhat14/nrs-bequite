@@ -29,13 +29,20 @@ interface CartTotals {
 
 interface CartStore extends CartTotals {
   items: Item[]
+  activeCartVariants: Array<{ id: string; productId: string; size: string | null }>
   wishlist: string[]
   isDrawerOpen: boolean
   catalogPricesSynced: boolean
+  catalogPricesSyncedFor: string | null
   priceUpdateNotice: boolean
   addItem: (product: NewCartItem, quantity?: number) => void
-  syncCatalogPrices: (products: Array<{ id: string; title?: string; price: number; compareAtPrice: number | null }>) => void
-  setCatalogPricesSynced: (synced: boolean) => void
+  syncCatalogPrices: (
+    products: Array<{ id: string; title?: string; price: number; compareAtPrice: number | null }>,
+    activeVariants?: Array<{ id: string; productId: string; size: string | null }>,
+    syncScope?: string,
+  ) => void
+  setCatalogPricesSynced: (synced: boolean, syncScope?: string) => void
+  replaceItemVariant: (cartItemId: string, variantId: string, size: string | undefined) => boolean
   removeItem: (cartItemId: string) => void
   updateMeasurements: (cartItemId: string, measurements: Measurements) => void
   updateQuantity: (cartItemId: string, quantity: number) => void
@@ -165,9 +172,11 @@ export const useCart = create<CartStore>()(
   persist(
     (set) => ({
       items: [],
+      activeCartVariants: [],
       wishlist: [],
       isDrawerOpen: false,
       catalogPricesSynced: false,
+      catalogPricesSyncedFor: null,
       priceUpdateNotice: false,
       subtotalAmount: 0,
       discountAmount: 0,
@@ -197,21 +206,62 @@ export const useCart = create<CartStore>()(
         })
       },
 
-      syncCatalogPrices: (products) => set((state) => {
+      syncCatalogPrices: (products, activeVariants = [], syncScope) => set((state) => {
         const current = new Map(products.map(product => [product.id, product]))
+        const variantsByProduct = new Map<string, typeof activeVariants>()
+        for (const variant of activeVariants) {
+          const rows = variantsByProduct.get(variant.productId) ?? []
+          rows.push(variant)
+          variantsByProduct.set(variant.productId, rows)
+        }
         let changed = false
         const items = state.items.map(item => {
           const product = current.get(item.id)
-          if (!product || !Number.isFinite(product.price) || product.price < 0) return item
-          const price = `₺${product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-          const compareAtPrice = product.compareAtPrice
-          if (parsePrice(item.price) !== product.price || Number(item.compareAtPrice ?? 0) !== Number(compareAtPrice ?? 0)) changed = true
-          return { ...item, title: product.title || item.title, price, compareAtPrice }
+          const updates: Partial<Item> = {}
+          if (product && Number.isFinite(product.price) && product.price >= 0) {
+            updates.title = product.title || item.title
+            updates.price = `₺${product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+            updates.compareAtPrice = product.compareAtPrice
+            if (parsePrice(item.price) !== product.price || Number(item.compareAtPrice ?? 0) !== Number(product.compareAtPrice ?? 0)) changed = true
+          }
+
+          // A persisted cart can outlive a catalog/variant update or a new auth
+          // session. Keep its chosen size and line data, but refresh the FK only
+          // when exactly one currently active variant has that exact size. Never
+          // translate legacy sizes (for example S -> 36) or guess between rows.
+          if (item.variantId) {
+            const productVariants = variantsByProduct.get(item.id) ?? []
+            const currentVariant = productVariants.find(variant => variant.id === item.variantId)
+            if (!currentVariant && productVariants.length) {
+              const wantedSize = item.size?.trim().toLocaleUpperCase('tr-TR') ?? null
+              const matches = productVariants.filter(variant => {
+                const activeSize = variant.size?.trim().toLocaleUpperCase('tr-TR') ?? null
+                return activeSize === wantedSize
+              })
+              if (matches.length === 1) {
+                updates.variantId = matches[0].id
+              }
+            }
+          }
+
+          return Object.keys(updates).length ? { ...item, ...updates } : item
         })
-        return { items, ...calculateCartTotals(items), catalogPricesSynced: true, priceUpdateNotice: state.priceUpdateNotice || changed }
+        return { items, activeCartVariants: activeVariants, ...calculateCartTotals(items), catalogPricesSynced: true, catalogPricesSyncedFor: syncScope ?? null, priceUpdateNotice: state.priceUpdateNotice || changed }
       }),
 
-      setCatalogPricesSynced: (catalogPricesSynced) => set({ catalogPricesSynced }),
+      setCatalogPricesSynced: (catalogPricesSynced, syncScope) => set({ catalogPricesSynced, catalogPricesSyncedFor: syncScope ?? null }),
+
+      replaceItemVariant: (cartItemId, variantId, size) => {
+        let replaced = false
+        set(state => {
+          const target = state.items.find(item => getCartItemId(item) === cartItemId)
+          if (!target || state.items.some(item => item !== target && item.id === target.id && item.variantId === variantId)) return state
+          replaced = true
+          const items = state.items.map(item => item === target ? { ...item, variantId, ...(size ? { size } : { size: undefined }) } : item)
+          return { items, ...calculateCartTotals(items) }
+        })
+        return replaced
+      },
 
       removeItem: (cartItemId) => set((state) => {
         const items = state.items.filter((item) => getCartItemId(item) !== cartItemId)
