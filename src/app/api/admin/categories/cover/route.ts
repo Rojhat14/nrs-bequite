@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { sameOrigin } from '@/lib/payment/http'
@@ -59,6 +59,8 @@ export async function POST(request: Request) {
     if (uploadError) return NextResponse.json({ message: 'Görsel kaydedilemedi. Mevcut görsel depolama izinlerini kontrol edin.' }, { status: 400 })
     revalidatePath('/', 'layout')
     revalidatePath('/admin/categories')
+    revalidateTag('storefront-category-covers')
+    revalidateTag('storefront-catalog')
     const imageUrl = new URL(bucket.getPublicUrl(key).data.publicUrl)
     imageUrl.searchParams.set('v', String(Date.now()))
     return NextResponse.json({ message: 'Home görseli kaydedildi.', imageUrl: imageUrl.toString() }, { headers: { 'Cache-Control': 'no-store' } })

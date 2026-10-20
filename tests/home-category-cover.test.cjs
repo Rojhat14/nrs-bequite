@@ -22,7 +22,7 @@ function route({category=home,deny=false}={}){
    getPublicUrl:key=>({data:{publicUrl:'https://example.supabase.co/storage/v1/object/public/'+bucket+'/'+key}}),
   }}},
  };
- const value=loader({'@/lib/auth/requireAdmin':{requireAdmin:async()=>{calls.push(['admin']);if(deny)throw Error('Denied')}},'@/lib/supabase/server':{createSupabaseServerClient:async()=>db},'next/cache':{revalidatePath:path=>calls.push(['revalidate',path])}})('src/app/api/admin/categories/cover/route.ts');
+ const value=loader({'@/lib/auth/requireAdmin':{requireAdmin:async()=>{calls.push(['admin']);if(deny)throw Error('Denied')}},'@/lib/supabase/server':{createSupabaseServerClient:async()=>db},'next/cache':{revalidatePath:path=>calls.push(['revalidate',path]),revalidateTag:tag=>calls.push(['revalidateTag',tag])}})('src/app/api/admin/categories/cover/route.ts');
  return {value,calls};
 }
 test('Home cover upload rejects cross-origin and non-admin requests before storage access',async()=>{
@@ -37,13 +37,15 @@ test('Home cover upload validates file signature, size, category and immutable s
  const body=await response.json();assert.ok(body.imageUrl.includes('/category-covers/'+id+'/cover?v='));
  const upload=calls.find(c=>c[0]==='upload');assert.equal(upload[1],'product-images');assert.equal(upload[2],'category-covers/'+id+'/cover');assert.deepEqual(upload[3],{contentType:'image/png',cacheControl:'60',upsert:true});
  assert.ok(calls.find(c=>c[0]==='revalidate'&&c[1]==='/'));
+ assert.ok(calls.find(c=>c[0]==='revalidateTag'&&c[1]==='storefront-category-covers'));
+ assert.ok(calls.find(c=>c[0]==='revalidateTag'&&c[1]==='storefront-catalog'));
 });
 test('Public Home cover uses default photo without a file and refreshes uploaded-photo cache by ETag',async()=>{
  const originalFetch=global.fetch,originalUrl=process.env.NEXT_PUBLIC_SUPABASE_URL;
  try {
   process.env.NEXT_PUBLIC_SUPABASE_URL='https://example.supabase.co';
   const lib=loader({'react':{cache:fn=>fn}})('src/lib/storage/category-covers.ts');
-  global.fetch=async(url,options)=>{assert.equal(options.method,'HEAD');assert.equal(options.cache,'no-store');assert.equal(options.headers,undefined);return new Response(null,{status:404})};
+  global.fetch=async(url,options)=>{assert.equal(options.method,'HEAD');assert.equal(options.cache,undefined);assert.deepEqual(options.next,{revalidate:300,tags:['storefront-category-covers']});assert.equal(options.headers,undefined);return new Response(null,{status:404})};
   assert.equal(await lib.getHomeCategoryCover(id),'/images/editorial/categories/home-bedding.webp');
   global.fetch=async()=>new Response(null,{status:200,headers:{'Content-Type':'image/webp',ETag:'new-cover'}});
   assert.equal(new URL(await lib.getHomeCategoryCover(id)).searchParams.get('v'),'new-cover');

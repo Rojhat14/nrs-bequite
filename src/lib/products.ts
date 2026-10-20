@@ -1,12 +1,14 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getRequestLocale } from '@/lib/i18n/request-locale'
 import { productSourceHash, sourceHash } from '@/lib/i18n/source-hash'
 import type { Locale } from '@/lib/i18n/messages'
 
 import { PRODUCTS, type Product } from '@/data/products'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabasePublicServerClient } from '@/lib/supabase/public-server'
 import { getProductImageUrl } from '@/lib/storage/products'
 import type { CategoryRow, CollectionRow, ProductImageRow, ProductRow, ProductVariantRow } from '@/lib/admin/types'
 import { isHomeCategory } from '@/lib/home-category'
@@ -26,10 +28,11 @@ const HOME_CATEGORY: StorefrontCategory = {
 const IMAGE_COLUMNS = 'id,product_id,provider,storage_key,url,alt_text,sort_order,is_primary,created_at'
 const VARIANT_COLUMNS = 'id,product_id,size,stock_quantity,is_active'
 
-// React cache is scoped to one server render, including metadata + page work.
-// It never shares cookie/RLS-dependent results between requests or users.
+const STOREFRONT_CACHE_SECONDS = 60
+const STOREFRONT_CACHE_TAG = 'storefront-catalog'
+
 const getActiveCategoryRows = cache(async () => {
-  const supabase = await createSupabaseServerClient()
+  const supabase = createSupabasePublicServerClient()
   return supabase.from('categories').select(CATEGORY_COLUMNS).eq('is_active', true).order('sort_order').order('name')
 })
 
@@ -44,7 +47,7 @@ function groupByProduct<T extends { product_id: string }>(rows: T[]) {
 }
 
 async function localizeTaxonomyRows<T extends { id: string; name: string; description: string | null }>(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: SupabaseClient,
   entityType: 'category' | 'collection',
   rows: T[],
   locale: Locale,
@@ -103,7 +106,7 @@ function toFallbackProduct(product: (typeof PRODUCTS)[number]): Product {
 }
 
 function toStorefrontProduct(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: SupabaseClient,
   row: CatalogProductRow,
   category: StorefrontCategory | null,
   images: ProductImageRow[],
@@ -150,7 +153,7 @@ function toStorefrontProduct(
 }
 
 async function mapProductRows(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: SupabaseClient,
   rows: CatalogProductRow[],
   knownCategories?: StorefrontCategory[],
   locale: Locale = 'tr',
@@ -167,7 +170,7 @@ async function mapProductRows(
     supabase.from('product_collections').select('product_id, collection_id').in('product_id', productIds),
     knownCategories
       ? Promise.resolve({ data: knownCategories, error: null })
-      : getActiveCategoryRows(),
+    : getActiveCategoryRows(),
     locale === 'tr' ? Promise.resolve({ data: [], error: null })
       : supabase.from('storefront_translations').select('entity_id,source_hash,payload').eq('entity_type', 'product').eq('locale', locale).in('entity_id', productIds),
   ])
@@ -218,9 +221,9 @@ async function mapProductRows(
   })
 }
 
-export const getStorefrontProducts = cache(async function getStorefrontProducts() {
+const readStorefrontProducts = unstable_cache(async function readStorefrontProducts(locale: Locale) {
   try {
-    const supabase = await createSupabaseServerClient()
+    const supabase = createSupabasePublicServerClient()
     const { data, error } = await supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
@@ -228,15 +231,52 @@ export const getStorefrontProducts = cache(async function getStorefrontProducts(
       .eq('payment_test_only', false)
       .order('created_at', { ascending: false })
     if (error) return PRODUCTS.map(toFallbackProduct)
-    return mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], undefined, await getRequestLocale())
+    return mapProductRows(supabase, (data ?? []) as unknown as CatalogProductRow[], undefined, locale)
   } catch {
     return PRODUCTS.map(toFallbackProduct)
   }
+}, ['storefront-products-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getStorefrontProducts = cache(async function getStorefrontProducts() {
+  return readStorefrontProducts(await getRequestLocale())
 })
 
-export const getStorefrontProduct = cache(async function getStorefrontProduct(slugOrId: string) {
+export interface HomepageShowcaseProduct {
+  id: string
+  image: string
+}
+
+const readHomepageShowcaseProducts = unstable_cache(async function readHomepageShowcaseProducts(): Promise<HomepageShowcaseProduct[]> {
   try {
-    const supabase = await createSupabaseServerClient()
+    const supabase = createSupabasePublicServerClient()
+    const { data, error } = await supabase.from('products').select('id')
+      .eq('status', 'active').eq('payment_test_only', false).order('created_at', { ascending: false }).limit(12)
+    if (error) throw error
+    const rows = (data ?? []) as { id: string }[]
+    if (rows.length === 0) return PRODUCTS.slice(0, 12).map(product => ({ id: product.id, image: product.image }))
+    const ids = rows.map(row => row.id)
+    const { data: imageRows, error: imageError } = await supabase.from('product_images')
+      .select(IMAGE_COLUMNS).in('product_id', ids).order('sort_order').order('created_at').order('id')
+    if (imageError) throw imageError
+    const imagesByProduct = groupByProduct((imageRows ?? []) as unknown as ProductImageRow[])
+    return rows.map(({ id }) => {
+      const legacy = PRODUCTS.find(product => product.id === id)
+      const images = imagesByProduct.get(id) ?? []
+      const image = images.find(item => item.is_primary) ?? images[0]
+      return { id, image: getProductImageUrl(supabase, image) ?? legacy?.image ?? '' }
+    })
+  } catch {
+    return PRODUCTS.slice(0, 12).map(product => ({ id: product.id, image: product.image }))
+  }
+}, ['homepage-showcase-products-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getHomepageShowcaseProducts = cache(async function getHomepageShowcaseProducts() {
+  return readHomepageShowcaseProducts()
+})
+
+const readStorefrontProduct = unstable_cache(async function readStorefrontProduct(slugOrId: string, locale: Locale) {
+  try {
+    const supabase = createSupabasePublicServerClient()
     let { data, error } = await supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
@@ -257,11 +297,15 @@ export const getStorefrontProduct = cache(async function getStorefrontProduct(sl
     }
     if (error) return fallbackById(slugOrId)
     if (!data || data.payment_test_only === true) return null
-    const [product] = await mapProductRows(supabase, [data as unknown as CatalogProductRow], undefined, await getRequestLocale())
+    const [product] = await mapProductRows(supabase, [data as unknown as CatalogProductRow], undefined, locale)
     return product ?? null
   } catch {
     return fallbackById(slugOrId)
   }
+}, ['storefront-product-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getStorefrontProduct = cache(async function getStorefrontProduct(slugOrId: string) {
+  return readStorefrontProduct(slugOrId, await getRequestLocale())
 })
 
 function fallbackById(id: string) {
@@ -269,14 +313,14 @@ function fallbackById(id: string) {
   return product ? toFallbackProduct(product) : null
 }
 
-export const getStorefrontCategories = cache(async function getStorefrontCategories(): Promise<StorefrontCategory[]> {
+const readStorefrontCategories = unstable_cache(async function readStorefrontCategories(locale: Locale): Promise<StorefrontCategory[]> {
   try {
+    const supabase = createSupabasePublicServerClient()
     const { data, error } = await getActiveCategoryRows()
     if (!error) {
       let categories = (data ?? []) as unknown as StorefrontCategory[]
-      const locale = await getRequestLocale()
       if (locale !== 'tr' && categories.length) categories = await localizeTaxonomyRows(
-        await createSupabaseServerClient(), 'category', categories, locale)
+        supabase, 'category', categories, locale)
       return categories.some(isHomeCategory)
         ? await Promise.all(categories.map(async category => isHomeCategory(category)
           ? { ...category, name: locale === 'ar' ? 'المنزل' : 'Home', imageUrl: await getHomeCategoryCover(category.id) } : category))
@@ -286,15 +330,18 @@ export const getStorefrontCategories = cache(async function getStorefrontCategor
     // Fall back to the existing category names when Supabase is unavailable.
   }
   return getLegacyCategories()
+}, ['storefront-categories-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getStorefrontCategories = cache(async function getStorefrontCategories(): Promise<StorefrontCategory[]> {
+  return readStorefrontCategories(await getRequestLocale())
 })
 
-export const getStorefrontCollections = cache(async function getStorefrontCollections(): Promise<StorefrontCollection[]> {
+const readStorefrontCollections = unstable_cache(async function readStorefrontCollections(locale: Locale): Promise<StorefrontCollection[]> {
   try {
-    const supabase = await createSupabaseServerClient()
+    const supabase = createSupabasePublicServerClient()
     const { data, error } = await supabase.from('collections').select(COLLECTION_COLUMNS).eq('is_active', true).order('sort_order').order('name')
     if (!error) {
       let rows = (data ?? []) as unknown as StorefrontCollection[]
-      const locale = await getRequestLocale()
       if (locale !== 'tr' && rows.length) rows = await localizeTaxonomyRows(supabase, 'collection', rows, locale)
       return rows
     }
@@ -302,6 +349,10 @@ export const getStorefrontCollections = cache(async function getStorefrontCollec
     return []
   }
   return []
+}, ['storefront-collections-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getStorefrontCollections = cache(async function getStorefrontCollections(): Promise<StorefrontCollection[]> {
+  return readStorefrontCollections(await getRequestLocale())
 })
 
 export const getStorefrontNavigationData = cache(async function getStorefrontNavigationData() {
@@ -309,10 +360,9 @@ export const getStorefrontNavigationData = cache(async function getStorefrontNav
   return { categories, collections }
 })
 
-export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: string) {
+const readCategoryCatalog = unstable_cache(async function readCategoryCatalog(slug: string, locale: Locale) {
   try {
-    const supabase = await createSupabaseServerClient()
-    const locale = await getRequestLocale()
+    const supabase = createSupabasePublicServerClient()
     const requestedSlug = slug.toLowerCase()
     const mappedSlug = categoryRouteAliases[requestedSlug]
     let { data: categoryData, error: categoryError } = await supabase
@@ -353,6 +403,10 @@ export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: 
   } catch {
     return fallbackCategoryCatalog(slug)
   }
+}, ['storefront-category-catalog-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getCategoryCatalog = cache(async function getCategoryCatalog(slug: string) {
+  return readCategoryCatalog(slug, await getRequestLocale())
 })
 
 function fallbackCategoryCatalog(slug: string) {
@@ -377,10 +431,9 @@ function getLegacyCategories(): StorefrontCategory[] {
   })).concat(HOME_CATEGORY)
 }
 
-export const getCollectionCatalog = cache(async function getCollectionCatalog(slug: string) {
+const readCollectionCatalog = unstable_cache(async function readCollectionCatalog(slug: string, locale: Locale) {
   try {
-    const supabase = await createSupabaseServerClient()
-    const locale = await getRequestLocale()
+    const supabase = createSupabasePublicServerClient()
     const { data: collectionData, error: collectionError } = await supabase
       .from('collections')
       .select(COLLECTION_COLUMNS)
@@ -410,4 +463,8 @@ export const getCollectionCatalog = cache(async function getCollectionCatalog(sl
   } catch {
     return { collection: null, products: [] as Product[] }
   }
+}, ['storefront-collection-catalog-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+export const getCollectionCatalog = cache(async function getCollectionCatalog(slug: string) {
+  return readCollectionCatalog(slug, await getRequestLocale())
 })

@@ -67,7 +67,8 @@ async function loadLocalizedCatalog(locale) {
 
   const load = loader({
     react: { cache: (fn) => fn },
-    '@/lib/supabase/server': { createSupabaseServerClient: async () => supabase },
+    'next/cache': { unstable_cache: fn => fn },
+    '@/lib/supabase/public-server': { createSupabasePublicServerClient: () => supabase },
     '@/lib/i18n/request-locale': { getRequestLocale: async () => locale },
     '@/lib/storage/products': { getProductImageUrl: () => null },
     '@/lib/storage/category-covers': { getHomeCategoryCover: async () => '' },
@@ -144,8 +145,9 @@ test('category pages localize the category, products, and collection labels from
     } }
     const load = loader({
       react: { cache: (fn) => fn },
+      'next/cache': { unstable_cache: fn => fn },
       '@/data/products': { PRODUCTS: [] },
-      '@/lib/supabase/server': { createSupabaseServerClient: async () => supabase },
+      '@/lib/supabase/public-server': { createSupabasePublicServerClient: () => supabase },
       '@/lib/i18n/request-locale': { getRequestLocale: async () => locale },
       '@/lib/storage/products': { getProductImageUrl: () => null },
       '@/lib/storage/category-covers': { getHomeCategoryCover: async () => '' },

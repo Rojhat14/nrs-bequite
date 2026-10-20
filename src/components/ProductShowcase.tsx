@@ -2,17 +2,16 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { m as motion } from 'framer-motion';
-import type { Product } from '@/data/products';
+import type { HomepageShowcaseProduct } from '@/lib/products';
 import Image from 'next/image';
 import { canOptimizeImage } from '@/lib/imageOptimization';
 import { getShowcaseItemCount, SHOWCASE_TRAVEL } from '@/lib/showcase';
 
 interface ProductShowcaseProps {
-  introFinished?: boolean;
-  products: Product[];
+  products: HomepageShowcaseProduct[];
 }
 
-const ProductShowcase = ({ introFinished, products }: ProductShowcaseProps) => {
+const ProductShowcase = ({ products }: ProductShowcaseProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(() => getShowcaseItemCount(3840));
   useEffect(() => {
@@ -34,8 +33,8 @@ const ProductShowcase = ({ introFinished, products }: ProductShowcaseProps) => {
     <motion.div
       ref={containerRef}
       initial={{ opacity: 0 }}
-      animate={{ opacity: introFinished ? 1 : 0 }}
-      transition={{ duration: 2, ease: "easeInOut" }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8, ease: "easeInOut" }}
       className="absolute inset-0 z-0 overflow-hidden pointer-events-none"
     >
       {/* Gradient Mask for Elegant Fade at Edges */}
@@ -67,6 +66,7 @@ const ProductShowcase = ({ introFinished, products }: ProductShowcaseProps) => {
                 aria-hidden="true"
                 width={250}
                 height={400}
+                sizes="250px"
                 loading="lazy"
                 unoptimized={!canOptimizeImage(product.image)}
                 className="h-full w-full object-contain transition-all duration-500"

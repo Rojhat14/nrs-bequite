@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PRODUCT_IMAGE_BUCKET, productImageObjectKey } from '@/lib/storage/products'
@@ -94,5 +95,6 @@ export async function POST(request: Request) {
     : await supabase.from('product_images').insert(imagePayload)
   if (saveResult.error) return NextResponse.json({ message: 'Görsel yüklendi ancak ürün kaydı oluşturulamadı. Tekrar deneyin.' }, { status: 400 })
 
+  revalidateTag('storefront-catalog')
   return NextResponse.json({ message: 'Görsel yüklendi.', storage_key: storageKey })
 }

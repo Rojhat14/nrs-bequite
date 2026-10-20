@@ -5,15 +5,14 @@ import { m as motion } from 'framer-motion';
 import ProductShowcase from '@/components/ProductShowcase';
 import Link from 'next/link';
 import Image from 'next/image';
-import type { Product } from '@/data/products';
+import type { HomepageShowcaseProduct } from '@/lib/products';
 import { useLocale } from '@/context/LocaleContext';
 
 interface HeroProps {
-  introFinished?: boolean;
-  products: Product[];
+  products: HomepageShowcaseProduct[];
 }
 
-const Hero = ({ introFinished, products }: HeroProps) => {
+const Hero = ({ products }: HeroProps) => {
   const { locale } = useLocale()
   const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr
   return (
@@ -24,8 +23,8 @@ const Hero = ({ introFinished, products }: HeroProps) => {
       {/* Editorial Background Image - Soft, high-end fashion feel */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: introFinished ? 0.4 : 0 }}
-        transition={{ duration: 2, delay: 1 }}
+        animate={{ opacity: 0.4 }}
+        transition={{ duration: 0.8 }}
         className="absolute inset-0 z-0"
       >
         <Image
@@ -38,55 +37,31 @@ const Hero = ({ introFinished, products }: HeroProps) => {
       </motion.div>
 
       {/* Background Product Showcase */}
-      <ProductShowcase introFinished={introFinished} products={products} />
+      <ProductShowcase products={products} />
 
       <div className="container mx-auto px-4 z-10">
         <div className="max-w-6xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: introFinished ? 1 : 0, y: introFinished ? 0 : 30 }}
-            transition={{
-              duration: 1.5,
-              delay: introFinished ? 0 : 0,
-              ease: [0.22, 1, 0.32, 1]
-            }}
-            className="space-y-8"
-          >
+          <div className="space-y-8">
             {/* Main Editorial Text */}
             <div className="relative flex flex-col justify-center items-center py-12">
-              <motion.h1
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: introFinished ? 1 : 0, scale: introFinished ? 1 : 0.98 }}
-                transition={{ delay: introFinished ? 0.2 : 0, duration: 1.8 }}
-                className="text-5xl md:text-8xl font-serif text-nrs-ink tracking-tight mb-6"
-              >
+              <h1 className="text-5xl md:text-8xl font-serif text-nrs-ink tracking-tight mb-6">
                 {copy('ZARAFETİN SANATI', 'THE ART OF ELEGANCE', 'فن الأناقة')}
-              </motion.h1>
+              </h1>
 
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: introFinished ? 1 : 0 }}
-                transition={{ delay: introFinished ? 1 : 0, duration: 1.5 }}
-                className="text-sm md:text-lg font-sans text-nrs-ink/60 max-w-2xl mx-auto leading-relaxed tracking-wide px-4"
-              >
+              <p className="text-sm md:text-lg font-sans text-nrs-ink/60 max-w-2xl mx-auto leading-relaxed tracking-wide px-4">
                 {copy('Modern kadının özgün duruşu için tasarlanan rafine siluetler, seçkin dokular ve zamansız detaylar.', 'Refined silhouettes, considered textures and timeless details for a distinctive modern woman.', 'خطوط راقية وخامات منتقاة وتفاصيل خالدة صُممت للمرأة العصرية ذات الحضور المميز.')}
-              </motion.p>
+              </p>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: introFinished ? 1 : 0, y: introFinished ? 0 : 20 }}
-                transition={{ delay: introFinished ? 1.4 : 0, duration: 1.2 }}
-                className="flex flex-col md:flex-row items-center justify-center gap-6 mt-12"
-              >
+              <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-12">
                 <Link
                   href="/collections"
                   className="px-10 py-4 bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory uppercase tracking-[0.3em] text-[10px] font-sans hover:bg-nrs-charcoal transition-all duration-700"
                 >
                   {copy('Koleksiyonu Keşfet', 'Explore the collection', 'اكتشفي المجموعة')}
                 </Link>
-              </motion.div>
+              </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
 

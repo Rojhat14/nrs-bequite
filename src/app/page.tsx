@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import HomePageContent from '@/components/HomePageContent'
-import { getStorefrontProducts } from '@/lib/products'
+import { getHomepageShowcaseProducts } from '@/lib/products'
 import { headers } from 'next/headers'
 import { isLocale } from '@/lib/i18n/messages'
 
@@ -38,7 +38,7 @@ const structuredData = {
 }
 
 export default async function Page() {
-  const products = await getStorefrontProducts()
+  const products = await getHomepageShowcaseProducts()
   return (
     <>
       <script

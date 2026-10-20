@@ -10,7 +10,12 @@ export const getHomeCategoryCover = cache(async (id: string) => {
   if (!origin || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)) return HOME_CATEGORY_IMAGE
   try {
     const url = new URL(`/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/${categoryCoverObjectKey(id)}`, origin)
-    const response = await fetch(url, { method: 'HEAD', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(2000) })
+    const response = await fetch(url, {
+      method: 'HEAD',
+      next: { revalidate: 300, tags: ['storefront-category-covers'] },
+      redirect: 'error',
+      signal: AbortSignal.timeout(2000),
+    })
     if (!response.ok || !/^image\/(jpeg|png|webp)(?:;|$)/i.test(response.headers.get('content-type') ?? '')) return HOME_CATEGORY_IMAGE
     // Changing the file changes this URL, avoiding the previous thumbnail cache.
     const version = response.headers.get('etag') || response.headers.get('last-modified')

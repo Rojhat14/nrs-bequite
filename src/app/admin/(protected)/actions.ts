@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import type { ActionResult, ProductStatus } from '@/lib/admin/types'
@@ -17,6 +17,10 @@ function validSlug(value: string) {
 
 function failure(message: string): ActionResult {
   return { ok: false, message }
+}
+
+function revalidateStorefrontCatalog() {
+  revalidateTag('storefront-catalog')
 }
 
 function mapWriteError(error: { code?: string } | null, fallback: string) {
@@ -94,6 +98,8 @@ export async function saveProduct(form: FormData): Promise<ActionResult> {
     const { error } = await supabase.from('products').insert(payload)
     if (error) return failure(mapWriteError(error, 'Ürün oluşturulamadı.'))
   }
+  // Product fields have already changed even if a later collection/translation write fails.
+  revalidateStorefrontCatalog()
   const { error: clearCollectionsError } = await supabase
     .from('product_collections')
     .delete()
@@ -136,6 +142,7 @@ export async function saveProduct(form: FormData): Promise<ActionResult> {
   revalidatePath('/admin')
   revalidatePath('/admin/products')
   revalidatePath(`/admin/products/${encodeURIComponent(id)}`)
+  revalidateStorefrontCatalog()
   return { ok: true, id, message: existing ? 'Ürün güncellendi.' : 'Ürün oluşturuldu.' }
 }
 
@@ -176,6 +183,7 @@ export async function duplicateProduct(sourceProductId: string): Promise<ActionR
   revalidatePath(`/admin/products/${encodeURIComponent(id)}`)
   revalidatePath('/')
   revalidatePath('/collections')
+  revalidateStorefrontCatalog()
   return { ok: true, id, message: 'Ürün başarıyla kopyalandı.' }
 }
 
@@ -189,6 +197,7 @@ export async function archiveProduct(form: FormData): Promise<ActionResult> {
   revalidatePath('/admin')
   revalidatePath('/admin/products')
   revalidatePath(`/admin/products/${encodeURIComponent(id)}`)
+  revalidateStorefrontCatalog()
   return { ok: true, id, message: 'Ürün arşivlendi. Sipariş geçmişi korunmuştur.' }
 }
 
@@ -230,6 +239,7 @@ export async function saveCategory(form: FormData): Promise<ActionResult> {
   revalidatePath('/admin/categories')
   revalidatePath('/admin/products')
   revalidatePath('/admin')
+  revalidateStorefrontCatalog()
   return { ok: true, message: id ? 'Kategori güncellendi.' : 'Kategori oluşturuldu.' }
 }
 
@@ -255,6 +265,7 @@ export async function saveCollectionTranslations(form: FormData): Promise<Action
   if (!saved) return failure('Bir dili seçip çeviriyi kaynakla karşılaştırdığınızı onaylayın.')
   revalidatePath('/admin/categories')
   revalidatePath('/collections')
+  revalidateStorefrontCatalog()
   return { ok: true, id, message: 'Koleksiyon çevirileri kaydedildi.' }
 }
 
@@ -275,6 +286,7 @@ export async function deleteCategory(form: FormData): Promise<ActionResult> {
   if (error) return failure(mapWriteError(error, 'Kategori silinemedi.'))
   revalidatePath('/admin/categories')
   revalidatePath('/admin/products')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Kategori silindi.' }
 }
 
@@ -297,6 +309,7 @@ export async function saveVariant(form: FormData): Promise<ActionResult> {
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin/inventory')
   revalidatePath('/admin')
+  revalidateStorefrontCatalog()
   return { ok: true, message: id ? 'Varyant güncellendi.' : 'Varyant eklendi.' }
 }
 
@@ -310,6 +323,7 @@ export async function deleteVariant(form: FormData): Promise<ActionResult> {
   if (error) return failure(mapWriteError(error, 'Varyant silinemedi.'))
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin/inventory')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Varyant silindi.' }
 }
 
@@ -325,6 +339,7 @@ export async function updateInventory(form: FormData): Promise<ActionResult> {
   revalidatePath('/admin/inventory')
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Stok güncellendi.' }
 }
 
@@ -355,6 +370,7 @@ export async function setImagePrimary(form: FormData): Promise<ActionResult> {
   if (error) return failure(mapWriteError(error, 'Ana görsel değiştirilemedi.'))
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin/products')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Ana görsel güncellendi.' }
 }
 
@@ -369,6 +385,7 @@ export async function updateImageOrder(form: FormData): Promise<ActionResult> {
   if (error) return failure(mapWriteError(error, 'Görsel sırası güncellenemedi.'))
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin/products')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Görsel sırası güncellendi.' }
 }
 
@@ -384,6 +401,7 @@ export async function updateImageMetadata(form: FormData): Promise<ActionResult>
   if (error) return failure(mapWriteError(error, 'Görsel bilgileri güncellenemedi.'))
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin/products')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Görsel bilgileri kaydedildi.' }
 }
 
@@ -421,6 +439,7 @@ export async function deleteProductImage(form: FormData): Promise<ActionResult> 
   revalidatePath(`/admin/products/${encodeURIComponent(productId)}`)
   revalidatePath('/admin/products')
   revalidatePath('/admin')
+  revalidateStorefrontCatalog()
   return { ok: true, message: 'Görsel silindi.' }
 }
 

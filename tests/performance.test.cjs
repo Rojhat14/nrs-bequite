@@ -99,6 +99,7 @@ function catalogFixture() {
       eq(key, value) { rows = rows.filter(row => row[key] === value); return query; },
       in(key, values) { rows = rows.filter(row => values.includes(row[key])); return query; },
       order() { return query; },
+      limit(count) { rows = rows.slice(0, count); return query; },
       maybeSingle() { single = true; return query; },
       then(resolve, reject) {
         calls.push({ table, columns });
@@ -120,8 +121,10 @@ function catalogFixture() {
   };
   const api = loadSource('src/lib/products.ts', {
     'server-only': {}, react: { cache },
+    'next/cache': { unstable_cache: fn => fn },
     '@/data/products': { PRODUCTS: [] },
-    '@/lib/supabase/server': { createSupabaseServerClient: async () => supabase },
+    '@/lib/i18n/request-locale': { getRequestLocale: async () => 'tr' },
+    '@/lib/supabase/public-server': { createSupabasePublicServerClient: () => supabase },
     '@/lib/storage/products': { getProductImageUrl: (_client, image) => image.url },
   });
   return { api, tables, calls };
@@ -179,4 +182,14 @@ test('payment-test products are excluded from public catalog, category, search s
   assert.equal(await api.getStorefrontProduct(privateTrial.slug), null);
   assert.equal(await api.getStorefrontProduct(privateTrial.id), null);
   assert.ok(calls.filter(call => call.table === 'products').every(call => call.columns.includes('payment_test_only')));
+});
+
+
+test('homepage showcase reads only active product IDs and primary image data', async () => {
+  const { api, calls } = catalogFixture();
+  const products = await api.getHomepageShowcaseProducts();
+  assert.deepEqual(products, [{ id: 'p1', image: '/primary.jpg' }]);
+  assert.deepEqual(calls.map(call => call.table), ['products', 'product_images']);
+  assert.equal(calls[0].columns, 'id');
+  assert.ok(!calls.some(call => call.table === 'product_variants'));
 });
