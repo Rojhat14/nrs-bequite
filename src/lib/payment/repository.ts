@@ -16,7 +16,7 @@ import { cookies } from 'next/headers'
 import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
-import { CheckoutProductUnavailableError, CheckoutVariantUnavailableError } from './variant-unavailable'
+import { CheckoutProductUnavailableError, CheckoutStockLimitError, CheckoutVariantUnavailableError } from './variant-unavailable'
 import { isMadeToOrderDressVariant } from '@/lib/dress-sizes'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
@@ -237,7 +237,9 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         if (!variant || variant.is_active !== true) throw new CheckoutVariantUnavailableError(item.productId)
         const madeToOrderDress = isMadeToOrderDressVariant(product.id, product.fulfillment_mode, variant.size)
         if (product.fulfillment_mode === 'made_to_order' && !madeToOrderDress) throw new CheckoutVariantUnavailableError(item.productId)
-        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) throw new CheckoutProductUnavailableError(item.productId)
+        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) {
+          throw new CheckoutStockLimitError(item.productId, item.variantId, Number.isSafeInteger(variant.stock_quantity) ? Math.max(0, variant.stock_quantity) : 0)
+        }
         const translation = translationsByProduct.get(product.id)
         const localized = translation?.source_hash === productSourceHash(product) ? translation.payload : null
         const displayName = typeof localized?.name === 'string' ? localized.name : product.name

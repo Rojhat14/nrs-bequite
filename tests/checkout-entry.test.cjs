@@ -10,10 +10,10 @@ function find(node, predicate) {
   if (Array.isArray(node)) return node.map(child => find(child, predicate)).find(Boolean) || null;
   return predicate(node) ? node : find(node.props?.children, predicate);
 }
-function productHarness({ stock = 2, inStock = true, variants = true } = {}) {
+function productHarness({ stock = 2, inStock = true, variants = true, bag = [] } = {}) {
   let cursor = 0;
   const slots = [], additions = [], routes = [], drawers = [];
-  const store = { addItem: (...args) => additions.push(args), openDrawer: () => drawers.push(true) };
+  const store = { items: bag, addItem: (...args) => additions.push(args), openDrawer: () => drawers.push(true) };
   const fakeReact = { ...React, useEffect() {}, useRef: () => ({ current: null }), useState(initial) {
     const index = cursor++;
     if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
@@ -148,4 +148,19 @@ test('Localized checkout shell uses a compact header and only the necessary shor
   assert.match(html, /href="\/ar\/kvkk"/);
   assert.match(html, /href="\/ar\/gizlilik-politikasi"/);
   assert.doesNotMatch(html, /full navigation|newsletter|cart drawer|long footer/);
+});
+
+test('Adding a size again counts what is already in the bag, so a saved cart cannot outgrow the stock', () => {
+  const h = productHarness({ stock: 2, bag: [{ id: 'product-1', variantId: 'variant-1', quantity: 2 }] });
+  let tree = h.render();
+  find(tree, node => node.type === 'button' && node.props.children === 'M').props.onClick();
+  tree = h.render();
+  find(tree, node => node.type === 'button' && [].concat(node.props.children).includes('Sepete ekle')).props.onClick();
+  assert.equal(h.additions.length, 0);
+  assert.match(renderToStaticMarkup(h.render()), /sepetinizde zaten 2 adet var; stokta 2 adet/);
+  // "Checkout" with the line already in the bag goes to checkout without adding more.
+  tree = h.render();
+  find(tree, node => node.type === 'button' && node.props.children === 'Ödeme / Siparişe geç').props.onClick();
+  assert.equal(h.additions.length, 0);
+  assert.deepEqual(h.routes, ['/checkout']);
 });

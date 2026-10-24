@@ -438,9 +438,9 @@ test('A saved cart line that is no longer sold is named with a remove option ins
   const harness = checkoutHarness(true, true);
   const removed = [];
   harness.cart.removeItem = id => removed.push(id);
-  const tree = await cardCheckoutAfterQuote(harness, { ok: false, status: 409, json: async () => ({ code: 'PRODUCT_UNAVAILABLE', productId: 'product', error: 'Sepetinizdeki bir ürün artık satışta değil veya stokta yok. Ürünü sepetten çıkarın ya da başka bir beden seçin.' }) });
+  const tree = await cardCheckoutAfterQuote(harness, { ok: false, status: 409, json: async () => ({ code: 'PRODUCT_UNAVAILABLE', productId: 'product', error: 'Sepetinizdeki bir ürün artık satışta değil. Ürünü sepetten çıkarın.' }) });
   const html = renderToStaticMarkup(tree);
-  assert.match(html, /artık satışta değil veya stokta yok/);
+  assert.match(html, /artık satışta değil/);
   assert.match(html, /Test Ürün/);
   assert.doesNotMatch(html, /Ödeme başlatılamadı|Sonuç belirsizse/);
   const remove = findElement(tree, node => node.type === 'button' && node.props.children === 'Sepetten çıkar');
@@ -454,4 +454,20 @@ test('A failed order summary shows the server reason, not the uncertain-payment 
   const html = renderToStaticMarkup(tree);
   assert.match(html, /Ürün, stok veya teslimat bilgileri doğrulanamadı\./);
   assert.doesNotMatch(html, /Sonuç belirsizse/);
+});
+
+test('A saved cart that asks for more than the stock left names the line and offers the available quantity', async () => {
+  const harness = checkoutHarness(true, true);
+  const updates = [];
+  harness.cart.updateQuantity = (...args) => updates.push(args);
+  const tree = await cardCheckoutAfterQuote(harness, { ok: false, status: 409, json: async () => ({ code: 'STOCK_LIMIT', productId: 'product', variantId: orderId, available: 1, error: 'Sepetinizdeki bu üründen bu bedende stokta 1 adet var. Adedi düzenleyip tekrar deneyin.' }) });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /stokta 1 adet var/);
+  assert.match(html, /sepetinizde 2 adet bulunuyor/);
+  assert.match(html, /Test Ürün/);
+  assert.doesNotMatch(html, /Ödeme başlatılamadı|satışta değil/);
+  const fix = findElement(tree, node => node.type === 'button' && node.props.children === 'Adedi 1 yap');
+  assert.ok(fix);
+  fix.props.onClick();
+  assert.deepEqual(updates, [['product::' + orderId, 1]]);
 });

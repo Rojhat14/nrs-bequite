@@ -28,13 +28,13 @@ import { randomUuid } from '@/lib/uuid'
 export default function Checkout() {
   const { locale, money, t, fxAvailable } = useLocale()
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
-  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, removeItem, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, catalogSyncFailed, priceUpdateNotice } = useCart()
+  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, removeItem, updateQuantity, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, catalogSyncFailed, priceUpdateNotice } = useCart()
   const { user, profile, loading: authLoading, profileLoading } = useAuth()
   const [step, setStep] = useState(2) // Customer details are the first checkout screen; account sign-in is optional.
   const router = useRouter()
   const [hydrated, setHydrated] = useState(false)
   const [acceptedSnapshot, setAcceptedSnapshot] = useState<string | null>(null)
-  const [checkoutError, setCheckoutError] = useState<{ message: string; errorCode?: string; trackingNumber?: string; payment?: boolean } | null>(null)
+  const [checkoutError, setCheckoutError] = useState<{ message: string; errorCode?: string; trackingNumber?: string; payment?: boolean; lineIssue?: 'product' | 'stock'; stockLimit?: { variantId: string; available: number } } | null>(null)
   const legalError = checkoutError && !checkoutError.payment ? checkoutError.message : ''
   const paymentFailure = checkoutError?.payment ? checkoutError : null
   const setLegalError = (message: string) => setCheckoutError(message ? { message } : null)
@@ -122,7 +122,10 @@ export default function Checkout() {
   }
 
   const orderSummary = confirmedQuote?.summary ?? previewSummary
-  const invalidVariantItem = items.find(item => item.id === invalidVariantProductId)
+  const stockLimit = checkoutError?.stockLimit
+  // A stock limit names the exact size line; other line issues name the product.
+  const invalidVariantItem = (stockLimit && items.find(item => item.id === invalidVariantProductId && item.variantId === stockLimit.variantId))
+    || items.find(item => item.id === invalidVariantProductId)
   const summaryDisplay = orderSummary.display
   const summaryRate = summaryDisplay?.currency === 'USD' && summaryDisplay.exchangeRate !== null && summaryDisplay.exchangeRateAt
     ? { usdTry: summaryDisplay.exchangeRate, fetchedAt: summaryDisplay.exchangeRateAt, rateDate: summaryDisplay.exchangeRateDate ?? undefined } : null
@@ -177,7 +180,13 @@ export default function Checkout() {
         }
         if (data.code === 'PRODUCT_UNAVAILABLE' && typeof data.productId === 'string') {
           setInvalidVariantProductId(data.productId)
-          setLegalError(typeof data.error === 'string' && data.error ? data.error : t('checkoutQuoteError'))
+          setCheckoutError({ message: typeof data.error === 'string' && data.error ? data.error : t('checkoutQuoteError'), lineIssue: 'product' })
+          return
+        }
+        if (data.code === 'STOCK_LIMIT' && typeof data.productId === 'string' && typeof data.variantId === 'string' && Number.isSafeInteger(data.available)) {
+          setInvalidVariantProductId(data.productId)
+          setCheckoutError({ message: typeof data.error === 'string' && data.error ? data.error : t('checkoutQuoteError'), lineIssue: 'stock',
+            stockLimit: { variantId: data.variantId, available: Math.max(0, data.available) } })
           return
         }
         if (data.code === 'CUSTOMER_FIELD_INVALID' && typeof data.field === 'string') {
@@ -444,7 +453,13 @@ export default function Checkout() {
                   <button type="button" onClick={() => window.location.reload()} className="inline-flex min-h-11 items-center underline underline-offset-4">{locale === 'en' ? 'Reload' : locale === 'ar' ? 'إعادة التحميل' : 'Sayfayı yenile'}</button>
                 </p>}
                 {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
-                  <p>{t('cartSizeInvalid')}</p>
+                  <p>{checkoutError?.lineIssue === 'stock'
+                    ? (stockLimit && stockLimit.available > 0
+                      ? (locale === 'en' ? `Only ${stockLimit.available} left in this size; your bag has ${invalidVariantItem.quantity}.` : locale === 'ar' ? `المتوفر من هذا المقاس ${stockLimit.available} فقط؛ في حقيبتك ${invalidVariantItem.quantity}.` : `Bu bedenden stokta ${stockLimit.available} adet var; sepetinizde ${invalidVariantItem.quantity} adet bulunuyor.`)
+                      : (locale === 'en' ? 'This size is out of stock.' : locale === 'ar' ? 'نفد هذا المقاس.' : 'Bu bedenin stoğu tükendi.'))
+                    : checkoutError?.lineIssue === 'product'
+                      ? (locale === 'en' ? 'This item is no longer sold.' : locale === 'ar' ? 'لم يعد هذا المنتج معروضاً للبيع.' : 'Bu ürün artık satışta değil.')
+                      : t('cartSizeInvalid')}</p>
                   <p className="font-medium">{invalidVariantItem.title}{invalidVariantItem.size ? ` · ${t('sizeLabel')} ${invalidVariantItem.size}` : ''}</p>
                   {(() => {
                     const options = activeCartVariants.filter(variant => variant.productId === invalidVariantItem.id
@@ -465,6 +480,13 @@ export default function Checkout() {
                       </select>
                     </label> : <p className="text-xs text-nrs-ink/65">{t('noAvailableSizes')}</p>
                   })()}
+                  {stockLimit && stockLimit.available > 0 && stockLimit.available < invalidVariantItem.quantity && <button type="button" onClick={() => {
+                    updateQuantity(getCartItemId(invalidVariantItem), stockLimit.available)
+                    setInvalidVariantProductId(null)
+                    setQuote(null); setQuoteKey(''); setAcceptedSnapshot(null); setLegalError('')
+                  }} className="me-4 inline-flex min-h-11 items-center underline underline-offset-4">
+                    {locale === 'en' ? `Change quantity to ${stockLimit.available}` : locale === 'ar' ? `غيّري الكمية إلى ${stockLimit.available}` : `Adedi ${stockLimit.available} yap`}
+                  </button>}
                   <button type="button" onClick={() => {
                     removeItem(getCartItemId(invalidVariantItem))
                     setInvalidVariantProductId(null)

@@ -25,6 +25,7 @@ interface ProductDetailProps {
 export default function ProductDetail({ product }: ProductDetailProps) {
   const router = useRouter();
   const addItem = useCart(state => state.addItem);
+  const bagItems = useCart(state => state.items);
   const openDrawer = useCart(state => state.openDrawer);
   const { user } = useAuth();
   const { locale, rate, money, t, fxAvailable } = useLocale();
@@ -107,6 +108,14 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     }
     if (!selectedVariant?.id || (!madeToOrderDress && (selectedVariant.stock < 1 || quantity > selectedVariant.stock))) {
       setOrderError(copy('Seçilen adet için yeterli stok bulunmuyor.', 'There is not enough stock for the selected quantity.', 'الكمية المختارة غير متوفرة في المخزون.')); return;
+    }
+    // Adding the same size again merges into the existing bag line, so the
+    // stock check must include what is already there (saved carts grow across
+    // visits otherwise and checkout later rejects the line).
+    const alreadyInBag = (bagItems ?? []).find(item => item.id === product.id && item.variantId === selectedVariant.id)?.quantity ?? 0
+    if (!madeToOrderDress && alreadyInBag + quantity > selectedVariant.stock) {
+      if (checkout && alreadyInBag > 0) { setOrderError(''); router.push('/checkout'); return; }
+      setOrderError(copy(`Bu bedenden sepetinizde zaten ${alreadyInBag} adet var; stokta ${selectedVariant.stock} adet bulunuyor.`, `Your bag already has ${alreadyInBag} in this size; ${selectedVariant.stock} in stock.`, `في حقيبتك ${alreadyInBag} من هذا المقاس؛ المتوفر ${selectedVariant.stock}.`)); return;
     }
     addItem({
       id: product.id, slug: product.slug, title: product.name,

@@ -20,3 +20,15 @@ export class CheckoutProductUnavailableError extends Error {
     this.name = 'CheckoutProductUnavailableError'
   }
 }
+
+/**
+ * The chosen size is still sold, but the cart asks for more than its stock.
+ * Saved carts grow when the same size is added again on a later visit.
+ */
+export class CheckoutStockLimitError extends Error {
+  readonly code = 'STOCK_LIMIT'
+  constructor(readonly productId: string, readonly variantId: string, readonly available: number) {
+    super('Ürün veya seçilen beden stokta yok.')
+    this.name = 'CheckoutStockLimitError'
+  }
+}

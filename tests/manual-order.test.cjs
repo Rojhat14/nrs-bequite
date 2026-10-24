@@ -305,8 +305,10 @@ test('Canonical order: stale price, altered measurements and forged legal summar
 test('A saved cart line for a product that is no longer sold, or a size without stock, is named instead of failing the whole quote generically',async()=>{
  const h=await orderedOrderHarness();try{
   const repository=h.repository.createPaymentRepository(true);
+  await h.db.exec(`RESET ROLE; UPDATE public.product_variants SET stock_quantity=2 WHERE id='${variantId}'`);
+  await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:3}],customer),error=>error.code==='STOCK_LIMIT'&&error.productId==='product'&&error.variantId===variantId&&error.available===2&&/stokta yok/.test(error.message));
   await h.db.exec(`RESET ROLE; UPDATE public.product_variants SET stock_quantity=0 WHERE id='${variantId}'`);
-  await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:1}],customer),error=>error.code==='PRODUCT_UNAVAILABLE'&&error.productId==='product'&&/stokta yok/.test(error.message));
+  await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:1}],customer),error=>error.code==='STOCK_LIMIT'&&error.available===0);
   await h.db.exec(`RESET ROLE; UPDATE public.product_variants SET stock_quantity=10 WHERE id='${variantId}'; UPDATE public.products SET status='archived' WHERE id='product'`);
   await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:1}],customer),error=>error.code==='PRODUCT_UNAVAILABLE'&&error.productId==='product');
  }finally{await h.close()}
