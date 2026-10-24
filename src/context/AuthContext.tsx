@@ -14,6 +14,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AUTH_INIT_TIMEOUT_MS = 8000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -24,9 +25,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
     let authEventObserved = false;
+    // Supabase's session read waits on a browser lock. In in-app browsers
+    // (Instagram, Facebook) a suspended earlier page can hold that lock, so the
+    // read may never settle. Checkout must not wait on it forever: after the
+    // timeout the visitor continues as a guest, and the server still decides
+    // from the request cookies whether an account session exists.
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
+      fallbackTimer = undefined;
+      if (active) setLoading(false);
+    }, AUTH_INIT_TIMEOUT_MS);
+    const settle = () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fallbackTimer = undefined;
+    };
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       authEventObserved = true;
+      settle();
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -41,13 +56,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         if (active && !authEventObserved) setUser(null);
       } finally {
+        settle();
         if (active) setLoading(false);
       }
     };
 
     void getSession();
 
-    return () => { active = false; subscription.unsubscribe(); };
+    return () => { active = false; settle(); subscription.unsubscribe(); };
   }, []);
 
   // Run queries outside the auth callback so they cannot hold the auth lock.

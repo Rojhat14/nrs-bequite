@@ -23,6 +23,7 @@ import { useLocale } from '@/context/LocaleContext'
 import { formatMinor } from '@/lib/i18n/money'
 import { formatLocalizedMeasurements, measurementHelp, measurementLabel } from '@/lib/i18n/measurements'
 import { cartCatalogSyncScope } from '@/lib/cart-catalog-sync'
+import { randomUuid } from '@/lib/uuid'
 
 export default function Checkout() {
   const { locale, money, t, fxAvailable } = useLocale()
@@ -183,7 +184,7 @@ export default function Checkout() {
         throw new Error(data.error || 'Sipariş özeti doğrulanamadı.')
       }
       setInvalidVariantProductId(null)
-      const paymentKey = !idempotencyKey || quoteKey !== inputKey ? crypto.randomUUID() : idempotencyKey
+      const paymentKey = !idempotencyKey || quoteKey !== inputKey ? randomUuid() : idempotencyKey
       setQuote(data); setQuoteKey(inputKey); setAcceptedSnapshot(ENABLE_CARD_PAYMENT ? inputKey : null); setIdempotencyKey(paymentKey)
       if (ENABLE_CARD_PAYMENT) {
         const payload = withLegalAcceptance({ ...checkoutInput(), quoteHash: data.hash, idempotencyKey: paymentKey }, true)

@@ -335,3 +335,49 @@ test('CartPriceSync retries after an in-flight request is cancelled', async () =
     await waitFor(() => harness.syncCalls.length === 1)
   } finally { restore() }
 })
+
+test('A Supabase session read that never settles (in-app browser lock) does not keep checkout waiting forever', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const supabase = { auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } } },
+    getSession: () => new Promise(() => {}),
+    signOut: async () => ({ error: null }),
+  }, from() { return {} } }
+  const slots = []
+  let cursor = 0
+  const effects = []
+  const fakeReact = {
+    createContext: () => ({ Provider: function Provider() {} }),
+    useContext: () => null,
+    useEffect(effect) { effects.push(effect) },
+    useState(initial) {
+      const index = cursor++
+      if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial
+      return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value }]
+    },
+  }
+  const auth = loader({ react: fakeReact, '@/lib/supabase': { supabase } })('src/context/AuthContext.tsx')
+  auth.AuthProvider({ children: null })
+  const cleanup = effects[0]()
+  assert.equal(slots[2], true)
+  t.mock.timers.tick(auth.AUTH_INIT_TIMEOUT_MS - 1)
+  assert.equal(slots[2], true)
+  t.mock.timers.tick(1)
+  assert.equal(slots[2], false)
+  assert.equal(slots[0], null)
+  cleanup()
+})
+
+test('Checkout payment keys are valid v4 UUIDs even where crypto.randomUUID is unavailable', () => {
+  const { randomUuid } = loader()('src/lib/uuid.ts')
+  const pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+  assert.match(randomUuid(), pattern)
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto')
+  const webcrypto = globalThis.crypto
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { getRandomValues: bytes => webcrypto.getRandomValues(bytes) } })
+  try {
+    const values = new Set(Array.from({ length: 50 }, () => randomUuid()))
+    assert.equal(values.size, 50)
+    for (const value of values) assert.match(value, pattern)
+  } finally { Object.defineProperty(globalThis, 'crypto', original) }
+})
