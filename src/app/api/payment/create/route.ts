@@ -4,7 +4,7 @@ import { UUID } from '@/lib/payment/request'
 import { localeFromCookieHeader } from '@/lib/i18n/messages'
 import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
 import { cookies } from 'next/headers'
-import { GUEST_COOKIE, hashGuestToken } from '@/lib/payment/access'
+import { GUEST_ACCESS_SECONDS, GUEST_COOKIE, hashGuestToken, newGuestToken } from '@/lib/payment/access'
 export async function POST(request: Request) {
   if (process.env.PAYMENT_ENABLED !== 'true') return NextResponse.json(
     { error: 'Online ödeme şu anda kullanılamıyor. Lütfen bizimle iletişime geçin.' }, { status: 503 })
@@ -22,9 +22,26 @@ export async function POST(request: Request) {
     if (!paymentAvailableForUser(user?.id)) return NextResponse.json({ error: 'Kartla ödeme şu anda kullanılamıyor.' }, { status: 403 })
     let guestHash: string | null = null
     if (!user) {
-      const token = (await cookies()).get(GUEST_COOKIE)?.value
-      if (!token) return NextResponse.json({ error: 'Misafir sipariş erişimi hazırlanamadı.' }, { status: 409 })
-      guestHash = hashGuestToken(token)
+      // Older checkout bundles can still carry an expired Supabase session:
+      // the browser then skips /guest-access while this server correctly sees
+      // no authenticated user. Mint the same scoped capability here so that
+      // a stale client session cannot block a guest order.
+      const cookieJar = await cookies()
+      const existingToken = cookieJar.get(GUEST_COOKIE)?.value
+      try {
+        if (existingToken) guestHash = hashGuestToken(existingToken)
+      } catch { /* replace an invalid or stale capability below */ }
+      if (!guestHash) {
+        const token = newGuestToken()
+        cookieJar.set(GUEST_COOKIE, token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: GUEST_ACCESS_SECONDS,
+        })
+        guestHash = hashGuestToken(token)
+      }
     }
     const { GarantiProvider } = await import('@/lib/payment/garanti/adapter')
     const rawIp = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
