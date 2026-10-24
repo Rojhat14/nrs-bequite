@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react';
-import { m as motion } from 'framer-motion';
 import type { Product } from '@/data/products';
 import { parsePrice, useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
@@ -158,11 +157,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       <main className="w-full flex-1 pb-32">
         <div className="max-w-7xl mx-auto px-6 pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-16">
           <div className="lg:col-span-7 min-w-0 space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className={`product-gallery relative grid gap-3 ${galleryImages.length > 1 ? 'grid-cols-[3rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
+            <div
+              className={`nrs-fade-up product-gallery relative grid gap-3 ${galleryImages.length > 1 ? 'grid-cols-[3rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
               role="region"
               aria-label={copy('Ürün görsel galerisi', 'Product image gallery', 'معرض صور المنتج')}
               tabIndex={galleryImages.length > 1 ? 0 : undefined}
@@ -243,15 +239,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   </button>
                 ))}
               </div>}
-            </motion.div>
+            </div>
           </div>
 
           <div className="lg:col-span-5 flex flex-col justify-start pt-12">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="space-y-10"
+            <div
+              style={{ animationDelay: '0.2s' }}
+              className="nrs-fade-side space-y-10"
             >
               <div className="space-y-4">
                 <span className="text-xs uppercase tracking-[0.3em] text-nrs-rosegold font-sans">
@@ -366,7 +360,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </main>

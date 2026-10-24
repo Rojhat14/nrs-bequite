@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/requireAdmin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { PRODUCT_IMAGE_BUCKET, productImageObjectKey } from '@/lib/storage/products'
+import { PRODUCT_IMAGE_BUCKET, productImageObjectKey, versionedProductImageUrl } from '@/lib/storage/products'
 
 export const runtime = 'nodejs'
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ message: 'Ana görsel güncellenemedi.' }, { status: 400 })
   }
 
-  const publicUrl = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(storageKey).data.publicUrl
+  const publicUrl = versionedProductImageUrl(supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(storageKey).data.publicUrl)
   const imagePayload = {
     product_id: productId,
     provider: 'supabase',

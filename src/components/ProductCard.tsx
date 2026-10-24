@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { canOptimizeImage } from '@/lib/imageOptimization';
-import { m as motion } from 'framer-motion';
 import { ShoppingBag, Heart } from 'lucide-react';
 import { useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
@@ -85,12 +84,7 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
   return (
     <div className="group cursor-pointer block">
       <div className="relative aspect-[3/4] overflow-hidden bg-nrs-black/5 mb-8">
-        {product.image ? <motion.div
-          className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
+        {product.image ? <div className="nrs-fade-in absolute inset-0" style={{ animationDuration: '0.5s' }}>
           <Image
             src={product.image}
             alt={product.name}
@@ -100,7 +94,7 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
             unoptimized={!canOptimizeImage(product.image)}
             className="object-cover transition-transform duration-1000 group-hover:scale-105"
           />
-        </motion.div> : <div className="h-full w-full bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
+        </div> : <div className="h-full w-full bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-nrs-black/0 group-hover:bg-nrs-black/5 transition-all duration-700" />

@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { m as motion } from 'framer-motion';
 import ProductShowcase from '@/components/ProductShowcase';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -21,12 +20,7 @@ const Hero = ({ products }: HeroProps) => {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-nrs-champagne/30 blur-[150px] rounded-full pointer-events-none" />
 
       {/* Editorial Background Image - Soft, high-end fashion feel */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.4 }}
-        transition={{ duration: 0.8 }}
-        className="absolute inset-0 z-0"
-      >
+      <div className="nrs-fade-in absolute inset-0 z-0 opacity-40">
         <Image
           src="/images/editorial/categories/dresses.jpg"
           alt={copy('NRS elbise koleksiyonundan görünüm', 'A look from the NRS dresses collection', 'إطلالة من مجموعة فساتين NRS')}
@@ -34,7 +28,7 @@ const Hero = ({ products }: HeroProps) => {
           className="object-cover opacity-40 mix-blend-multiply"
           priority
         />
-      </motion.div>
+      </div>
 
       {/* Background Product Showcase */}
       <ProductShowcase products={products} />

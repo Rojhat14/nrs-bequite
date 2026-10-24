@@ -88,3 +88,19 @@ a, button {
 ::-webkit-scrollbar-thumb {
   background: #D2B48C;
 }
+
+/* Entrance motion that starts with the first paint instead of waiting for
+   JavaScript, so hero and gallery images count as painted immediately. */
+@keyframes nrs-fade-in { from { opacity: 0; } }
+@keyframes nrs-fade-up { from { opacity: 0; transform: translateY(20px); } }
+@keyframes nrs-fade-side { from { opacity: 0; transform: translateX(20px); } }
+@keyframes nrs-settle { from { transform: scale(1.1); } }
+@keyframes nrs-marquee { to { transform: translateX(calc(-1 * var(--nrs-marquee-travel, 2000px))); } }
+.nrs-fade-in { animation: nrs-fade-in 0.8s ease-in-out both; }
+.nrs-fade-up { animation: nrs-fade-up 0.8s ease-out both; }
+.nrs-fade-side { animation: nrs-fade-side 0.8s ease-out both; }
+.nrs-settle { animation: nrs-settle 1.5s ease-out both; }
+.nrs-marquee { animation: nrs-marquee 40s linear infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .nrs-fade-in, .nrs-fade-up, .nrs-fade-side, .nrs-settle, .nrs-marquee { animation: none; }
+}

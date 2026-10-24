@@ -24,6 +24,13 @@ const nextConfig = {
       { source: '/category/blazers', destination: '/category/ceketler-blazerlar', permanent: true },
       { source: '/category/bottoms', destination: '/category/alt-giyim', permanent: true },
       { source: '/category/suits', destination: '/category/takimlar', permanent: true },
+      // Common storefront paths customers type or keep in history; none of
+      // them exist as pages here.
+      ...['', '/en', '/ar'].flatMap(prefix => [
+        { source: `${prefix}/wishlist`, destination: `${prefix}/profile`, permanent: false },
+        { source: `${prefix}/shop`, destination: `${prefix}/collections`, permanent: false },
+        { source: `${prefix}/products`, destination: `${prefix}/collections`, permanent: false },
+      ]),
     ];
   },
   async headers() {
@@ -34,6 +41,10 @@ const nextConfig = {
     ] }];
   },
   images: {
+    // Product images are re-uploaded under the same storage path, so their
+    // public URLs carry a ?v= version (see productImagePublicUrl); that lets
+    // optimized copies stay cached instead of expiring after Supabase's hour.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: 'https',

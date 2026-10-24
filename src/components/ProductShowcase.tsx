@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { m as motion } from 'framer-motion';
+import React, { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { HomepageShowcaseProduct } from '@/lib/products';
 import Image from 'next/image';
 import { canOptimizeImage } from '@/lib/imageOptimization';
@@ -30,30 +29,19 @@ const ProductShowcase = ({ products }: ProductShowcaseProps) => {
   );
 
   return (
-    <motion.div
+    <div
       ref={containerRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8, ease: "easeInOut" }}
-      className="absolute inset-0 z-0 overflow-hidden pointer-events-none"
+      className="nrs-fade-in absolute inset-0 z-0 overflow-hidden pointer-events-none"
     >
       {/* Gradient Mask for Elegant Fade at Edges */}
       <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-r from-nrs-canvas via-transparent to-nrs-canvas opacity-70" />
 
       <div className="relative h-full w-full flex items-center">
-        <motion.div
-          className="flex gap-8 px-4"
-          animate={{
-            x: [0, -SHOWCASE_TRAVEL],
-          }}
-          transition={{
-            x: {
-              repeat: Infinity,
-              repeatType: "loop",
-              duration: 40,
-              ease: "linear"
-            }
-          }}
+        {/* CSS marquee runs on the compositor, so it stays smooth while the
+            page hydrates and does not wait for JavaScript to start. */}
+        <div
+          className="nrs-marquee flex gap-8 px-4"
+          style={{ '--nrs-marquee-travel': `${SHOWCASE_TRAVEL}px` } as CSSProperties}
         >
           {duplicatedProducts.map((product, index) => (
             <div
@@ -67,15 +55,17 @@ const ProductShowcase = ({ products }: ProductShowcaseProps) => {
                 width={250}
                 height={400}
                 sizes="250px"
-                loading="lazy"
+                // The first tiles are the largest paint on the homepage.
+                priority={index < 3}
+                loading={index < 3 ? undefined : 'lazy'}
                 unoptimized={!canOptimizeImage(product.image)}
                 className="h-full w-full object-contain transition-all duration-500"
               />}
             </div>
           ))}
-        </motion.div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
