@@ -33,7 +33,12 @@ export default function Checkout() {
   const router = useRouter()
   const [hydrated, setHydrated] = useState(false)
   const [acceptedSnapshot, setAcceptedSnapshot] = useState<string | null>(null)
-  const [legalError, setLegalError] = useState('')
+  const [checkoutError, setCheckoutError] = useState<{ message: string; errorCode?: string; trackingNumber?: string; payment?: boolean } | null>(null)
+  const legalError = checkoutError && !checkoutError.payment ? checkoutError.message : ''
+  const paymentFailure = checkoutError?.payment ? checkoutError : null
+  const setLegalError = (message: string) => setCheckoutError(message ? { message } : null)
+  const setPaymentFailure = (failure: { message: string; errorCode?: string; trackingNumber?: string } | null) =>
+    setCheckoutError(failure ? { ...failure, payment: true } : null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [quote, setQuote] = useState<Quote | null>(null)
   const [quoteKey, setQuoteKey] = useState('')
@@ -155,6 +160,7 @@ export default function Checkout() {
     }
     setSavedOrder(null)
     setBusy(true)
+    setPaymentFailure(null)
     setLegalError('')
     try {
       const response = await fetch(ENABLE_CARD_PAYMENT ? '/api/payment/quote' : '/api/orders/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkoutInput()) })
@@ -189,12 +195,22 @@ export default function Checkout() {
         const payment = await paymentResponse.json()
         if (!paymentResponse.ok) {
           if (typeof payment.resumeUrl === 'string' && /^\/checkout\/verify\?orderId=[0-9a-f-]{36}$/i.test(payment.resumeUrl)) setPendingOrderUrl(payment.resumeUrl)
-          throw new Error(payment.error || 'Payment could not be started.')
+          const errorCode = typeof payment.errorCode === 'string' && /^NRS-PAY-[A-Z]+$/.test(payment.errorCode) ? payment.errorCode : undefined
+          const trackingNumber = typeof payment.trackingNumber === 'string' && /^[A-F0-9]{16}$/.test(payment.trackingNumber) ? payment.trackingNumber : undefined
+          setPaymentFailure({
+            message: 'Sonuç belirsizse yeniden ödeme başlatmayın; destek ekibimizle iletişime geçin.',
+            ...(errorCode && trackingNumber ? { errorCode, trackingNumber } : {}),
+          })
+          return
         }
         if (typeof payment.redirectUrl !== 'string' || !payment.redirectUrl.startsWith('https://')) throw new Error('Payment redirect could not be verified.')
         window.location.assign(payment.redirectUrl)
       } else setStep(3)
-    } catch { setLegalError(ENABLE_CARD_PAYMENT ? t('checkoutPaymentError') : t('checkoutQuoteError')) }
+    } catch {
+      setPaymentFailure({ message: ENABLE_CARD_PAYMENT
+        ? 'Ödeme başlatılamadı. Sonuç belirsizse yeniden ödeme başlatmayın; destek ekibimizle iletişime geçin.'
+        : t('checkoutQuoteError') })
+    }
     finally { setBusy(false) }
   }
   async function saveManualOrder() {
@@ -393,6 +409,14 @@ export default function Checkout() {
                 {ENABLE_CARD_PAYMENT && <CheckoutLegalConsent accepted={acceptedSnapshot === inputKey} onChange={value => {
                   setAcceptedSnapshot(value ? inputKey : null); setLegalError('')
                 }} error={legalError} />}
+                {ENABLE_CARD_PAYMENT && (paymentFailure || legalError) && <div role="alert" aria-live="assertive" className="mt-6 space-y-2 rounded-sm border border-rose-800/30 bg-rose-50 px-4 py-4 text-sm leading-6 text-rose-950">
+                  <p className="font-medium">{paymentFailure ? 'Ödeme başlatılamadı.' : legalError}</p>
+                  {paymentFailure && <p>{paymentFailure.message}</p>}
+                  {paymentFailure?.errorCode && paymentFailure.trackingNumber
+                    ? <dl className="grid grid-cols-[auto_1fr] gap-x-2"><dt>Hata kodu:</dt><dd className="font-mono">{paymentFailure.errorCode}</dd><dt>Takip numarası:</dt><dd className="font-mono">{paymentFailure.trackingNumber}</dd></dl>
+                    : null}
+                  {paymentFailure?.errorCode && paymentFailure.trackingNumber && <p>Lütfen bu bilgileri destek ekibimizle paylaşın.</p>}
+                </div>}
                 <button
                   onClick={() => void reviewPayment()} disabled={busy || authLoading || (user !== null && profileLoading) || !cartReady}
                   className="mt-12 w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black/90 transition-all"
@@ -423,7 +447,6 @@ export default function Checkout() {
                     </label> : <p className="text-xs text-nrs-ink/65">{t('noAvailableSizes')}</p>
                   })()}
                 </div>}
-                {legalError && <p role="alert" className="text-sm text-rose-700">{legalError}</p>}
               </motion.div>
             )}
 

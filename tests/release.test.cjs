@@ -100,7 +100,12 @@ for (const route of ['create', 'callback']) {
       method: 'POST', body: JSON.stringify({ orderId: 'forged', status: 'paid', totalAmount: 0 }),
     }));
     assert.equal(response.status, 503);
-    assert.match((await response.json()).error, /kullanılamıyor/);
+    const body = await response.json();
+    if (route === 'create') {
+      assert.equal(body.errorCode, 'NRS-PAY-UNKNOWN');
+      assert.match(body.trackingNumber, /^[A-F0-9]{16}$/);
+      assert.match(body.error, /Ödeme başlatılamadı/);
+    } else assert.match(body.error, /kullanılamıyor/);
   });
 }
 

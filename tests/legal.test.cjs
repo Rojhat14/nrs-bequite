@@ -368,6 +368,37 @@ test('Real checkout sends only IDs/quantities and versioned consent after confir
   } finally { global.fetch = oldFetch; }
 });
 
+test('Payment start failure shows one Turkish checkout alert with the server reference and preserves customer input', async () => {
+  const harness = checkoutHarness(true, true), oldFetch = global.fetch;
+  global.fetch = async url => url === '/api/payment/quote'
+    ? { ok: true, json: async () => ({ summary, hash: 'a'.repeat(64) }) }
+    : { ok: false, status: 409, json: async () => ({ error: 'private internal detail', errorCode: 'NRS-PAY-RPC', trackingNumber: 'A7F2C9D8B1E4F603' }) };
+  try {
+    let tree = harness.render();
+    findElement(tree, node => node.type?.name === 'CheckoutLegalConsent').props.onChange(true);
+    tree = harness.render();
+    findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç').props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    tree = harness.render();
+    const alerts = [];
+    const visit = node => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (node.props?.role === 'alert') alerts.push(node);
+      visit(node.props?.children);
+    };
+    visit(tree);
+    assert.equal(alerts.length, 1);
+    const html = renderToStaticMarkup(tree);
+    assert.match(html, /Ödeme başlatılamadı/);
+    assert.match(html, /NRS-PAY-RPC/);
+    assert.match(html, /A7F2C9D8B1E4F603/);
+    assert.doesNotMatch(html, /Payment could not be started|private internal detail/);
+    assert.match(html, /value="Test"/);
+    assert.match(html, /value="test@example\.com"/);
+  } finally { global.fetch = oldFetch; }
+});
+
 test('Pending-order recovery link is visible after a quote when payment creation returns an owned order', async () => {
   const harness = checkoutHarness(true, true), oldFetch = global.fetch;
   const resumeUrl = '/checkout/verify?orderId=11111111-1111-4111-8111-111111111111';

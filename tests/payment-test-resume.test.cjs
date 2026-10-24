@@ -53,16 +53,25 @@ test('Safe errors retain RPC SQLSTATE without exposing arbitrary error fields',a
  assert.equal(new PaymentStartError('START_FAILED','create_rpc','internal','secret/credential').databaseCode,undefined);
  await assert.rejects(startStage('create_rpc',async()=>{throw e}),x=>x===e);
 });
-test('Checkout reports/logs only allowlisted stage and code, and links an owned unresolved test order',async()=>{
+test('Checkout returns a matching opaque reference and logs safe RPC diagnostics for P0001',async()=>{
  const load=loader({'@/lib/payment/provider':{paymentAvailable:()=>true,paymentAvailableForUser:()=>true,getPaymentProvider:()=>({})},
  '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user:{id:'owner'}}})}})},
  '@/lib/payment/repository':{createPaymentRepository:()=>({})},
  '@/lib/payment/service':{initiatePayment:async()=>{throw new (load('src/lib/payment/start-error.ts').PaymentStartError)('UNRESOLVED_PAYMENT','create_rpc','NEVER_EXPOSE_RAW_CREDENTIAL', 'P0001',id)}}});
  const warn=console.warn,logs=[];console.warn=x=>logs.push(x);process.env.PAYMENT_ENABLED='true';
- try{const r=await load('src/app/api/payment/create/route.ts').POST(new Request(origin+'/api/payment/create',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'}));
- const data=await r.json();assert.equal(r.status,409);assert.equal(data.code,'UNRESOLVED_PAYMENT');assert.equal(data.stage,'create_rpc');assert.equal(data.databaseCode,'P0001');
+ try{const route=load('src/app/api/payment/create/route.ts');
+ const r=await route.POST(new Request(origin+'/api/payment/create',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'}));
+ const data=await r.json();assert.equal(r.status,409);assert.equal(data.errorCode,'NRS-PAY-RPC');
+ assert.match(data.trackingNumber,/^[A-F0-9]{16}$/);assert.match(data.error,/Ödeme başlatılamadı/);
  assert.equal(data.resumeUrl,`/checkout/verify?orderId=${id}`);
  assert.equal(JSON.stringify({data,logs}).includes('NEVER_EXPOSE_RAW_CREDENTIAL'),false);assert.equal(logs.length,1);
+ const log=JSON.parse(logs[0]);assert.equal(log.event,'payment_start_failed');assert.equal(log.status,409);
+ assert.equal(log.stage,'create_rpc');assert.equal(log.sqlState,'P0001');assert.equal(log.errorCode,data.errorCode);
+ assert.equal(log.trackingNumber,data.trackingNumber);
+ assert.equal(JSON.stringify(data).includes('P0001'),false);assert.equal(JSON.stringify(data).includes('create_rpc'),false);
+ const again=await route.POST(new Request(origin+'/api/payment/create',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'}));
+ const againBody=await again.json();assert.notEqual(againBody.trackingNumber,data.trackingNumber);
+ assert.equal(JSON.parse(logs[1]).trackingNumber,againBody.trackingNumber);
  }finally{console.warn=warn}
 });
 

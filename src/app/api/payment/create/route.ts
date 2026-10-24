@@ -5,13 +5,44 @@ import { localeFromCookieHeader } from '@/lib/i18n/messages'
 import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
 import { cookies } from 'next/headers'
 import { GUEST_ACCESS_SECONDS, GUEST_COOKIE, hashGuestToken, newGuestToken } from '@/lib/payment/access'
+import { randomBytes } from 'node:crypto'
+
+type PublicPaymentErrorCode = 'NRS-PAY-SESSION' | 'NRS-PAY-CART' | 'NRS-PAY-PRICE' | 'NRS-PAY-STOCK' | 'NRS-PAY-RPC' | 'NRS-PAY-BANK' | 'NRS-PAY-UNKNOWN'
+
+function categoryFor(stage: string, databaseCode?: string): PublicPaymentErrorCode {
+  // PostgreSQL P0001 is intentionally not inferred from its message: only the
+  // RPC boundary is known, so report the safe RPC category.
+  if (stage === 'create_rpc' || databaseCode === 'P0001') return 'NRS-PAY-RPC'
+  if (stage === 'handoff' || stage === 'store_redirect') return 'NRS-PAY-BANK'
+  if (stage === 'request' && databaseCode) return 'NRS-PAY-SESSION'
+  return 'NRS-PAY-UNKNOWN'
+}
+
+function failedResponse(status: number, stage: string, options: {
+  databaseCode?: string
+  internalCode?: string
+  resumeUrl?: string
+} = {}) {
+  const trackingNumber = randomBytes(8).toString('hex').toUpperCase()
+  const errorCode = categoryFor(stage, options.databaseCode)
+  console.warn(JSON.stringify({
+    event: 'payment_start_failed', endpoint: '/api/payment/create', status,
+    stage, sqlState: options.databaseCode, errorCode, trackingNumber,
+  }))
+  const error = options.internalCode === 'UNRESOLVED_PAYMENT'
+    ? 'Ödeme başlatılamadı. Bekleyen bir siparişiniz olabilir; durum netleşene kadar yeniden ödeme başlatmayın.'
+    : 'Ödeme başlatılamadı. Lütfen hata kodu ve takip numarasını destek ekibimizle paylaşın. Sonuç belirsizse yeniden ödeme başlatmayın.'
+  return NextResponse.json({ error, errorCode, trackingNumber,
+    ...(options.resumeUrl ? { resumeUrl: options.resumeUrl } : {}) },
+  { status, headers: { 'Cache-Control': 'no-store' } })
+}
+
 export async function POST(request: Request) {
-  if (process.env.PAYMENT_ENABLED !== 'true') return NextResponse.json(
-    { error: 'Online ödeme şu anda kullanılamıyor. Lütfen bizimle iletişime geçin.' }, { status: 503 })
+  if (process.env.PAYMENT_ENABLED !== 'true') return failedResponse(503, 'request')
   const { paymentAvailable, paymentAvailableForUser, getPaymentProvider } = await import('@/lib/payment/provider')
-  const { boundedJson, sameOrigin, unavailable } = await import('@/lib/payment/http')
-  if (!paymentAvailable()) return unavailable()
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 403 })
+  const { boundedJson, sameOrigin } = await import('@/lib/payment/http')
+  if (!paymentAvailable()) return failedResponse(503, 'request')
+  if (!sameOrigin(request)) return failedResponse(403, 'request')
   try {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     const { createPaymentRepository } = await import('@/lib/payment/repository')
@@ -19,7 +50,7 @@ export async function POST(request: Request) {
     const auth = await createSupabaseServerClient()
     const { data: { user } } = await auth.auth.getUser()
     const provider = getPaymentProvider()
-    if (!paymentAvailableForUser(user?.id)) return NextResponse.json({ error: 'Kartla ödeme şu anda kullanılamıyor.' }, { status: 403 })
+    if (!paymentAvailableForUser(user?.id)) return failedResponse(403, 'request')
     let guestHash: string | null = null
     if (!user) {
       // Older checkout bundles can still carry an expired Supabase session:
@@ -55,17 +86,12 @@ export async function POST(request: Request) {
       guestHash, createPaymentRepository(), provider, { customerIp, locale, rate })
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    // No raw provider errors, secrets, customer data or tokens in logs/response.
+    // Never log raw errors, secrets, customer data, order IDs or capabilities.
     const diagnostic = error instanceof PaymentStartError ? error : null
-    const code = diagnostic?.code ?? 'START_FAILED'
     const stage = diagnostic?.stage ?? 'request'
-    console.warn(JSON.stringify({ event: 'payment_start_rejected', endpoint: '/api/payment/create', http: 409, code, stage, ...(diagnostic?.databaseCode ? { databaseCode: diagnostic.databaseCode } : {}) }))
     const resumeUrl = diagnostic?.resumeOrderId && UUID.test(diagnostic.resumeOrderId)
       ? `/checkout/verify?orderId=${diagnostic.resumeOrderId}` : undefined
-    const message = code === 'UNRESOLVED_PAYMENT' ? 'Bekleyen bir siparişiniz var. Yeni sipariş oluşturulmadı; önce mevcut siparişinize devam edin.'
-      : code === 'TEST_HANDOFF_SUBMITTED' ? 'Bu test siparişi bankaya gönderilmiş. Sonuç doğrulanmadan tekrar ödeme başlatılmadı.'
-      : code === 'CONTROLLED_ITEM_REQUIRED' ? 'Bu ürün, tek kullanımlık canlı ödeme izni kapsamında değil. Ödeme başlatılmadı.'
-      : 'Ödeme başlatılamadı. Özeti kontrol edin; işleminiz bankaya iletildiyse yeniden ödeme yapmadan bizimle iletişime geçin.'
-    return NextResponse.json({ error: message, code, stage, ...(diagnostic?.databaseCode ? { databaseCode: diagnostic.databaseCode } : {}), ...(resumeUrl ? { resumeUrl } : {}) }, { status: 409, headers: { 'Cache-Control': 'no-store' } })
+    return failedResponse(409, stage, { databaseCode: diagnostic?.databaseCode,
+      internalCode: diagnostic?.code, resumeUrl })
   }
 }
