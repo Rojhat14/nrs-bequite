@@ -1,5 +1,4 @@
 import type { Measurements } from '@/lib/order-measurements'
-import { calculateOpeningTotals, discountForUnitMinor, isOpeningCampaignActive, OPENING_CAMPAIGN } from '@/lib/opening-campaign'
 import { SHIPPING_MINOR } from '@/lib/delivery-policy'
 import { allocateDisplayMinor, displayCurrency, type DisplayRate } from '@/lib/i18n/money'
 import type { Locale } from '@/lib/i18n/messages'
@@ -63,33 +62,14 @@ export function buildWhatsappOrderMessage(items: WhatsappOrderItem[], _displayed
       `${copy('Ara toplam', 'Line total', 'المجموع الفرعي')}: ${displayMoney(lineMinorDisplay)}`, '')
   })
   {
-    const campaignActive = isOpeningCampaignActive()
-    const rows = items.map(item => ({
-      unitPriceMinor: campaignActive
-        ? Math.round(item.unitPrice * 100)
-        : Math.max(Math.round(item.unitPrice * 100), Math.round((item.compareAtPrice ?? item.unitPrice) * 100)),
-      quantity: item.quantity,
-    }))
-    const totals = calculateOpeningTotals(rows, SHIPPING_MINOR, campaignActive)
-    const legacyDiscountMinor = campaignActive ? 0 : items.reduce((sum, item) => {
-      const price = Math.round(item.unitPrice * 100)
-      return sum + (Math.max(price, Math.round((item.compareAtPrice ?? item.unitPrice) * 100)) - price) * item.quantity
-    }, 0)
-    const discountMinor = totals.discountMinor + legacyDiscountMinor
-    const totalMinor = totals.totalMinor - legacyDiscountMinor
     const itemNormalLines = items.map(item => Math.round(item.unitPrice * 100) * item.quantity)
-    const itemSaleLines = rows.map(row => (campaignActive
-      ? row.unitPriceMinor - discountForUnitMinor(row.unitPriceMinor)
-      : row.unitPriceMinor) * row.quantity)
     const displayedSubtotalLines = allocateDisplayMinor(itemNormalLines, display.locale, display.rate)
-    const displayedSaleLines = allocateDisplayMinor(itemSaleLines, display.locale, display.rate)
+    const displayedSaleLines = displayedSubtotalLines
     const displayedSubtotal = displayedSubtotalLines.reduce((sum, value) => sum + value, 0)
     const displayedSale = displayedSaleLines.reduce((sum, value) => sum + value, 0)
-    const displayedDiscount = displayedSubtotal - displayedSale
+    const totalMinor = itemNormalLines.reduce((sum, value) => sum + value, 0) + SHIPPING_MINOR
     const displayedShipping = allocateDisplayMinor([SHIPPING_MINOR], display.locale, display.rate)[0]
     lines.push(`${copy('Ürünler toplamı', 'Products subtotal', 'إجمالي المنتجات')}: ${displayMoney(displayedSubtotal)}`)
-    if (campaignActive) lines.push(`${display.locale === 'tr' ? OPENING_CAMPAIGN.name : copy('Açılışa özel %20 indirim', 'Opening offer: 20% discount', 'خصم الافتتاح 20٪')}: −${displayMoney(displayedDiscount)}`)
-    else if (legacyDiscountMinor) lines.push(`${copy('Ürün indirimi', 'Product discount', 'خصم المنتجات')}: −${displayMoney(displayedDiscount)}`)
     if (SHIPPING_MINOR > 0) lines.push(`${copy('Kargo', 'Shipping', 'الشحن')}: ${displayMoney(displayedShipping)}`)
     lines.push(`${copy('Ödenecek toplam', 'Total due', 'الإجمالي المستحق')}: ${displayMoney(displayedSale + displayedShipping)}`, '')
     if (currency === 'USD') lines.push(`${copy('Garanti BBVA üzerinden tahsil edilecek tutar', 'Amount charged by Garanti BBVA', 'المبلغ الذي سيتم تحصيله عبر Garanti BBVA')}: \u2066${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'TRY', currencyDisplay: 'code' }).format(totalMinor / 100)}\u2069`,

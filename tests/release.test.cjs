@@ -23,7 +23,7 @@ test('Turkish and international prices preserve decimal amounts', () => {
   }
 });
 
-test('Different sizes remain separate and the opening discount uses normal prices in minor units', () => {
+test('Different sizes remain separate and cart totals use current sale prices only', () => {
   useCart.getState().clearCart();
   const small = { id: 'test-product', title: 'Test', price: '₺99,90', compareAtPrice: 120, size: 'S', variantId: 'small' };
   const large = { ...small, size: 'L', variantId: 'large' };
@@ -31,12 +31,12 @@ test('Different sizes remain separate and the opening discount uses normal price
   useCart.getState().addItem(large);
   assert.equal(useCart.getState().items.length, 2);
   assert.equal(useCart.getState().subtotalAmount, 299.7);
-  assert.equal(useCart.getState().discountAmount, 59.94);
-  assert.equal(useCart.getState().totalAmount, 239.76);
+  assert.equal(useCart.getState().discountAmount, 0);
+  assert.equal(useCart.getState().totalAmount, 299.7);
   useCart.getState().updateQuantity(getCartItemId(small), 0);
   assert.equal(useCart.getState().items.length, 1);
   assert.equal(useCart.getState().items[0].variantId, 'large');
-  assert.equal(useCart.getState().totalAmount, 79.92);
+  assert.equal(useCart.getState().totalAmount, 99.9);
   useCart.getState().clearCart();
 });
 
@@ -49,29 +49,29 @@ test('Saved cart items refresh to current catalog prices and recompute totals', 
   let state = useCart.getState();
   assert.equal(state.items[0].price, '₺74.9');
   assert.equal(state.items[0].compareAtPrice, null);
-  assert.equal(state.totalAmount, 119.84);
-  assert.equal(state.discountAmount, 29.96);
+  assert.equal(state.totalAmount, 149.8);
+  assert.equal(state.discountAmount, 0);
   assert.equal(state.catalogPricesSynced, true);
   assert.equal(state.priceUpdateNotice, true);
 
   useCart.getState().addItem({ id: 'refresh-me', title: 'Ürün', price: '₺69', compareAtPrice: null });
   state = useCart.getState();
   assert.equal(state.items[0].price, '₺69');
-  assert.equal(state.totalAmount, 165.6);
+  assert.equal(state.totalAmount, 207);
   useCart.getState().clearCart();
 });
 
-test('Product structured data matches the campaign display and uses the selected currency, not compare-at price', () => {
+test('Product structured data uses current sale price and ignores compare-at price', () => {
   const { buildProductStructuredData } = loadSource('src/lib/product-structured-data.ts');
   const schema = buildProductStructuredData({ id: 'dress-id', slug: 'dress-slug', name: 'Dress', description: 'Description',
     priceAmount: 24900, currency: 'TRY', compareAtPrice: 30000, inStock: true, galleryImages: [{ url: 'https://example.test/dress.webp' }] });
   assert.equal(schema['@type'], 'Product');
-  assert.equal(schema.offers.price, '19920.00');
+  assert.equal(schema.offers.price, '24900.00');
   assert.equal(schema.offers.priceCurrency, 'TRY');
   assert.equal(schema.offers.availability, 'https://schema.org/InStock');
   const usd = buildProductStructuredData({ id: 'dress-id', slug: 'dress-slug', name: 'Dress', description: 'Description',
     priceAmount: 24900, currency: 'TRY', compareAtPrice: 30000, inStock: true }, 'en', { usdTry: 50, fetchedAt: '2026-10-16T00:00:00.000Z' });
-  assert.equal(usd.offers.price, '398.40');
+  assert.equal(usd.offers.price, '498.00');
   assert.equal(usd.offers.priceCurrency, 'USD');
   assert.match(usd.offers.url, /\/en\/product\/dress-slug$/);
 });
@@ -89,7 +89,7 @@ test('Malformed saved carts cannot replace store actions or poison totals', () =
   assert.equal(restored.items.length, 1);
   assert.equal(restored.items[0].quantity, 2);
   assert.equal(restored.items[0].size, undefined);
-  assert.equal(restored.totalAmount, 16);
+  assert.equal(restored.totalAmount, 20);
   assert.deepEqual(restored.wishlist, ['valid']);
 });
 

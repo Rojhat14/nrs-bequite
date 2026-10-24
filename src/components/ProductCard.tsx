@@ -12,7 +12,6 @@ import { lookupWishlist } from '@/lib/wishlistClient';
 import { Product } from '@/data/products';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { discountForUnitMinor, isOpeningCampaignActive } from '@/lib/opening-campaign';
 import { useLocale } from '@/context/LocaleContext';
 
 interface ProductCardProps {
@@ -152,9 +151,6 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
           <p className="text-sm font-sans text-nrs-ink/60 font-light">
           {product.priceAmount == null ? product.price : money(product.priceAmount)}
         </p>
-        {isOpeningCampaignActive() && product.priceAmount != null && <p className="text-[11px] font-medium text-nrs-ink/70">
-          {t('campaignShort')} · {money((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}
-        </p>}
         {locale !== 'tr' && !fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('fxUnavailable')}</p>}
         {locale !== 'tr' && fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('currencyNote')}</p>}
       </div>

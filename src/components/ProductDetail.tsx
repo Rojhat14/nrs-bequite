@@ -15,7 +15,6 @@ import BankTransferInfo from '@/components/BankTransferInfo';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { useRouter } from 'next/navigation';
 import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
-import { discountForUnitMinor, isOpeningCampaignActive } from '@/lib/opening-campaign';
 import { useLocale } from '@/context/LocaleContext';
 import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOptions } from '@/lib/dress-sizes'
 
@@ -254,12 +253,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 </h1>
                 <div className="flex items-baseline gap-3">
                   <p className="text-2xl font-serif text-nrs-ink/80">{product.priceAmount == null ? product.price : money(product.priceAmount)}</p>
-                  {!isOpeningCampaignActive() && product.compareAtPrice && product.compareAtPrice > (product.priceAmount ?? 0) && <del className="text-sm text-nrs-ink/60">{money(product.compareAtPrice)}</del>}
                 </div>
-                {isOpeningCampaignActive() && product.priceAmount != null && <div className="space-y-1 text-sm">
-                  <p className="font-medium">{locale === 'en' ? 'Opening offer at checkout' : locale === 'ar' ? 'سعر عرض الافتتاح عند إتمام الطلب' : 'Açılışa özel sepette'}: {money((Math.round(product.priceAmount * 100) - discountForUnitMinor(Math.round(product.priceAmount * 100))) / 100)}</p>
-                  <p className="text-xs text-nrs-ink/60">{locale === 'en' ? 'The discount is applied automatically in your bag.' : locale === 'ar' ? 'يُطبّق الخصم تلقائياً في حقيبة التسوق.' : 'Sepette indirim otomatik uygulanır.'}</p>
-                </div>}
                 {locale !== 'tr' && <p className="max-w-md text-xs text-nrs-ink/55">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
               </div>
 

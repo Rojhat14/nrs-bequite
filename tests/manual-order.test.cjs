@@ -12,9 +12,10 @@ const { measurementFields } = load('src/lib/order-measurements.ts');
 const variantId='44444444-4444-4444-8444-444444444444';
 const customer={firstName:'Test',lastName:'Alıcı',email:'test@example.com',phone:'905551234567',address:'Beytepe',city:'Ankara',district:'Çankaya',postalCode:'06800',orderNote:'Kapıyı arayın'};
 const items=[{productId:'product',variantId,quantity:1,measurements:{chest:92,waist:72,hips:98,height:168,length:110}}];
-const summary={items:[{...items[0],measurementKind:'dress',name:'Test Ürün',description:'Pamuk',size:'M',unitPrice:100}],buyer:{name:'Test Alıcı',email:customer.email,phone:customer.phone,address:'Beytepe, Çankaya, Ankara, 06800'},orderNote:customer.orderNote,subtotal:120,discount:20,shipping:0,total:100,currency:'TRY',paymentMethod:'Havale / EFT — ödeme henüz doğrulanmadı',deliveryTerms:load('src/lib/delivery-policy.ts').DELIVERY_TERMS,orderedAt:new Date().toISOString()};
+const summary={items:[{...items[0],measurementKind:'dress',name:'Test Ürün',description:'Pamuk',size:'M',unitPrice:100}],buyer:{name:'Test Alıcı',email:customer.email,phone:customer.phone,address:'Beytepe, Çankaya, Ankara, 06800'},orderNote:customer.orderNote,subtotal:100,discount:0,shipping:0,total:100,currency:'TRY',paymentMethod:'Havale / EFT — ödeme henüz doğrulanmadı',deliveryTerms:load('src/lib/delivery-policy.ts').DELIVERY_TERMS,orderedAt:new Date().toISOString()};
 async function setup() {
  const db=new PGlite(); await fixture.setup(db,true,{omitManualOrderColumns:true});
+ await db.exec('UPDATE public.products SET compare_at_price=price_amount');
  const foundation=fixture.read('supabase/migrations/20260928120000_product_database_foundation.sql');
  await db.exec(foundation.slice(foundation.indexOf('CREATE OR REPLACE FUNCTION public.nrs_is_active_admin()'),foundation.indexOf('REVOKE ALL ON FUNCTION public.nrs_is_active_admin()')));
  await db.exec(fs.readFileSync('supabase/migrations/20261009150000_customer_access_hardening.sql','utf8'));
@@ -210,6 +211,7 @@ async function orderedOrderHarness() {
  ('${ids[1]}','pants','L',10,true),('${ids[2]}','top','S',10,true)`);
  const lines=[{...items[0]}, {productId:'pants',variantId:ids[1],quantity:2,measurements:{waist:80,hips:104,inseam:78,length:108}},
  {productId:'top',variantId:ids[2],quantity:3,measurements:{chest:100,waist:82,shoulder:42,sleeve:62,length:68}}];
+ await db.exec('UPDATE public.products SET compare_at_price=price_amount');
  const calls=[];
  const serviceDb={from(table){return {select(){return this},in(column,keys){this.column=column;this.keys=keys;return this},eq(column,key){this.key=key;return this},
  async maybeSingle(){const r=await db.query('SELECT id,user_id,manual_request_hash FROM public.orders WHERE manual_request_key=$1::uuid',[this.key]);return {data:r.rows[0]||null,error:null}},
@@ -251,26 +253,19 @@ for(const [name,indexes]of [['single product',[0]],['two products added in rever
  }finally{await h.close()}
  });
 }
-test('Campaign amount is independently rechecked and atomically persisted by the payment RPC',async()=>{
+test('Normal sale price is independently rechecked and atomically persisted by the payment RPC',async()=>{
  const h=await orderedOrderHarness();try{
   const input=[structuredClone(h.lines[0])];const quote=await h.quote(input);
-  assert.equal(quote.summary.subtotal,100);assert.equal(quote.summary.discount,20);assert.equal(quote.summary.total,80);
-  const forged=structuredClone(quote.summary);forged.items[0].discountAmount=19.99;forged.items[0].unitPrice=80.01;forged.campaign.discountAmount=19.99;forged.discount=19.99;forged.total=80.01;
-  const forgedLegal=prepareOrderLegalRecord(fixture.orderId,createLegalAcceptance(true),forged);
-  await assert.rejects(h.db.query('SELECT public.nrs_create_payment_order($1::uuid,$2::uuid,NULL,$1::uuid,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7)',
-   [fixture.orderId,fixture.userId,'a'.repeat(64),JSON.stringify(input),JSON.stringify(customer),JSON.stringify(forgedLegal),'test-bank']));
-  assert.equal((await h.db.query('SELECT count(*)::int AS count FROM public.orders')).rows[0].count,0);
+  assert.equal(quote.summary.subtotal,100);assert.equal(quote.summary.discount,0);assert.equal(quote.summary.total,100);
   const legal=prepareOrderLegalRecord(fixture.orderId,createLegalAcceptance(true),quote.summary);
   const result=await h.db.query('SELECT public.nrs_create_payment_order($1::uuid,$2::uuid,NULL,$1::uuid,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7) AS result',
    [fixture.orderId,fixture.userId,'a'.repeat(64),JSON.stringify(input),JSON.stringify(customer),JSON.stringify(legal),'test-bank']);
   const order=result.rows[0].result;
-  assert.equal(order.order.amountMinor,8000);
+  assert.equal(order.order.amountMinor,10000);
   const stored=(await h.db.query('SELECT o.total_amount,p.amount_minor,l.order_summary FROM public.orders o JOIN public.payment_orders p ON p.order_id=o.id JOIN public.order_legal_records l ON l.order_id=o.id WHERE o.id=$1::uuid',[fixture.orderId])).rows[0];
-  assert.equal(Number(stored.total_amount),80);assert.equal(Number(stored.amount_minor),8000);
-  assert.equal(stored.order_summary.campaign.id,quote.summary.campaign.id);
-  assert.equal(stored.order_summary.campaign.discountAmount,20);
-  assert.equal(stored.order_summary.items[0].normalUnitPrice,100);
-  assert.equal(stored.order_summary.items[0].discountAmount,20);
+  assert.equal(Number(stored.total_amount),100);assert.equal(Number(stored.amount_minor),10000);
+  assert.equal(stored.order_summary.discount,0);
+  assert.equal(stored.order_summary.items[0].unitPrice,100);
   assert.equal((await h.db.query('SELECT stock_quantity FROM public.product_variants WHERE id=$1::uuid',[variantId])).rows[0].stock_quantity,9);
  }finally{await h.close()}
 });

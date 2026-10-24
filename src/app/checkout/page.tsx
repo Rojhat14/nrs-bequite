@@ -19,7 +19,6 @@ import type { Quote } from '@/lib/payment/types'
 import type { LegalOrderSummary as OrderSummary } from '@/lib/legal/order-summary'
 
 import { MEASUREMENT_RANGES, measurementFields, validateOptionalMeasurements, type Measurements } from '@/lib/order-measurements'
-import { discountForUnitMinor, getOpeningCampaign, isOpeningCampaignActive } from '@/lib/opening-campaign'
 import { useLocale } from '@/context/LocaleContext'
 import { formatMinor } from '@/lib/i18n/money'
 import { formatLocalizedMeasurements, measurementHelp, measurementLabel } from '@/lib/i18n/measurements'
@@ -73,7 +72,6 @@ export default function Checkout() {
   }, [authLoading, profile, user])
 
   const inputKey = JSON.stringify({ items, measurements, formData, subtotalAmount, discountAmount, shippingAmount, totalAmount })
-  const openingCampaign = getOpeningCampaign()
   const confirmedQuote = quoteKey === inputKey ? quote : null
   const snapshotKey = JSON.stringify({ inputKey, quoteHash: confirmedQuote?.hash })
   const checkoutInput = () => ({ items: items.map(item => {
@@ -101,21 +99,18 @@ export default function Checkout() {
   const previewSummary: OrderSummary = {
     items: items.map(item => {
       const normalMinor = Math.round(parsePrice(item.price) * 100)
-      const discountMinor = isOpeningCampaignActive() ? discountForUnitMinor(normalMinor) * item.quantity : 0
       return { productId: item.id, name: item.title,
       description: 'Temel özellikler ürün sayfasında yer alır; varsa özel üretim koşulları sipariş teyidinde bildirilir.',
       ...(item.size ? { size: item.size } : {}),
       ...((measurements[getCartItemId(item)] ?? item.measurements) && Object.keys(measurements[getCartItemId(item)] ?? item.measurements ?? {}).length
         ? { measurements: measurements[getCartItemId(item)] ?? item.measurements } : {}), quantity: item.quantity,
-      unitPrice: (normalMinor - (isOpeningCampaignActive() ? discountForUnitMinor(normalMinor) : 0)) / 100,
-      ...(isOpeningCampaignActive() ? { normalUnitPrice: normalMinor / 100, discountAmount: discountMinor / 100 } : {})
+      unitPrice: normalMinor / 100
     }}),
     buyer: { name: [formData.firstName, formData.lastName].filter(Boolean).join(' '), email: formData.email,
       phone: formData.phone, address: [formData.address, formData.district, formData.city, formData.postalCode].filter(Boolean).join(', ') },
     orderNote: formData.orderNote,
     subtotal: subtotalAmount, discount: discountAmount,
-    ...(openingCampaign ? { campaign: { id: openingCampaign.id, name: openingCampaign.name,
-      rateBasisPoints: openingCampaign.rateBasisPoints, discountAmount } } : {}), shipping: 0,
+    shipping: 0,
     total: totalAmount, currency: 'TRY', paymentMethod: 'Havale / EFT — sipariş teyidinden sonra',
     deliveryTerms: DELIVERY_TERMS,
   }

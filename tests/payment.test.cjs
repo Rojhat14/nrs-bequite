@@ -107,7 +107,7 @@ test('Variant duplicates, invalid quantities and missing address cannot reach pa
   assert.throws(() => parsePaymentRequest({ ...request, customer: { ...request.customer, address: '' } }));
 });
 
-test('Repository calculates prices, discount and stock from catalog rather than browser values', async () => {
+test('Repository calculates normal sale prices and stock from catalog rather than browser values', async () => {
   const previous = { ...process.env };
   Object.assign(process.env, { PAYMENT_DATABASE_VERIFIED: 'true', SUPABASE_SERVICE_ROLE_KEY: 'test-only', PAYMENT_SHIPPING_MINOR: '2500', PAYMENT_DELIVERY_TERMS: 'İşletmenin teyit ettiği süre' });
   let stock = 2;
@@ -118,10 +118,9 @@ test('Repository calculates prices, discount and stock from catalog rather than 
   try {
     const repository = local('src/lib/payment/repository.ts').createPaymentRepository();
     const quote = await repository.quote(request.items, request.customer);
-    assert.equal(quote.summary.total, 159.84); assert.equal(quote.summary.discount, 39.96);
+    assert.equal(quote.summary.total, 199.8); assert.equal(quote.summary.discount, 0);
     assert.equal(quote.summary.subtotal, 199.8); assert.equal(quote.summary.shipping, 0);
-    assert.equal(quote.summary.items[0].unitPrice, 79.92); assert.equal(quote.summary.items[0].normalUnitPrice, 99.9);
-    assert.equal(quote.summary.items[0].discountAmount, 39.96);
+    assert.equal(quote.summary.items[0].unitPrice, 99.9);
     assert.equal(local('src/lib/payment/repository.ts').quoteHash({ ...quote.summary, orderedAt: '2099-01-01' }), quote.hash);
     stock = 1; await assert.rejects(repository.quote(request.items, request.customer), /stokta yok/);
   } finally {

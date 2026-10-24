@@ -3,8 +3,7 @@
 import React from 'react'
 import { m as motion, AnimatePresence } from 'framer-motion'
 import { X, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react'
-import { getCartItemId, getCartLineCampaignPrice, useCart } from '@/store/useCart'
-import { isOpeningCampaignActive } from '@/lib/opening-campaign'
+import { getCartItemId, parsePrice, useCart } from '@/store/useCart'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useDialog } from '@/hooks/useDialog'
@@ -18,11 +17,8 @@ export default function CartDrawer() {
   const { locale, rate, t, minorMoney, fxAvailable } = useLocale()
   const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr
   const dialogRef = useDialog(isDrawerOpen, closeDrawer)
-  const lineAmounts = items.map(item => getCartLineCampaignPrice(item))
-  const normalLines = allocateDisplayMinor(lineAmounts.map(line => Math.round(line.normalLineAmount * 100)), locale, rate)
-  const saleLines = allocateDisplayMinor(lineAmounts.map(line => Math.round(line.saleLineAmount * 100)), locale, rate)
-  const displaySubtotal = normalLines.reduce((sum, value) => sum + value, 0)
-  const displaySaleTotal = saleLines.reduce((sum, value) => sum + value, 0)
+  const itemLines = allocateDisplayMinor(items.map(item => Math.round(parsePrice(item.price) * item.quantity * 100)), locale, rate)
+  const displayTotal = itemLines.reduce((sum, value) => sum + value, 0)
   const displayShipping = allocateDisplayMinor([Math.round(shippingAmount * 100)], locale, rate)[0] || 0
 
   return <AnimatePresence>
@@ -67,8 +63,7 @@ export default function CartDrawer() {
                       {item.size && <p className="mt-1 text-xs text-nrs-ink/55">{t('sizeLabel')}: <bdi dir="ltr">{item.size}</bdi></p>}
                     </div>
                     <div className="shrink-0 text-right text-sm tabular-nums text-nrs-ink">
-                      <p>{minorMoney(normalLines[index])}</p>
-                      {isOpeningCampaignActive() && <p className="mt-1 text-xs font-medium text-nrs-ink/65">{t('campaignShort')} {minorMoney(saleLines[index])}</p>}
+                      <p>{minorMoney(itemLines[index])}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-3 pt-2">
@@ -93,10 +88,9 @@ export default function CartDrawer() {
             {!catalogPricesSynced && <p role="status" className="mb-3 text-xs text-nrs-ink/65">{t('checkingCartPrices')}</p>}
             {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mb-3 text-xs text-nrs-ink/65">{t('cartUpdated')}</p>}
             <dl className="space-y-1.5 text-sm">
-              <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">{t('productTotal')}</dt><dd className="tabular-nums">{minorMoney(displaySubtotal)}</dd></div>
-              {isOpeningCampaignActive() && <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">{t('discount')}</dt><dd className="tabular-nums">−{minorMoney(displaySubtotal - displaySaleTotal)}</dd></div>}
+              <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">{t('productTotal')}</dt><dd className="tabular-nums">{minorMoney(displayTotal)}</dd></div>
               {shippingAmount > 0 && <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">{t('shipping')}</dt><dd className="tabular-nums">{minorMoney(displayShipping)}</dd></div>}
-              <div className="flex justify-between gap-3 border-t border-nrs-ink/10 pt-2"><dt className="font-medium">{t('total')}</dt><dd className="font-serif text-xl tabular-nums">{minorMoney(displaySaleTotal + displayShipping)}</dd></div>
+              <div className="flex justify-between gap-3 border-t border-nrs-ink/10 pt-2"><dt className="font-medium">{t('total')}</dt><dd className="font-serif text-xl tabular-nums">{minorMoney(displayTotal + displayShipping)}</dd></div>
             </dl>
             <p className="mt-1 text-[11px] text-nrs-ink/50">{locale === 'en' ? 'Shipping terms are shown before payment.' : locale === 'ar' ? 'تُعرض شروط الشحن قبل الدفع.' : 'Kargo ve teslimat koşulları ödeme öncesinde gösterilir.'}</p>
             {locale !== 'tr' && <p className="mt-1 text-[11px] text-nrs-ink/50">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}

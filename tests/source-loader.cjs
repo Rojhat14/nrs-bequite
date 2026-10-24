@@ -11,7 +11,7 @@ function loader(mocks = {}) {
       if (Object.hasOwn(mocks, name)) return mocks[name];
       if (name === '@/context/LocaleContext') return {
         useLocale: () => ({ locale: 'tr', rate: null, fxAvailable: false,
-          t: key => ({ campaign: 'Açılışa özel tüm ürünlerde sepette %20 indirim.', campaignShort: 'Sepette %20 indirim', checkout: 'Ödemeye geç',
+          t: key => ({ checkout: 'Ödemeye geç',
             categories: 'Kategoriler', collections: 'Koleksiyonlar', all: 'Tümünü gör', bag: 'Alışveriş çantası', wishlist: 'Favorilerim',
             menu: 'Menüyü aç', closeMenu: 'Menüyü kapat', search: 'Ürün ara', account: 'Hesabım', favorites: 'Favoriler', cart: 'Sepet',
             productTotal: 'Ürünler toplamı', discount: 'Açılış indirimi', shipping: 'Kargo', total: 'Ödenecek toplam',

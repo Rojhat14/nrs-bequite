@@ -1,5 +1,4 @@
 import { parseMeasurements, type Measurements } from '@/lib/order-measurements'
-import { calculateOpeningTotals, discountedUnitMinor, isOpeningCampaignActive } from '@/lib/opening-campaign'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -101,27 +100,13 @@ function sameVariant(item: Item, incoming: NewCartItem) {
 }
 
 function calculateCartTotals(items: Item[]): CartTotals {
-  const active = isOpeningCampaignActive()
-  const calculated = calculateOpeningTotals(items.map(item => {
+  const subtotalMinor = items.reduce((sum, item) => {
     const priceMinor = toMinorUnits(parsePrice(item.price))
-    const compareMinor = item.compareAtPrice == null
-      ? priceMinor
-      : Math.max(priceMinor, toMinorUnits(parsePrice(item.compareAtPrice)))
-    // During the opening offer compare-at prices are intentionally excluded;
-    // the 20% is calculated only from today's catalog selling price.
-    return { unitPriceMinor: active ? priceMinor : compareMinor, quantity: item.quantity }
-  }), 0, active)
-  const subtotalMinor = calculated.subtotalMinor
-  const discountMinor = active
-    ? calculated.discountMinor
-    : items.reduce((sum, item) => {
-      const priceMinor = toMinorUnits(parsePrice(item.price))
-      const compareMinor = item.compareAtPrice == null ? priceMinor : Math.max(priceMinor, toMinorUnits(parsePrice(item.compareAtPrice)))
-      return sum + (compareMinor - priceMinor) * item.quantity
-    }, 0)
+    return sum + priceMinor * item.quantity
+  }, 0)
 
   const subtotalAmount = fromMinorUnits(subtotalMinor)
-  const discountAmount = fromMinorUnits(discountMinor)
+  const discountAmount = 0
   // Confirmed business policy: shipping throughout Turkey is free.
   const shippingAmount = 0
 
@@ -129,14 +114,8 @@ function calculateCartTotals(items: Item[]): CartTotals {
     subtotalAmount,
     discountAmount,
     shippingAmount,
-    totalAmount: fromMinorUnits(subtotalMinor - discountMinor + toMinorUnits(shippingAmount)),
+    totalAmount: fromMinorUnits(subtotalMinor + toMinorUnits(shippingAmount)),
   }
-}
-
-export function getCartLineCampaignPrice(item: Pick<Item, 'price' | 'quantity'>) {
-  const unitMinor = toMinorUnits(parsePrice(item.price))
-  const saleUnitMinor = discountedUnitMinor(unitMinor)
-  return { normalLineAmount: fromMinorUnits(unitMinor * item.quantity), saleLineAmount: fromMinorUnits(saleUnitMinor * item.quantity) }
 }
 
 function validQuantity(quantity: number) {

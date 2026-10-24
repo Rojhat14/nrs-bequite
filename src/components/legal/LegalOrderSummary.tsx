@@ -33,7 +33,7 @@ export default function LegalOrderSummary({ summary, preview = false }: { summar
     </ul>
     <dl className="space-y-2 text-sm">
       <div className="flex justify-between gap-4"><dt>{copy('Ara toplam', 'Subtotal', 'المجموع الفرعي')}</dt><dd>{summary.display ? storedMinor(summary.display.subtotalMinor) : money(summary.subtotal)}</dd></div>
-      <div className="flex justify-between gap-4"><dt>{copy('İndirim', 'Discount', 'الخصم')}</dt><dd>{summary.display ? storedMinor(summary.display.discountMinor) : money(summary.discount)}</dd></div>
+      {summary.discount > 0 && <div className="flex justify-between gap-4"><dt>{copy('İndirim', 'Discount', 'الخصم')}</dt><dd>{summary.display ? storedMinor(summary.display.discountMinor) : money(summary.discount)}</dd></div>}
       <div className="flex flex-wrap justify-between gap-2"><dt>{copy('Kargo / teslimat', 'Shipping / delivery', 'الشحن / التوصيل')}</dt><dd>{summary.shipping === null ? copy('Henüz belirlenmedi; sipariş teyidinde bildirilir', 'To be confirmed with the order', 'يُحدد عند تأكيد الطلب') : summary.display ? storedMinor(summary.display.shippingMinor) : money(summary.shipping)}</dd></div>
       <div className="flex justify-between gap-4 border-t border-nrs-ink/10 pt-2"><dt>{preview ? copy('Mevcut sepet toplamı', 'Current bag total', 'إجمالي الحقيبة الحالي') : copy('KDV dahil toplam', 'Total including VAT', 'الإجمالي شامل ضريبة القيمة المضافة')}</dt><dd>{summary.display ? storedMinor(summary.display.totalMinor) : money(summary.total)}</dd></div>
     </dl>
