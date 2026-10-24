@@ -1,4 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
+const {createHash}=require('node:crypto');
 const {loader}=require('./source-loader.cjs');
 const {GarantiProvider}=loader()('src/lib/payment/garanti/adapter.ts');
 const id='11111111-1111-4111-8111-111111111111',origin='https://shop.example';
@@ -7,18 +8,19 @@ const config={mode:'TEST',merchantId:'1000001',terminalId:'12345678',userId:'GAR
  formUrl:'https://sanalposprovtest.garantibbva.com.tr/servlet/gt3dengine',queryUrl:'https://sanalposprovtest.garantibbva.com.tr/VPServlet',
  successUrl:origin+'/api/payment/garanti/success',errorUrl:origin+'/api/payment/garanti/failure',installment:'',capturedStatus:'CAPTURED',saleChargeType:'sales',failedStatuses:[]};
 async function fixture(){
- const order={id,userId:'owner',merchantReference:id,amountMinor:100,currency:'TRY',state:'pending',legal:{order_summary:{buyer:{email:'test@example.com'},items:[{name:'TEST ürün',size:'M',quantity:1,unitPrice:1}]}}};
+ const order={id,userId:'owner',guestHash:null,merchantReference:id,amountMinor:100,currency:'TRY',state:'pending',legal:{order_summary:{buyer:{email:'test@example.com'},items:[{name:'TEST ürün',size:'M',quantity:1,unitPrice:1}]}}};
  const provider=new GarantiProvider(config,async()=>order,async()=>{throw Error('No bank call in this test')});
  order.redirectUrl=(await provider.initiate({...order,state:'initiating'},id,{customerIp:'127.0.0.1'})).redirectUrl;
- let claims=0,user='owner';
+ let claims=0,user='owner',guestToken;
  const route=loader({
  '@/lib/payment/provider':{paymentAvailable:()=>true,getPaymentProvider:()=>provider},
  '@/lib/payment/garanti/adapter':{GarantiProvider},
  '@/lib/payment/garanti/order':{loadGarantiOrder:async()=>order,claimGarantiHandoff:async(_order,redirect)=>{
   assert.equal(order.redirectUrl,redirect);order.redirectUrl+='&used=1';claims++}},
- '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user:user?{id:user}:null}})}})}
+ '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user:user?{id:user}:null}})}})},
+ 'next/headers':{cookies:async()=>({get:name=>name==='nrs-order-access'&&guestToken?{value:guestToken}:undefined})}
  })('src/app/api/payment/garanti/handoff/route.ts');
- return {route,order,provider,claims:()=>claims,user:v=>user=v};
+ return {route,order,provider,claims:()=>claims,user:v=>user=v,guest:v=>guestToken=v};
 }
 test('Native form handoff preserves POST Origin without leaking token in referrers, and keeps restrictive CSP',async()=>{
  const f=await fixture();const r=await f.route.GET(new Request(f.order.redirectUrl));
@@ -59,6 +61,25 @@ test('Handoff retains session, owner, signature, expiry and one-use checks',asyn
  {const f=await fixture(),now=Date.now;Date.now=()=>now()+1000000;try{assert.equal((await f.route.POST(new Request(f.order.redirectUrl,{method:'POST',headers:{Origin:origin}}))).status,409)}finally{Date.now=now}assert.equal(f.claims(),0)}
  {const f=await fixture(),url=f.order.redirectUrl;assert.equal((await f.route.POST(new Request(url,{method:'POST',headers:{Origin:origin}}))).status,200);
  assert.equal((await f.route.POST(new Request(url,{method:'POST',headers:{Origin:origin}}))).status,409);assert.equal(f.claims(),1)}
+});
+test('Guest-owned orders use only the matching guest capability at handoff',async()=>{
+ const token='a'.repeat(64),hash=createHash('sha256').update(token).digest('hex');
+ {
+  const f=await fixture();f.order.userId=null;f.order.guestHash=hash;f.user(null);f.guest(token);
+  const get=await f.route.GET(new Request(f.order.redirectUrl));assert.equal(get.status,200);
+  const post=await f.route.POST(new Request(f.order.redirectUrl,{method:'POST',headers:{Origin:origin}}));
+  assert.equal(post.status,200);assert.equal(f.claims(),1);
+ }
+ for(const supplied of [undefined,'b'.repeat(64)]){
+  const f=await fixture();f.order.userId=null;f.order.guestHash=hash;f.user(null);f.guest(supplied);
+  assert.equal((await f.route.GET(new Request(f.order.redirectUrl))).status,409);
+  assert.equal((await f.route.POST(new Request(f.order.redirectUrl,{method:'POST',headers:{Origin:origin}}))).status,409);
+  assert.equal(f.claims(),0);
+ }
+ {
+  const f=await fixture();f.order.userId=null;f.order.guestHash=null;f.user(null);f.guest(token);
+  assert.equal((await f.route.GET(new Request(f.order.redirectUrl))).status,409);assert.equal(f.claims(),0);
+ }
 });
 test('Only the authenticated owner can renew an unsubmitted TEST handoff; expired POSTs stay rejected',async()=>{
  const f=await fixture();f.provider.config.observationOnly=true;let renewed=0,actualOwner='owner';

@@ -338,7 +338,7 @@ test('Bank return endpoints are POST-only and independent of cookies; handoff ha
  const fs=require('fs');
  const handler=fs.readFileSync('src/lib/payment/garanti/return-handler.ts','utf8');assert.doesNotMatch(handler,/auth\.getUser|cookies\(/);
  for(const path of ['success','failure']){const code=fs.readFileSync(`src/app/api/payment/garanti/${path}/route.ts`,'utf8');assert.match(code,/POST = garantiReturn/);assert.doesNotMatch(code,/export.*GET/)}
- const route=fs.readFileSync('src/app/api/payment/garanti/handoff/route.ts','utf8');assert.match(route,/user\.id !== order\.userId/);assert.match(route,/sameOrigin\(request\)/);assert.match(route,/claimGarantiHandoff/);
+ const route=fs.readFileSync('src/app/api/payment/garanti/handoff/route.ts','utf8');assert.match(route,/user\?\.id === order\.userId/);assert.match(route,/guestTokenMatchesHash\(guestToken, order\.guestHash\)/);assert.match(route,/sameOrigin\(request\)/);assert.match(route,/claimGarantiHandoff/);
 });
 test('Return encoding handles bank ISO-8859-9 bytes, dedupes identical repeats, rejects conflicts and missing signatures',()=>{
  const isoHeaders=new Headers({'content-type':'application/x-www-form-urlencoded;charset=iso-8859-9'});

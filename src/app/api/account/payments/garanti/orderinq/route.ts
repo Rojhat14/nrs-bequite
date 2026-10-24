@@ -47,10 +47,11 @@ export async function POST(request: Request) {
     if (!(provider instanceof GarantiProvider) || !provider.config.liveObservationOnly) return json(503, { error: 'LIVE_OBSERVATION_UNAVAILABLE' })
     const order = await loadGarantiOrder(orderId)
     if (order.userId !== user.id) return json(404, { error: 'NOT_FOUND' })
+    const ownedOrder = { ...order, userId: user.id }
     const queryType = (body as { queryType?: 'orderinq' | 'orderhistoryinq' }).queryType || 'orderinq'
     const evidence = queryType === 'orderhistoryinq'
-      ? await provider.readOnlyOrderHistoryInquiry(order, user.id)
-      : await provider.readOnlyOrderInquiry(order, user.id)
+      ? await provider.readOnlyOrderHistoryInquiry(ownedOrder, user.id)
+      : await provider.readOnlyOrderInquiry(ownedOrder, user.id)
     return json(200, evidence)
   } catch {
     // Never return XML, passwords, hashes, cards, buyer data or exception text.

@@ -4,6 +4,8 @@ import { GarantiProvider } from '@/lib/payment/garanti/adapter'
 import { loadGarantiOrder, claimGarantiHandoff } from '@/lib/payment/garanti/order'
 import { escapeMarkup } from '@/lib/payment/garanti/protocol'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
+import { GUEST_COOKIE, guestTokenMatchesHash } from '@/lib/payment/access'
 import { sameOrigin, unavailable } from '@/lib/payment/http'
 import { localeFromCookieHeader } from '@/lib/i18n/messages'
 
@@ -29,8 +31,12 @@ async function authorized(request: Request) {
   const auth = await createSupabaseServerClient()
   const { data: { user } } = await auth.auth.getUser()
   const order = await loadGarantiOrder(handoff.id)
+  const guestToken = (await cookies()).get(GUEST_COOKIE)?.value
+  const ownerMatches = order.userId === null
+    ? guestTokenMatchesHash(guestToken, order.guestHash)
+    : user?.id === order.userId
   const redirect = `${provider.config.siteOrigin}/api/payment/garanti/handoff?token=${token}`
-  if (!user || user.id !== order.userId || order.state !== 'pending' || order.redirectUrl !== redirect) throw new Error('Unauthorized handoff.')
+  if (!ownerMatches || order.state !== 'pending' || order.redirectUrl !== redirect) throw new Error('Unauthorized handoff.')
   return { provider, order, handoff, redirect }
 }
 function html(body: string, formOrigin: string, script?: { nonce: string; text: string }, locale: 'tr' | 'en' | 'ar' = 'tr') {
