@@ -30,17 +30,18 @@ export default function InventoryTable({ variants, products }: { variants: Produ
         <tbody className="divide-y divide-[#F0ECE5]">
           {variants.map((variant) => {
             const product = productMap.get(variant.product_id)
-            const stockState = variant.stock_quantity === 0 ? 'Tükendi' : variant.stock_quantity <= LOW_STOCK_THRESHOLD ? 'Düşük stok' : 'Stokta'
+            const madeToOrder = product?.fulfillment_mode === 'made_to_order'
+            const stockState = madeToOrder ? 'Sipariş üzerine' : variant.stock_quantity === 0 ? 'Tükendi' : variant.stock_quantity <= LOW_STOCK_THRESHOLD ? 'Düşük stok' : 'Stokta'
             return <tr key={variant.id}>
               <td className="p-3"><span className="block text-sm">{product?.name ?? 'Ürün'}</span><span className="font-mono text-[10px] text-[#9A9385]">{variant.product_id}</span></td>
               <td className="p-3 text-sm">{variant.size || 'Bedensiz'}</td><td className="p-3 font-mono text-xs">{variant.sku || '—'}</td>
-              <td colSpan={3} className="p-0"><form action={save} className="grid grid-cols-[1fr_1fr_1fr] items-center gap-2 p-2"><input type="hidden" name="id" value={variant.id} /><input type="hidden" name="product_id" value={variant.product_id} /><input name="stock_quantity" aria-label="Stok miktarı" type="number" min="0" step="1" defaultValue={variant.stock_quantity} className="admin-field" /><span className={`text-xs ${variant.stock_quantity === 0 ? 'text-rose-800' : variant.stock_quantity <= LOW_STOCK_THRESHOLD ? 'text-amber-800' : 'text-emerald-800'}`}>{stockState}</span><button disabled={busyId === variant.id} className="admin-secondary">{busyId === variant.id ? 'Kaydediliyor…' : 'Stoku güncelle'}</button></form></td>
+              <td colSpan={3} className="p-0"><form action={save} className="grid grid-cols-[1fr_1fr_1fr] items-center gap-2 p-2"><input type="hidden" name="id" value={variant.id} /><input type="hidden" name="product_id" value={variant.product_id} /><input name="stock_quantity" aria-label="Stok miktarı" type="number" min="0" step="1" defaultValue={variant.stock_quantity} className="admin-field" /><span className={`text-xs ${madeToOrder ? 'text-emerald-800' : variant.stock_quantity === 0 ? 'text-rose-800' : variant.stock_quantity <= LOW_STOCK_THRESHOLD ? 'text-amber-800' : 'text-emerald-800'}`}>{stockState}</span><button disabled={busyId === variant.id} className="admin-secondary">{busyId === variant.id ? 'Kaydediliyor…' : 'Stoku güncelle'}</button></form></td>
             </tr>
           })}
           {variants.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-sm text-[#9A9385]">Stok göstermek için önce ürün düzenleme ekranından beden varyantı ekleyin.</td></tr>}
         </tbody>
       </table>
     </div>
-    <p className="mt-3 text-xs leading-5 text-[#8A8479]">Bu ekran `product_variants` stoklarını günceller. Mevcut storefront checkout akışı ve `products.in_stock` alanı değiştirilmez.</p>
+    <p className="mt-3 text-xs leading-5 text-[#8A8479]">Tüm ürünler sipariş üzerine üretildiği için stok miktarı satışı sınırlamaz; bu ekrandaki sayılar yalnızca bilgi amaçlıdır.</p>
   </div>
 }

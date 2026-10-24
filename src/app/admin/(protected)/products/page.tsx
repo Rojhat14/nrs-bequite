@@ -49,7 +49,7 @@ export default async function AdminProductsPage({ searchParams: searchParamsProm
               <td className="p-3 text-xs">{product.category_id ? categoryNames.get(product.category_id) ?? '—' : '—'}</td>
               <td className="p-3 text-xs">{formatMoney(product.price_amount, product.currency)}</td>
               <td className="p-3"><AdminStatusBadge value={product.status} /></td>
-              <td className="p-3 text-xs">{(result.stockByProduct.get(product.id) ?? 0) > 0 ? `${result.stockByProduct.get(product.id)} adet` : 'Tükendi / varyant yok'}</td>
+              <td className="p-3 text-xs">{product.fulfillment_mode === 'made_to_order' ? 'Sipariş üzerine' : (result.stockByProduct.get(product.id) ?? 0) > 0 ? `${result.stockByProduct.get(product.id)} adet` : 'Tükendi / varyant yok'}</td>
               <td className="p-3 text-xs text-[#777165]">{formatDate(product.updated_at)}</td>
               <td className="p-3 whitespace-nowrap"><Link href={`/admin/products/${encodeURIComponent(product.id)}`} className="text-xs text-[#6B5734] underline underline-offset-4">Düzenle</Link><DuplicateProductButton productId={product.id} /></td>
             </tr>

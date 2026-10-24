@@ -27,11 +27,13 @@ export function isNumericDressProduct(product: { id: string; category: string })
 
 export type DressVariantOption = { id: string; label: string; size?: string; stock: number }
 
-export function isMadeToOrderDressVariant(productId: string, fulfillmentMode: unknown, size: unknown) {
+/** Every catalogue product is made to order, so stock never limits a sale.
+ * The numeric-size dresses only accept their 32-44 sizes. Mirrors
+ * public.nrs_is_made_to_order_dress_variant. */
+export function isMadeToOrderVariant(productId: string, fulfillmentMode: unknown, size: unknown) {
   return fulfillmentMode === 'made_to_order'
-    && MADE_TO_ORDER_DRESS_IDS.has(productId)
-    && typeof size === 'string'
-    && NUMERIC_DRESS_SIZES.includes(size as (typeof NUMERIC_DRESS_SIZES)[number])
+    && (!MADE_TO_ORDER_DRESS_IDS.has(productId)
+      || (typeof size === 'string' && NUMERIC_DRESS_SIZES.includes(size as (typeof NUMERIC_DRESS_SIZES)[number])))
 }
 
 const ALPHA_SIZE_ORDER = ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']

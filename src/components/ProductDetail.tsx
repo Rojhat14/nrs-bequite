@@ -94,7 +94,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
   const actualVariants = (product.variants ?? []).map((variant) => ({ id: variant.id, label: variant.size ?? 'Tek beden', size: variant.size ?? undefined, stock: variant.stock_quantity }))
   const numericDress = isNumericDressProduct(product)
-  const madeToOrderDress = product.fulfillmentMode === 'made_to_order' && numericDress
+  const madeToOrder = product.fulfillmentMode === 'made_to_order'
   const variants = sortActualVariantOptions(numericDress ? numericDressVariantOptions(actualVariants) ?? actualVariants : actualVariants)
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
   const hasRealVariantInventory = actualVariants.length > 0
@@ -106,14 +106,14 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     if (!Number.isSafeInteger(quantity) || quantity < 1) {
       setOrderError(copy('Lütfen geçerli bir adet seçin.', 'Please enter a valid quantity.', 'يُرجى إدخال كمية صالحة.')); return;
     }
-    if (!selectedVariant?.id || (!madeToOrderDress && (selectedVariant.stock < 1 || quantity > selectedVariant.stock))) {
+    if (!selectedVariant?.id || (!madeToOrder && (selectedVariant.stock < 1 || quantity > selectedVariant.stock))) {
       setOrderError(copy('Seçilen adet için yeterli stok bulunmuyor.', 'There is not enough stock for the selected quantity.', 'الكمية المختارة غير متوفرة في المخزون.')); return;
     }
     // Adding the same size again merges into the existing bag line, so the
     // stock check must include what is already there (saved carts grow across
     // visits otherwise and checkout later rejects the line).
     const alreadyInBag = (bagItems ?? []).find(item => item.id === product.id && item.variantId === selectedVariant.id)?.quantity ?? 0
-    if (!madeToOrderDress && alreadyInBag + quantity > selectedVariant.stock) {
+    if (!madeToOrder && alreadyInBag + quantity > selectedVariant.stock) {
       if (checkout && alreadyInBag > 0) { setOrderError(''); router.push('/checkout'); return; }
       setOrderError(copy(`Bu bedenden sepetinizde zaten ${alreadyInBag} adet var; stokta ${selectedVariant.stock} adet bulunuyor.`, `Your bag already has ${alreadyInBag} in this size; ${selectedVariant.stock} in stock.`, `في حقيبتك ${alreadyInBag} من هذا المقاس؛ المتوفر ${selectedVariant.stock}.`)); return;
     }
@@ -275,7 +275,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       <button
                         key={variant.label}
                         type="button"
-                        disabled={!variant.id || (!madeToOrderDress && variant.stock < 1)}
+                        disabled={!variant.id || (!madeToOrder && variant.stock < 1)}
                         onClick={() => { setSelectedVariantId(variant.id); setOrderError(''); setQuantity(1); }}
                         aria-pressed={selectedVariantId === variant.id}
                         className={`min-w-12 h-12 px-3 text-xs font-sans transition-all duration-500 border disabled:cursor-not-allowed disabled:opacity-35 ${
@@ -320,7 +320,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     onClick={() => {
                       const variant = selectedVariant || variants.find(variant => !variant.size);
                       const error = whatsappSelectionError({ requiresSize: variants.some(variant => Boolean(variant.size)),
-                        selected: Boolean(selectedVariant), stock: madeToOrderDress ? undefined : variant?.stock, quantity });
+                        selected: Boolean(selectedVariant), stock: madeToOrder ? undefined : variant?.stock, quantity });
                       if (error) { setOrderError(error); return; }
                       const message = buildWhatsappOrderMessage([{
                         id: product.id, slug: product.slug, name: product.name, size: variant?.size || undefined, quantity,

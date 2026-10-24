@@ -17,7 +17,7 @@ import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObse
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
 import { CheckoutProductUnavailableError, CheckoutStockLimitError, CheckoutVariantUnavailableError } from './variant-unavailable'
-import { isMadeToOrderDressVariant } from '@/lib/dress-sizes'
+import { isMadeToOrderVariant } from '@/lib/dress-sizes'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
 import { productSourceHash } from '@/lib/i18n/source-hash'
@@ -253,9 +253,9 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const product = products.data.find(p => p.id === item.productId)
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
         if (!product || product.status !== 'active' || product.currency !== 'TRY' || !variant || variant.is_active !== true) break
-        const madeToOrderDress = isMadeToOrderDressVariant(product.id, product.fulfillment_mode, variant.size)
-        if (product.fulfillment_mode === 'made_to_order' && !madeToOrderDress) break
-        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) {
+        const madeToOrder = isMadeToOrderVariant(product.id, product.fulfillment_mode, variant.size)
+        if (product.fulfillment_mode === 'made_to_order' && !madeToOrder) break
+        if (!madeToOrder && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) {
           const available = Number.isSafeInteger(variant.stock_quantity) ? Math.max(0, variant.stock_quantity) : 0
           throw new CheckoutStockLimitError(item.productId, item.variantId, available, await heldByUnfinishedPayments(db, item.variantId))
         }
@@ -265,9 +265,9 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
         if (!product || product.status !== 'active' || product.currency !== 'TRY') throw new CheckoutProductUnavailableError(item.productId)
         if (!variant || variant.is_active !== true) throw new CheckoutVariantUnavailableError(item.productId)
-        const madeToOrderDress = isMadeToOrderDressVariant(product.id, product.fulfillment_mode, variant.size)
-        if (product.fulfillment_mode === 'made_to_order' && !madeToOrderDress) throw new CheckoutVariantUnavailableError(item.productId)
-        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) {
+        const madeToOrder = isMadeToOrderVariant(product.id, product.fulfillment_mode, variant.size)
+        if (product.fulfillment_mode === 'made_to_order' && !madeToOrder) throw new CheckoutVariantUnavailableError(item.productId)
+        if (!madeToOrder && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) {
           throw new CheckoutStockLimitError(item.productId, item.variantId, Number.isSafeInteger(variant.stock_quantity) ? Math.max(0, variant.stock_quantity) : 0)
         }
         const translation = translationsByProduct.get(product.id)
