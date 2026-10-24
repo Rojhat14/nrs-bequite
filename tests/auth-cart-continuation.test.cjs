@@ -268,3 +268,70 @@ test('Checkout account registration and existing-account login return to the sam
     if (mode === 'signup') assert.ok(harness.calls.includes('profile-upsert'))
   })
 })
+
+function cartPriceSyncHarness(fetchImpl) {
+  const items = [{ id: 'dress', title: 'Elbise', price: '₺100', quantity: 1 }]
+  const syncCalls = []
+  const statusCalls = []
+  const store = { items, syncCatalogPrices: (...args) => syncCalls.push(args), setCatalogPricesSynced: (...args) => statusCalls.push(args) }
+  const refs = []
+  let hookIndex = 0
+  let effects = []
+  const fakeReact = {
+    useRef(initial) { const index = hookIndex++; if (!refs[index]) refs[index] = { current: initial }; return refs[index] },
+    useMemo(factory) { hookIndex++; return factory() },
+    useEffect(effect) { hookIndex++; effects.push(effect) },
+  }
+  const component = loader({
+    react: fakeReact,
+    '@/store/useCart': { useCart: selector => selector(store) },
+    '@/context/LocaleContext': { useLocale: () => ({ locale: 'tr' }) },
+    '@/context/AuthContext': { useAuth: () => ({ user: null, loading: false }) },
+  })('src/components/CartPriceSync.tsx').default
+  return { syncCalls, statusCalls, run() { hookIndex = 0; effects = []; component(); return effects[0]() }, install() { const old = global.fetch; global.fetch = fetchImpl; return () => { global.fetch = old } } }
+}
+const okCatalog = { ok: true, json: async () => ({ products: [{ id: 'dress', price: 100, compareAtPrice: null }], variants: [] }) }
+const waitFor = async (check, ms = 5000) => { const end = Date.now() + ms; while (!check()) { if (Date.now() > end) throw new Error('timeout'); await new Promise(resolve => setTimeout(resolve, 20)) } }
+
+test('CartPriceSync retries a failed catalog price request', async () => {
+  let requests = 0
+  const harness = cartPriceSyncHarness(async () => { requests++; return requests === 1 ? { ok: false, json: async () => ({}) } : okCatalog })
+  const restore = harness.install()
+  try {
+    harness.run()
+    await waitFor(() => harness.syncCalls.length === 1)
+    assert.equal(requests, 2)
+    assert.equal(harness.syncCalls[0][2], 'tr:guest:dress')
+    assert.equal(harness.statusCalls.some(call => call[2] === true), false)
+  } finally { restore() }
+})
+
+test('CartPriceSync reports a final failure after bounded retries', async () => {
+  let requests = 0
+  const harness = cartPriceSyncHarness(async () => { requests++; throw new TypeError('network down') })
+  const restore = harness.install()
+  try {
+    harness.run()
+    await waitFor(() => harness.statusCalls.some(call => call[2] === true), 8000)
+    assert.equal(requests, 3)
+    assert.equal(harness.syncCalls.length, 0)
+    assert.deepEqual(harness.statusCalls.at(-1), [false, 'tr:guest:dress', true])
+  } finally { restore() }
+})
+
+test('CartPriceSync retries after an in-flight request is cancelled', async () => {
+  let requests = 0
+  let resolveRequest
+  const harness = cartPriceSyncHarness(() => { requests++; return new Promise(resolve => { resolveRequest = resolve }) })
+  const restore = harness.install()
+  try {
+    const cleanup = harness.run()
+    cleanup()
+    resolveRequest(okCatalog)
+    await new Promise(resolve => setImmediate(resolve))
+    harness.run()
+    await waitFor(() => requests === 2)
+    resolveRequest(okCatalog)
+    await waitFor(() => harness.syncCalls.length === 1)
+  } finally { restore() }
+})
