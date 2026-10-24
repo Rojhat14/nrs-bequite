@@ -29,8 +29,8 @@ export function paymentAvailableForUser(userId: string | null | undefined) {
     const provider = getPaymentProvider()
     if (provider.name !== 'garanti-oos') return false
     const garanti = provider as GarantiProvider
-    return !!userId && (garanti.config.mode === 'TEST'
-      || (garanti.config.generalLivePayments === true && garanti.config.liveObservationOnly !== true)
-      || controlledLiveAccountAllowed(userId))
+    if (garanti.config.mode === 'TEST') return true
+    if (garanti.config.generalLivePayments === true && garanti.config.liveObservationOnly !== true) return true
+    return !!userId && controlledLiveAccountAllowed(userId)
   } catch { return false }
 }

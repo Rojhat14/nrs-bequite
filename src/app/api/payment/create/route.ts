@@ -3,6 +3,8 @@ import { PaymentStartError } from '@/lib/payment/start-error'
 import { UUID } from '@/lib/payment/request'
 import { localeFromCookieHeader } from '@/lib/i18n/messages'
 import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
+import { cookies } from 'next/headers'
+import { GUEST_COOKIE, hashGuestToken } from '@/lib/payment/access'
 export async function POST(request: Request) {
   if (process.env.PAYMENT_ENABLED !== 'true') return NextResponse.json(
     { error: 'Online ödeme şu anda kullanılamıyor. Lütfen bizimle iletişime geçin.' }, { status: 503 })
@@ -16,9 +18,14 @@ export async function POST(request: Request) {
     const { initiatePayment } = await import('@/lib/payment/service')
     const auth = await createSupabaseServerClient()
     const { data: { user } } = await auth.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Kartla ödeme için hesabınıza giriş yapın.' }, { status: 401 })
     const provider = getPaymentProvider()
-    if (!paymentAvailableForUser(user.id)) return NextResponse.json({ error: 'Kartla ödeme bu hesap için açık değil.' }, { status: 403 })
+    if (!paymentAvailableForUser(user?.id)) return NextResponse.json({ error: 'Kartla ödeme şu anda kullanılamıyor.' }, { status: 403 })
+    let guestHash: string | null = null
+    if (!user) {
+      const token = (await cookies()).get(GUEST_COOKIE)?.value
+      if (!token) return NextResponse.json({ error: 'Misafir sipariş erişimi hazırlanamadı.' }, { status: 409 })
+      guestHash = hashGuestToken(token)
+    }
     const { GarantiProvider } = await import('@/lib/payment/garanti/adapter')
     const rawIp = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
     const { isIP } = await import('node:net')
@@ -27,8 +34,8 @@ export async function POST(request: Request) {
     const customerIp = provider instanceof GarantiProvider && provider.config.observationOnly && isIP(rawIp) !== 4 ? '192.168.0.1' : rawIp
     const locale = localeFromCookieHeader(request.headers.get('cookie'))
     const rate = await getCurrentUsdTryRate()
-    const result = await initiatePayment(await boundedJson(request), user.id,
-      null, createPaymentRepository(), provider, { customerIp, locale, rate })
+    const result = await initiatePayment(await boundedJson(request), user?.id ?? null,
+      guestHash, createPaymentRepository(), provider, { customerIp, locale, rate })
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     // No raw provider errors, secrets, customer data or tokens in logs/response.

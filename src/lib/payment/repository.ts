@@ -302,7 +302,9 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       return { summary, hash: quoteHash(summary) }
     },
     async createAtomic(request: CheckoutRequest, userId: string | null, guestHash: string | null, quote: Quote) {
-      if (!userId || guestHash !== null) throw new Error('Authenticated checkout required.')
+      if ((userId && guestHash !== null) || (!userId && (!guestHash || !/^[0-9a-f]{64}$/.test(guestHash)))) {
+        throw new Error('Order access unavailable.')
+      }
       const id = randomUUID()
       const record = prepareOrderLegalRecord(id, request, quote.summary)
       const amountMinor = Math.round(quote.summary.total * 100)

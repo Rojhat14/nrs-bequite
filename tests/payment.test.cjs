@@ -152,9 +152,14 @@ test('Payment context crosses Next server/client boundary through a function com
   assert.equal(html, '<p>safe</p>');
 });
 
-test('Guest initiation is blocked before any database/provider side effect', async () => {
+test('Guest initiation carries a server-generated capability hash into the atomic order RPC', async () => {
  const f = fixture();
- await assert.rejects(initiatePayment(request, null, 'hash', f.repository, f.provider), /giriş yapın/);
+ const guestHash = 'a'.repeat(64);
+ const result = await initiatePayment(request, null, guestHash, f.repository, f.provider);
+ assert.equal(result.orderId, key);
+ assert.equal(f.calls[1].userId, null);
+ assert.equal(f.calls[1].guestHash, guestHash);
+ assert.equal(f.calls[2], 20000);
 });
 
 test('Cached payment redirects also require HTTPS and provider origin allowlist',async()=>{

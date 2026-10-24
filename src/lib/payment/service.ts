@@ -9,7 +9,9 @@ import { saveGarantiVerifiedPaymentEvidence } from './repository'
 export async function initiatePayment(body: unknown, userId: string | null, guestHash: string | null,
   repository: PaymentRepository, provider: PaymentProvider, context?: { customerIp: string } & Partial<CheckoutDisplayContext>) {
   const request = await startStage('request', async () => parsePaymentRequest(body))
-  if (!userId || guestHash !== null) throw new Error('Kartla ödeme için hesabınıza giriş yapın.')
+  if ((userId && guestHash !== null) || (!userId && (!guestHash || !/^[0-9a-f]{64}$/.test(guestHash)))) {
+    throw new Error('Sipariş erişimi doğrulanamadı.')
+  }
   if (provider.name === 'garanti-oos' && (!context || isIP(context.customerIp) !== 4)) throw new Error('Müşteri IP adresi doğrulanamadı.')
   if (provider.name === 'garanti-oos' && isoBytes(request.customer.email).length > 64) throw new Error('Banka ödeme adresi doğrulanamadı.')
   const existing = await startStage('lookup', () => repository.findExisting(request, userId, guestHash))
@@ -17,7 +19,7 @@ export async function initiatePayment(body: unknown, userId: string | null, gues
     if (provider.initiationMaxAmountMinor != null && existing.amountMinor > provider.initiationMaxAmountMinor) {
       throw new PaymentStartError('START_FAILED', 'lookup', 'Mevcut sipariş kontrollü canlı deneme üst sınırını aşıyor; yeniden ödeme başlatılmadı.')
     }
-    if (provider.testObservationOnly && repository.resumeUnsubmittedTest) {
+    if (userId && provider.testObservationOnly && repository.resumeUnsubmittedTest) {
       const redirect = await startStage('handoff', () => repository.resumeUnsubmittedTest!(existing.id, userId, provider, context))
       validateRedirect(redirect.redirectUrl, provider)
       return { orderId: existing.id, ...redirect }

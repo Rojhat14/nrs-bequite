@@ -5,16 +5,15 @@ import { m as motion } from 'framer-motion'
 import { getCartItemId, parsePrice, useCart } from '@/store/useCart'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ShoppingBag, User, Check } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, Check } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
-import AccountModal from '@/components/AccountModal'
 import CartWhatsappOrder from '@/components/CartWhatsappOrder'
 import { useCardPaymentEnabled } from '@/lib/feature-flags'
 import CheckoutLegalConsent from '@/components/legal/CheckoutLegalConsent'
 import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
-import CardPaymentNotice, { CARD_PAYMENT_COMING_SOON } from '@/components/payment/CardPaymentNotice'
+import CardPaymentNotice from '@/components/payment/CardPaymentNotice'
 import { withLegalAcceptance } from '@/lib/legal/acceptance'
 import type { Quote } from '@/lib/payment/types'
 import type { LegalOrderSummary as OrderSummary } from '@/lib/legal/order-summary'
@@ -31,14 +30,12 @@ export default function Checkout() {
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
   const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, priceUpdateNotice } = useCart()
   const { user, profile, loading: authLoading, profileLoading } = useAuth()
-  const [step, setStep] = useState(1) // 1: Auth Choice, 2: Shipping, 3: Payment
+  const [step, setStep] = useState(2) // Customer details are the first checkout screen; account sign-in is optional.
   const router = useRouter()
-  const [authOpen, setAuthOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [acceptedSnapshot, setAcceptedSnapshot] = useState<string | null>(null)
   const [legalError, setLegalError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [paymentMessage, setPaymentMessage] = useState('')
   const [quote, setQuote] = useState<Quote | null>(null)
   const [quoteKey, setQuoteKey] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
@@ -75,10 +72,6 @@ export default function Checkout() {
     }))
   }, [authLoading, profile, user])
 
-  useEffect(() => {
-    if (ENABLE_CARD_PAYMENT && !authLoading && user && step === 1) setStep(2)
-  }, [ENABLE_CARD_PAYMENT, authLoading, step, user])
-
   const inputKey = JSON.stringify({ items, measurements, formData, subtotalAmount, discountAmount, shippingAmount, totalAmount })
   const openingCampaign = getOpeningCampaign()
   const confirmedQuote = quoteKey === inputKey ? quote : null
@@ -88,7 +81,7 @@ export default function Checkout() {
     return { productId: item.id, variantId: item.variantId, quantity: item.quantity,
       ...(Object.keys(itemMeasurements).length ? { measurements: itemMeasurements } : {}) }
   }), customer: formData })
-  const contractAccepted = acceptedSnapshot === snapshotKey
+  const contractAccepted = acceptedSnapshot === snapshotKey || acceptedSnapshot === inputKey
   const cartSyncScope = cartCatalogSyncScope(locale, user?.id ?? null, items.map(item => item.id))
   const cartReady = catalogPricesSynced && catalogPricesSyncedFor === cartSyncScope
   const customerFieldError = (field: string, reason: string) => {
@@ -137,8 +130,8 @@ export default function Checkout() {
     : money(amountTry)
   async function reviewPayment() {
     if (busy) return
-    if (authLoading || profileLoading || !cartReady) return
-    if (!user) { setAuthOpen(true); return }
+    if (authLoading || (user && profileLoading) || !cartReady) return
+    if (ENABLE_CARD_PAYMENT && acceptedSnapshot !== inputKey) { setLegalError(t('checkoutConsentError')); return }
     const errors: Record<string, string> = {}
     if (!formData.firstName.trim()) errors.firstName = `${t('firstName')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
     if (!formData.lastName.trim()) errors.lastName = `${t('lastName')} ${locale === 'en' ? 'is required.' : locale === 'ar' ? 'مطلوب.' : 'girmeniz gerekir.'}`
@@ -189,10 +182,24 @@ export default function Checkout() {
         throw new Error(data.error || 'Sipariş özeti doğrulanamadı.')
       }
       setInvalidVariantProductId(null)
-      setQuote(data); setQuoteKey(inputKey); setAcceptedSnapshot(null)
-      if (!idempotencyKey || quoteKey !== inputKey) setIdempotencyKey(crypto.randomUUID())
-      setStep(3)
-    } catch { setLegalError(t('checkoutQuoteError')) }
+      const paymentKey = !idempotencyKey || quoteKey !== inputKey ? crypto.randomUUID() : idempotencyKey
+      setQuote(data); setQuoteKey(inputKey); setAcceptedSnapshot(ENABLE_CARD_PAYMENT ? inputKey : null); setIdempotencyKey(paymentKey)
+      if (ENABLE_CARD_PAYMENT) {
+        const payload = withLegalAcceptance({ ...checkoutInput(), quoteHash: data.hash, idempotencyKey: paymentKey }, true)
+        if (!user) {
+          const access = await fetch('/api/payment/guest-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+          if (!access.ok) throw new Error('Guest access could not be prepared.')
+        }
+        const paymentResponse = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        const payment = await paymentResponse.json()
+        if (!paymentResponse.ok) {
+          if (typeof payment.resumeUrl === 'string' && /^\/checkout\/verify\?orderId=[0-9a-f-]{36}$/i.test(payment.resumeUrl)) setPendingOrderUrl(payment.resumeUrl)
+          throw new Error(payment.error || 'Payment could not be started.')
+        }
+        if (typeof payment.redirectUrl !== 'string' || !payment.redirectUrl.startsWith('https://')) throw new Error('Payment redirect could not be verified.')
+        window.location.assign(payment.redirectUrl)
+      } else setStep(3)
+    } catch { setLegalError(ENABLE_CARD_PAYMENT ? t('checkoutPaymentError') : t('checkoutQuoteError')) }
     finally { setBusy(false) }
   }
   async function saveManualOrder() {
@@ -206,30 +213,6 @@ export default function Checkout() {
       setSavedOrder(result.orderId)
     } catch { setLegalError(t('checkoutSaveError')) }
     finally { setBusy(false) }
-  }
-
-  async function prepareCardPayment() {
-    if (busy) return
-    if (!ENABLE_CARD_PAYMENT) { setPaymentMessage(CARD_PAYMENT_COMING_SOON); return }
-    if (!contractAccepted) { setLegalError(t('checkoutConsentError')); return }
-    if (!user || !confirmedQuote) { setLegalError(t('checkoutPaymentError')); return }
-    try {
-      // Consent is checked BEFORE any payment request. Client commercial values
-      // never reach payment/create; only IDs, quantity and approved quote hash.
-      const payload = withLegalAcceptance({ ...checkoutInput(), quoteHash: confirmedQuote?.hash, idempotencyKey }, contractAccepted)
-      setLegalError(''); setPendingOrderUrl(null); setBusy(true)
-      const response = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      const data = await response.json()
-      if (!response.ok) {
-        if (typeof data.resumeUrl === 'string' && /^\/checkout\/verify\?orderId=[0-9a-f-]{36}$/i.test(data.resumeUrl)) setPendingOrderUrl(data.resumeUrl)
-        throw new Error(data.error || 'Ödeme başlatılamadı.')
-      }
-      if (typeof data.redirectUrl !== 'string' || !data.redirectUrl.startsWith('https://')) throw new Error('Ödeme yönlendirmesi doğrulanamadı.')
-      window.location.assign(data.redirectUrl)
-    } catch {
-      setLegalError(t('checkoutPaymentError'))
-      setPaymentMessage('')
-    } finally { setBusy(false) }
   }
 
   if (!hydrated) return <main className="min-h-screen pt-[calc(var(--nrs-header-height)+3rem)] text-center">{t('checkoutLoading')}</main>
@@ -255,61 +238,32 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-nrs-canvas">
-      <AccountModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onAuthenticated={() => {
-        setAuthOpen(false)
-        setStep(2)
-        setQuote(null)
-        setQuoteKey('')
-        setAcceptedSnapshot(null)
-        setFieldErrors({})
-        setLegalError('')
-      }} />
       <main className="min-w-0 pt-[calc(var(--nrs-header-height)+1.5rem)] pb-12 sm:pt-[calc(var(--nrs-header-height)+2.5rem)]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mb-7 flex flex-wrap items-start justify-between gap-4 sm:mb-9">
             <div>
             {ENABLE_CARD_PAYMENT && step <= 3 && (
               <button
-                onClick={() => (step === 1 ? router.push('/') : setStep(step - 1))}
+                onClick={() => (step <= 2 ? router.push('/') : setStep(step - 1))}
                 className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-nrs-ink/60 hover:text-nrs-ink transition-colors mb-6 group"
               >
                 <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                {step === 1 ? t('returnShopping') : t('previousStep')}
+                {step <= 2 ? t('returnShopping') : t('previousStep')}
               </button>
             )}
             <h1 className="mb-2 font-serif text-3xl text-nrs-ink sm:text-4xl">{ENABLE_CARD_PAYMENT ? t('checkoutTitle') : t('orderRequest')}</h1>
             <p className="text-sm text-nrs-ink/60">{t('chosenItemsReady')}</p>
             </div>
-            <ol aria-label={t('orderSteps')} className="flex items-center gap-2 pt-1 text-xs text-nrs-ink/55 sm:gap-3">
+            {!ENABLE_CARD_PAYMENT && <ol aria-label={t('orderSteps')} className="flex items-center gap-2 pt-1 text-xs text-nrs-ink/55 sm:gap-3">
               {[t('stepInformation'), t('stepSummary'), t('stepApproval')].map((label, index) => <li key={label} className="flex items-center gap-2">
                 <span className={`flex h-7 w-7 items-center justify-center rounded-full border ${step >= index + 1 ? 'border-nrs-ink bg-nrs-ink text-nrs-ivory' : 'border-nrs-ink/20'}`}>{step > index + 1 ? <Check size={14} /> : index + 1}</span>
                 <span className="hidden sm:inline">{label}</span>
               </li>)}
-            </ol>
+            </ol>}
           </div>
 
           <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,370px)] lg:gap-10">
           <section className="min-w-0 space-y-7">
-            {ENABLE_CARD_PAYMENT && step === 1 && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <h2 className="font-serif text-2xl text-nrs-ink">{t('continueWithAccount')}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <button
-                    disabled={authLoading}
-                    onClick={() => { if (!user) { setAuthOpen(true); return; } setStep(2); }}
-                    className="p-8 border border-nrs-ink/10 hover:border-nrs-ink transition-all group flex flex-col items-center gap-4 text-center bg-nrs-panel disabled:opacity-50"
-                  >
-                    <User size={32} className="text-nrs-ink group-hover:scale-110 transition-transform" />
-                    <div>
-                      <h3 className="font-serif text-lg text-nrs-ink">{t('accountContinue')}</h3>
-                    <p className="mt-2 text-sm leading-6 text-nrs-ink/60">{t('trackOrders')}</p>
-                    </div>
-                  </button>
-                  <p className="p-5 text-sm leading-6 text-nrs-ink/65">{t('loginForPayment')}</p>
-                </div>
-              </motion.div>
-            )}
-
             {(!ENABLE_CARD_PAYMENT || step === 2) && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                 <h2 className="font-serif text-2xl text-nrs-ink">{t('customerDelivery')}</h2>
@@ -441,12 +395,16 @@ export default function Checkout() {
                     })}</div>
                   </details>
                 </div>
+                {ENABLE_CARD_PAYMENT && <CheckoutLegalConsent accepted={acceptedSnapshot === inputKey} onChange={value => {
+                  setAcceptedSnapshot(value ? inputKey : null); setLegalError('')
+                }} error={legalError} />}
                 <button
-                  onClick={() => void reviewPayment()} disabled={busy || authLoading || profileLoading || !cartReady}
+                  onClick={() => void reviewPayment()} disabled={busy || authLoading || (user !== null && profileLoading) || !cartReady}
                   className="mt-12 w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs font-sans hover:bg-nrs-black/90 transition-all"
                 >
-                  {busy ? t('reviewingQuote') : (!cartReady || profileLoading) ? t('checkingCartPrices') : t('reviewSummary')}
+                  {busy ? (ENABLE_CARD_PAYMENT ? t('bankRedirecting') : t('reviewingQuote')) : (!cartReady || (user !== null && profileLoading)) ? t('checkingCartPrices') : ENABLE_CARD_PAYMENT ? t('goToBank') : t('reviewSummary')}
                 </button>
+                {pendingOrderUrl && <Link href={pendingOrderUrl} className="inline-flex min-h-11 items-center text-sm underline">{t('resumeTestOrder')}</Link>}
                 {cartReady && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">{t('cartUpdated')}</p>}
                 {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
                   <p>{t('cartSizeInvalid')}</p>
@@ -477,27 +435,12 @@ export default function Checkout() {
             {(!ENABLE_CARD_PAYMENT || step === 3) && (
               <div className="space-y-5">
                 <h2 className="font-serif text-2xl">{t('summaryApproval')}</h2>
-                {ENABLE_CARD_PAYMENT && <>
-                  <p role="status" className="text-nrs-ink/60">{t('quoteInstruction')}</p>
-                </>}
-                {ENABLE_CARD_PAYMENT && <p role="status" className="rounded-sm bg-nrs-panel px-4 py-3 text-sm leading-6 text-nrs-ink/70">{t('bankHandoffNote')}</p>}
                 {confirmedQuote && <details className="rounded-sm border border-nrs-ink/15 bg-nrs-warm-white px-4 py-3">
                   <summary className="min-h-11 cursor-pointer py-2 text-sm underline underline-offset-4">{t('viewOrderTerms')}</summary>
                   <div className="pt-3">{/* The server-quoted snapshot remains the source recorded with legal acceptance. */}
                     <LegalOrderSummary summary={orderSummary} preview={!confirmedQuote} />
                   </div>
                 </details>}
-                {ENABLE_CARD_PAYMENT && <div className="space-y-4">
-                  <CheckoutLegalConsent accepted={contractAccepted} onChange={value => {
-                    setAcceptedSnapshot(value ? snapshotKey : null); setLegalError(''); setPaymentMessage('')
-                  }} error={legalError} />
-                  <button type="button" onClick={() => void prepareCardPayment()} disabled={busy}
-                    className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-4 uppercase tracking-widest text-xs hover:bg-nrs-black/90 transition-all">
-                    {busy ? t('bankRedirecting') : t('goToBank')}
-                  </button>
-                  {paymentMessage && <p role="status" className="text-sm text-nrs-ink/65">{paymentMessage}</p>}
-                  {pendingOrderUrl && <Link href={pendingOrderUrl} className="inline-flex min-h-11 items-center text-sm underline">{t('resumeTestOrder')}</Link>}
-                </div>}
                 {!ENABLE_CARD_PAYMENT && <div className="space-y-3 border border-nrs-ink/15 p-4 sm:p-6">
                   <button type="button" disabled aria-describedby="checkout-card-payment-status"
                     className="flex min-h-12 w-full items-center justify-center bg-nrs-charcoal px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ivory opacity-50 cursor-not-allowed">

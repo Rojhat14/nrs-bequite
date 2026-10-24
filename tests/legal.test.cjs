@@ -129,27 +129,27 @@ test('E: eight legal pages and every footer legal/service link render; invalid a
   assert.throws(() => uiLoad('src/app/shipping/page.tsx').default(), /REDIRECT \/kargo-ve-teslimat/);
 });
 
-function checkoutHarness(enabled, confirmed = false, { initialStep = 3, itemMeasurements = {chest:92,waist:72,hips:98,height:168} } = {}) {
+function checkoutHarness(enabled, confirmed = false, { initialStep = enabled ? 2 : 3, itemMeasurements = {chest:92,waist:72,hips:98,height:168}, guest = false } = {}) {
   const slots = [];
   let cursor = 0;
   const cart = { items: [{ id: 'product', title: 'Test Ürün', price: '₺99,90', size: 'M', variantId: orderId, quantity: 2, measurements: itemMeasurements }],
     subtotalAmount: 240, discountAmount: 40.2, shippingAmount: 0, totalAmount: 199.8, catalogPricesSynced: true,
-    catalogPricesSyncedFor: `tr:${orderId}:product`, activeCartVariants: [{ id: '22222222-2222-4222-8222-222222222222', productId: 'product', size: '36' }], openDrawer() {}, updateMeasurements() {}, removeItem() {},
+    catalogPricesSyncedFor: `tr:${guest ? 'guest' : orderId}:product`, activeCartVariants: [{ id: '22222222-2222-4222-8222-222222222222', productId: 'product', size: '36' }], openDrawer() {}, updateMeasurements() {}, removeItem() {},
     replaceItemVariant(cartItemId, variantId, size) { cart.items[0] = { ...cart.items[0], variantId, size }; return true } };
   const fakeReact = { ...React, useEffect(effect) { effect(); }, useState(initial) {
     const index = cursor++;
     if (!(index in slots)) {
       const customer = { firstName: 'Test', lastName: 'Alıcı', email: 'test@example.com', phone: '905551234567', address: 'Beytepe', city: 'Ankara', district: 'Çankaya', postalCode: '06800', orderNote: '' };
       const inputKey = JSON.stringify({ items: cart.items, measurements: { ['product::'+orderId]: cart.items[0].measurements }, formData: customer, subtotalAmount: cart.subtotalAmount, discountAmount: cart.discountAmount, shippingAmount: cart.shippingAmount, totalAmount: cart.totalAmount });
-      slots[index] = index === 0 ? initialStep : index === 2 ? true : confirmed && index === 7 ? { summary, hash: 'a'.repeat(64) }
-        : confirmed && index === 8 ? inputKey : confirmed && index === 9 ? orderId : index === 16 ? customer : typeof initial === 'function' ? initial() : initial;
+      slots[index] = index === 0 ? initialStep : index === 1 ? true : confirmed && index === 5 ? { summary, hash: 'a'.repeat(64) }
+        : confirmed && index === 6 ? inputKey : confirmed && index === 7 ? orderId : index === 14 ? customer : typeof initial === 'function' ? initial() : initial;
     }
     return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
   } };
   const checkoutLoad = loader({ react: fakeReact, 'next/link': linkMock, 'next/image': imageMock,
     'framer-motion': animationMock, 'next/navigation': { useRouter: () => ({ push() {} }) },
     '@/lib/feature-flags': { useCardPaymentEnabled: () => enabled },
-    '@/context/AuthContext': { useAuth: () => ({ user: { id: orderId, email: 'test@example.com', user_metadata: {} }, profile: null, loading: false, profileLoading: false }) },
+    '@/context/AuthContext': { useAuth: () => ({ user: guest ? null : { id: orderId, email: 'test@example.com', user_metadata: {} }, profile: null, loading: false, profileLoading: false }) },
     '@/components/AccountModal': { __esModule: true, default: () => null },
     '@/store/useCart': { getCartItemId: item => item.id + '::' + item.variantId, useCart: () => cart, parsePrice: price => Number(price.replace('₺', '').replace(',', '.')) } });
   const Checkout = checkoutLoad('src/app/checkout/page.tsx').default;
@@ -162,11 +162,16 @@ function findElement(node, predicate) {
   return findElement(node.props?.children, predicate);
 }
 
-test('A/B/F: real checkout handler blocks unticked acceptance without fetch; ticking validates; changes reset consent; mobile label is accessible', () => {
+test('A/B/F: real checkout blocks unticked acceptance; one accepted click quotes and creates payment; changes reset consent', async () => {
   const harness = checkoutHarness(true);
   const oldFetch = global.fetch;
   let requests = 0;
-  global.fetch = () => { requests++; throw new Error('Unexpected request'); };
+  global.fetch = async url => {
+    requests++;
+    return url === '/api/payment/quote'
+      ? { ok: true, json: async () => ({ summary, hash: 'a'.repeat(64) }) }
+      : { ok: false, json: async () => ({ error: 'Test: payment unavailable' }) };
+  };
   try {
     let tree = harness.render();
     const button = findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç');
@@ -181,10 +186,10 @@ test('A/B/F: real checkout handler blocks unticked acceptance without fetch; tic
     consent = findElement(tree, node => node.type?.name === 'CheckoutLegalConsent');
     assert.equal(consent.props.accepted, true);
     findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç').props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
     tree = harness.render();
     consent = findElement(tree, node => node.type?.name === 'CheckoutLegalConsent');
-    assert.match(consent.props.error, /sipariş özetini yeniden doğrulayın/);
-    assert.equal(requests, 0);
+    assert.equal(requests, 2);
     const html = renderToStaticMarkup(consent);
     assert.match(html, /type="checkbox"/);
     assert.match(html, /required=""/);
@@ -197,6 +202,15 @@ test('A/B/F: real checkout handler blocks unticked acceptance without fetch; tic
     harness.cart.totalAmount = 200;
     assert.equal(findElement(harness.render(), node => node.type?.name === 'CheckoutLegalConsent').props.accepted, false);
   } finally { global.fetch = oldFetch; }
+});
+
+test('Guest checkout opens at delivery details without an auth prompt; optional note and measurements do not block continuation', () => {
+  const harness = checkoutHarness(true, false, { initialStep: 2, itemMeasurements: {}, guest: true });
+  const tree = harness.render();
+  assert.ok(findElement(tree, node => node.type === 'h2' && node.props.children === 'customerDelivery'));
+  assert.equal(findElement(tree, node => node.type === 'h2' && node.props.children === 'Hesabınızla devam edin'), null);
+  assert.equal(findElement(tree, node => node.type?.name === 'AccountModal'), null);
+  assert.ok(findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç'));
 });
 
 test('Payment flag remains false and WhatsApp does not require card consent', () => {
@@ -330,7 +344,12 @@ test('Real checkout sends only IDs/quantities and versioned consent after confir
   const harness = checkoutHarness(true, true);
   const oldFetch = global.fetch;
   const calls = [];
-  global.fetch = async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return { ok: false, json: async () => ({ error: 'Test: ödeme kapalı' }) }; };
+  global.fetch = async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return url === '/api/payment/quote'
+      ? { ok: true, json: async () => ({ summary, hash: 'a'.repeat(64) }) }
+      : { ok: false, json: async () => ({ error: 'Test: ödeme kapalı' }) };
+  };
   try {
     let tree = harness.render();
     const findButton = node => findElement(node, element => element.type === 'button' && element.props.children === 'Garanti BBVA ödeme sayfasına geç');
@@ -341,18 +360,24 @@ test('Real checkout sends only IDs/quantities and versioned consent after confir
     findElement(tree, node => node.type?.name === 'CheckoutLegalConsent').props.onChange(true);
     tree = harness.render(); findButton(tree).props.onClick();
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(calls.length, 1); assert.equal(calls[0].url, '/api/payment/create');
-    assert.equal(calls[0].body.contractAccepted, true); assert.equal(calls[0].body.contractVersion, 'v1.5');
-    assert.equal(calls[0].body.quoteHash, 'a'.repeat(64));
-    assert.equal(calls[0].body.totalAmount, undefined); assert.equal(calls[0].body.items[0].price, undefined);
+    assert.equal(calls.length, 2); assert.equal(calls[0].url, '/api/payment/quote');
+    assert.equal(calls[1].url, '/api/payment/create');
+    assert.equal(calls[1].body.contractAccepted, true); assert.equal(calls[1].body.contractVersion, 'v1.5');
+    assert.equal(calls[1].body.quoteHash, 'a'.repeat(64));
+    assert.equal(calls[1].body.totalAmount, undefined); assert.equal(calls[1].body.items[0].price, undefined);
   } finally { global.fetch = oldFetch; }
 });
 
-test('Pending-order recovery link is visible in the payment step without creating another order', async () => {
+test('Pending-order recovery link is visible after a quote when payment creation returns an owned order', async () => {
   const harness = checkoutHarness(true, true), oldFetch = global.fetch;
   const resumeUrl = '/checkout/verify?orderId=11111111-1111-4111-8111-111111111111';
   let calls = 0;
-  global.fetch = async () => { calls++; return { ok: false, json: async () => ({ error: 'Bekleyen sipariş', code: 'UNRESOLVED_PAYMENT', resumeUrl }) }; };
+  global.fetch = async url => {
+    calls++;
+    return url === '/api/payment/quote'
+      ? { ok: true, json: async () => ({ summary, hash: 'a'.repeat(64) }) }
+      : { ok: false, json: async () => ({ error: 'Bekleyen sipariş', code: 'UNRESOLVED_PAYMENT', resumeUrl }) };
+  };
   try {
     let tree = harness.render();
     findElement(tree, node => node.type?.name === 'CheckoutLegalConsent').props.onChange(true);
@@ -361,6 +386,6 @@ test('Pending-order recovery link is visible in the payment step without creatin
     await new Promise(resolve => setImmediate(resolve));
     tree = harness.render();
     const link = findElement(tree, node => node.props?.href === resumeUrl);
-    assert.ok(link); assert.equal(link.props.children, 'Bekleyen test siparişine devam et'); assert.equal(calls, 1);
+    assert.ok(link); assert.equal(link.props.children, 'Bekleyen test siparişine devam et'); assert.equal(calls, 2);
   } finally { global.fetch = oldFetch; }
 });

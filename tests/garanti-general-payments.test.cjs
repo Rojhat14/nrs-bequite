@@ -54,7 +54,7 @@ test('general access permits distinct authenticated users only when its explicit
   const general = makeProviderModule({ mode: 'PROD', generalLivePayments: true, liveObservationOnly: false })
   assert.equal(general.paymentAvailableForUser(allowed), true)
   assert.equal(general.paymentAvailableForUser('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), true)
-  assert.equal(general.paymentAvailableForUser(null), false)
+  assert.equal(general.paymentAvailableForUser(null), true)
   const closed = makeProviderModule({ mode: 'PROD', generalLivePayments: false, liveObservationOnly: true })
   assert.equal(closed.paymentAvailableForUser(allowed), true)
   assert.equal(closed.paymentAvailableForUser('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), false)
