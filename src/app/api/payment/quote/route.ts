@@ -6,7 +6,7 @@ import { CheckoutCustomerFieldError, parseCheckoutInput } from '@/lib/payment/re
 import { boundedJson, sameOrigin, unavailable } from '@/lib/payment/http'
 import { localeFromCookieHeader } from '@/lib/i18n/messages'
 import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
-import { CheckoutVariantUnavailableError } from '@/lib/payment/variant-unavailable'
+import { CheckoutProductUnavailableError, CheckoutVariantUnavailableError } from '@/lib/payment/variant-unavailable'
 export async function POST(request: Request) {
   if (!paymentAvailable()) return unavailable()
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Geçersiz istek.' }, { status: 403 })
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json(quote, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof CheckoutVariantUnavailableError) return NextResponse.json({ code: error.code, productId: error.productId, error: 'Sepetinizdeki beden artık kullanılamıyor. Bu ürünü kaldırıp güncel bedenlerden yeniden seçin.' }, { status: 409 })
+    if (error instanceof CheckoutProductUnavailableError) return NextResponse.json({ code: error.code, productId: error.productId, error: 'Sepetinizdeki bir ürün artık satışta değil veya stokta yok. Ürünü sepetten çıkarın ya da başka bir beden seçin.' }, { status: 409 })
     if (error instanceof CheckoutCustomerFieldError) return NextResponse.json({ code: error.code, field: error.field, reason: error.reason }, { status: 422 })
     return NextResponse.json({ error: 'Ürün, stok veya teslimat bilgileri doğrulanamadı.' }, { status: 409 })
   }

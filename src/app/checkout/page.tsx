@@ -28,7 +28,7 @@ import { randomUuid } from '@/lib/uuid'
 export default function Checkout() {
   const { locale, money, t, fxAvailable } = useLocale()
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
-  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, catalogSyncFailed, priceUpdateNotice } = useCart()
+  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, removeItem, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, catalogSyncFailed, priceUpdateNotice } = useCart()
   const { user, profile, loading: authLoading, profileLoading } = useAuth()
   const [step, setStep] = useState(2) // Customer details are the first checkout screen; account sign-in is optional.
   const router = useRouter()
@@ -163,6 +163,9 @@ export default function Checkout() {
     setBusy(true)
     setPaymentFailure(null)
     setLegalError('')
+    // Which step failed decides the message: before /api/payment/create no
+    // payment exists, so the customer can safely retry.
+    let stage: 'quote' | 'guest' | 'payment' = 'quote'
     try {
       const response = await fetch(ENABLE_CARD_PAYMENT ? '/api/payment/quote' : '/api/orders/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkoutInput()) })
       const data = await response.json()
@@ -170,6 +173,11 @@ export default function Checkout() {
         if (data.code === 'VARIANT_UNAVAILABLE' && typeof data.productId === 'string') {
           setInvalidVariantProductId(data.productId)
           setLegalError(t('cartSizeInvalid'))
+          return
+        }
+        if (data.code === 'PRODUCT_UNAVAILABLE' && typeof data.productId === 'string') {
+          setInvalidVariantProductId(data.productId)
+          setLegalError(typeof data.error === 'string' && data.error ? data.error : t('checkoutQuoteError'))
           return
         }
         if (data.code === 'CUSTOMER_FIELD_INVALID' && typeof data.field === 'string') {
@@ -181,7 +189,10 @@ export default function Checkout() {
             return
           }
         }
-        throw new Error(data.error || 'Sipariş özeti doğrulanamadı.')
+        // The order summary was not created, so no payment has started: show the
+        // server's customer-facing reason instead of the uncertain-payment text.
+        setLegalError(typeof data.error === 'string' && data.error ? data.error : t('checkoutQuoteError'))
+        return
       }
       setInvalidVariantProductId(null)
       const paymentKey = !idempotencyKey || quoteKey !== inputKey ? randomUuid() : idempotencyKey
@@ -189,9 +200,11 @@ export default function Checkout() {
       if (ENABLE_CARD_PAYMENT) {
         const payload = withLegalAcceptance({ ...checkoutInput(), quoteHash: data.hash, idempotencyKey: paymentKey }, true)
         if (!user) {
+          stage = 'guest'
           const access = await fetch('/api/payment/guest-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
           if (!access.ok) throw new Error('Guest access could not be prepared.')
         }
+        stage = 'payment'
         const paymentResponse = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         const payment = await paymentResponse.json()
         if (!paymentResponse.ok) {
@@ -208,9 +221,9 @@ export default function Checkout() {
         window.location.assign(payment.redirectUrl)
       } else setStep(3)
     } catch {
-      setPaymentFailure({ message: ENABLE_CARD_PAYMENT
-        ? 'Ödeme başlatılamadı. Sonuç belirsizse yeniden ödeme başlatmayın; destek ekibimizle iletişime geçin.'
-        : t('checkoutQuoteError') })
+      if (!ENABLE_CARD_PAYMENT || stage === 'quote') setLegalError(`${t('checkoutQuoteError')} ${locale === 'en' ? 'Reload the page and try again.' : locale === 'ar' ? 'أعيدي تحميل الصفحة وحاولي مرة أخرى.' : 'Sayfayı yenileyip tekrar deneyin.'}`)
+      else if (stage === 'guest') setLegalError(locale === 'en' ? 'Guest checkout could not be prepared. No payment was started; reload the page and try again.' : locale === 'ar' ? 'تعذر تجهيز الدفع كضيف. لم يبدأ أي دفع؛ أعيدي تحميل الصفحة وحاولي مرة أخرى.' : 'Misafir ödeme hazırlanamadı. Ödeme başlatılmadı; sayfayı yenileyip tekrar deneyin.')
+      else setPaymentFailure({ message: 'Ödeme başlatılamadı. Sonuç belirsizse yeniden ödeme başlatmayın; destek ekibimizle iletişime geçin.' })
     }
     finally { setBusy(false) }
   }
@@ -432,6 +445,7 @@ export default function Checkout() {
                 </p>}
                 {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
                   <p>{t('cartSizeInvalid')}</p>
+                  <p className="font-medium">{invalidVariantItem.title}{invalidVariantItem.size ? ` · ${t('sizeLabel')} ${invalidVariantItem.size}` : ''}</p>
                   {(() => {
                     const options = activeCartVariants.filter(variant => variant.productId === invalidVariantItem.id
                       && !items.some(item => item !== invalidVariantItem && item.id === invalidVariantItem.id && item.variantId === variant.id))
@@ -451,6 +465,13 @@ export default function Checkout() {
                       </select>
                     </label> : <p className="text-xs text-nrs-ink/65">{t('noAvailableSizes')}</p>
                   })()}
+                  <button type="button" onClick={() => {
+                    removeItem(getCartItemId(invalidVariantItem))
+                    setInvalidVariantProductId(null)
+                    setQuote(null); setQuoteKey(''); setAcceptedSnapshot(null); setLegalError('')
+                  }} className="inline-flex min-h-11 items-center underline underline-offset-4">
+                    {locale === 'en' ? 'Remove from bag' : locale === 'ar' ? 'إزالة من الحقيبة' : 'Sepetten çıkar'}
+                  </button>
                 </div>}
               </motion.div>
             )}

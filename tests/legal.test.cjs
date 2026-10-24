@@ -420,3 +420,38 @@ test('Pending-order recovery link is visible after a quote when payment creation
     assert.ok(link); assert.equal(link.props.children, 'Bekleyen test siparişine devam et'); assert.equal(calls, 2);
   } finally { global.fetch = oldFetch; }
 });
+
+async function cardCheckoutAfterQuote(harness, quoteResponse) {
+  const oldFetch = global.fetch;
+  global.fetch = async () => quoteResponse;
+  try {
+    let tree = harness.render();
+    findElement(tree, node => node.type?.name === 'CheckoutLegalConsent').props.onChange(true);
+    tree = harness.render();
+    findElement(tree, node => node.type === 'button' && node.props.children === 'Garanti BBVA ödeme sayfasına geç').props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    return harness.render();
+  } finally { global.fetch = oldFetch; }
+}
+
+test('A saved cart line that is no longer sold is named with a remove option instead of a generic payment failure', async () => {
+  const harness = checkoutHarness(true, true);
+  const removed = [];
+  harness.cart.removeItem = id => removed.push(id);
+  const tree = await cardCheckoutAfterQuote(harness, { ok: false, status: 409, json: async () => ({ code: 'PRODUCT_UNAVAILABLE', productId: 'product', error: 'Sepetinizdeki bir ürün artık satışta değil veya stokta yok. Ürünü sepetten çıkarın ya da başka bir beden seçin.' }) });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /artık satışta değil veya stokta yok/);
+  assert.match(html, /Test Ürün/);
+  assert.doesNotMatch(html, /Ödeme başlatılamadı|Sonuç belirsizse/);
+  const remove = findElement(tree, node => node.type === 'button' && node.props.children === 'Sepetten çıkar');
+  assert.ok(remove);
+  remove.props.onClick();
+  assert.deepEqual(removed, ['product::' + orderId]);
+});
+
+test('A failed order summary shows the server reason, not the uncertain-payment warning', async () => {
+  const tree = await cardCheckoutAfterQuote(checkoutHarness(true, true), { ok: false, status: 409, json: async () => ({ error: 'Ürün, stok veya teslimat bilgileri doğrulanamadı.' }) });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /Ürün, stok veya teslimat bilgileri doğrulanamadı\./);
+  assert.doesNotMatch(html, /Sonuç belirsizse/);
+});

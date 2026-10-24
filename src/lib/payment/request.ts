@@ -2,6 +2,7 @@ import { parseMeasurements } from '@/lib/order-measurements'
 import type { Buyer, CheckoutItem, CheckoutRequest } from './types'
 import { validateLegalAcceptance } from '@/lib/legal/acceptance'
 import { canonicalCheckoutItems } from './items'
+import { CheckoutVariantUnavailableError } from './variant-unavailable'
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export class CheckoutCustomerFieldError extends Error {
   readonly code = 'CUSTOMER_FIELD_INVALID'
@@ -18,6 +19,10 @@ export function parseCheckoutInput(value: unknown): { items: CheckoutItem[]; cus
   const items = body.items.map(raw => {
     if (!raw || typeof raw !== 'object') throw new Error('Geçersiz ürün.')
     const item = raw as Record<string, unknown>
+    // Older saved carts can hold lines without a current size identity. Ask
+    // for a size on that line instead of rejecting the whole cart generically.
+    if (typeof item.productId === 'string' && item.productId.trim() && item.productId.length <= 200
+      && (typeof item.variantId !== 'string' || !UUID.test(item.variantId))) throw new CheckoutVariantUnavailableError(item.productId)
     if (typeof item.productId !== 'string' || !item.productId.trim() || item.productId.length > 200
       || typeof item.variantId !== 'string' || !UUID.test(item.variantId)
       || typeof item.quantity !== 'number' || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100

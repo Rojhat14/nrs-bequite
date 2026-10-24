@@ -16,7 +16,7 @@ import { cookies } from 'next/headers'
 import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
 import { PaymentStartError } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
-import { CheckoutVariantUnavailableError } from './variant-unavailable'
+import { CheckoutProductUnavailableError, CheckoutVariantUnavailableError } from './variant-unavailable'
 import { isMadeToOrderDressVariant } from '@/lib/dress-sizes'
 import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garanti/live-observation-product'
 import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
@@ -233,11 +233,11 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       const lines = sorted.map(item => {
         const product = products.data.find(p => p.id === item.productId)
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
-        if (!product || product.status !== 'active' || product.currency !== 'TRY') throw new Error('Ürün veya seçilen beden stokta yok.')
+        if (!product || product.status !== 'active' || product.currency !== 'TRY') throw new CheckoutProductUnavailableError(item.productId)
         if (!variant || variant.is_active !== true) throw new CheckoutVariantUnavailableError(item.productId)
         const madeToOrderDress = isMadeToOrderDressVariant(product.id, product.fulfillment_mode, variant.size)
         if (product.fulfillment_mode === 'made_to_order' && !madeToOrderDress) throw new CheckoutVariantUnavailableError(item.productId)
-        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) throw new Error('Ürün veya seçilen beden stokta yok.')
+        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) throw new CheckoutProductUnavailableError(item.productId)
         const translation = translationsByProduct.get(product.id)
         const localized = translation?.source_hash === productSourceHash(product) ? translation.payload : null
         const displayName = typeof localized?.name === 'string' ? localized.name : product.name

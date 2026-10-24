@@ -301,3 +301,20 @@ test('Canonical order: stale price, altered measurements and forged legal summar
  assert.ok((await h.db.query('SELECT stock_quantity FROM public.product_variants')).rows.every(v=>v.stock_quantity===10));
  }finally{await h.close()}
 });
+
+test('A saved cart line for a product that is no longer sold, or a size without stock, is named instead of failing the whole quote generically',async()=>{
+ const h=await orderedOrderHarness();try{
+  const repository=h.repository.createPaymentRepository(true);
+  await h.db.exec(`RESET ROLE; UPDATE public.product_variants SET stock_quantity=0 WHERE id='${variantId}'`);
+  await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:1}],customer),error=>error.code==='PRODUCT_UNAVAILABLE'&&error.productId==='product'&&/stokta yok/.test(error.message));
+  await h.db.exec(`RESET ROLE; UPDATE public.product_variants SET stock_quantity=10 WHERE id='${variantId}'; UPDATE public.products SET status='archived' WHERE id='product'`);
+  await assert.rejects(()=>repository.quote([{productId:'product',variantId,quantity:1}],customer),error=>error.code==='PRODUCT_UNAVAILABLE'&&error.productId==='product');
+ }finally{await h.close()}
+});
+
+test('A saved cart line without a size identity asks for a size on that line',()=>{
+ const {parseCheckoutInput}=loader()('src/lib/payment/request.ts');
+ assert.throws(()=>parseCheckoutInput({items:[{productId:'old-dress',quantity:1}],customer}),error=>error.code==='VARIANT_UNAVAILABLE'&&error.productId==='old-dress');
+ assert.throws(()=>parseCheckoutInput({items:[{productId:'old-dress',variantId:'size-m',quantity:1}],customer}),error=>error.code==='VARIANT_UNAVAILABLE'&&error.productId==='old-dress');
+ assert.throws(()=>parseCheckoutInput({items:[{productId:'',variantId,quantity:1}],customer}),/doğrulanamadı/);
+});
