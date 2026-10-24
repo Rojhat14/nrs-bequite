@@ -29,7 +29,7 @@ import { cartCatalogSyncScope } from '@/lib/cart-catalog-sync'
 export default function Checkout() {
   const { locale, money, t, fxAvailable } = useLocale()
   const ENABLE_CARD_PAYMENT = useCardPaymentEnabled()
-  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, priceUpdateNotice } = useCart()
+  const { items, subtotalAmount, discountAmount, shippingAmount, totalAmount, updateMeasurements, replaceItemVariant, activeCartVariants, catalogPricesSynced, catalogPricesSyncedFor, catalogSyncFailed, priceUpdateNotice } = useCart()
   const { user, profile, loading: authLoading, profileLoading } = useAuth()
   const [step, setStep] = useState(1) // 1: Auth Choice, 2: Shipping, 3: Payment
   const router = useRouter()
@@ -263,6 +263,13 @@ export default function Checkout() {
         setAcceptedSnapshot(null)
         setFieldErrors({})
         setLegalError('')
+        // Card payment availability is decided by the server layout from the
+        // auth cookie. A visitor who arrived signed out (for example in the
+        // Instagram in-app browser, which has its own cookies) would otherwise
+        // stay on the card-disabled flow after signing in here. refresh()
+        // re-renders the server layout with the new session and keeps the cart
+        // and the form state on this page.
+        router.refresh()
       }} />
       <main className="min-w-0 pt-[calc(var(--nrs-header-height)+1.5rem)] pb-12 sm:pt-[calc(var(--nrs-header-height)+2.5rem)]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -448,6 +455,10 @@ export default function Checkout() {
                   {busy ? t('reviewingQuote') : (!cartReady || profileLoading) ? t('checkingCartPrices') : t('reviewSummary')}
                 </button>
                 {cartReady && priceUpdateNotice && <p role="status" className="mt-3 text-sm text-nrs-ink/65">{t('cartUpdated')}</p>}
+                {!cartReady && catalogSyncFailed && <p role="alert" className="mt-3 text-sm text-rose-700">
+                  {locale === 'en' ? 'Prices could not be checked. Check your connection and reload the page.' : locale === 'ar' ? 'تعذر التحقق من الأسعار. تحققي من الاتصال وأعيدي تحميل الصفحة.' : 'Fiyatlar kontrol edilemedi. Bağlantınızı kontrol edip sayfayı yenileyin.'}{' '}
+                  <button type="button" onClick={() => window.location.reload()} className="inline-flex min-h-11 items-center underline underline-offset-4">{locale === 'en' ? 'Reload' : locale === 'ar' ? 'إعادة التحميل' : 'Sayfayı yenile'}</button>
+                </p>}
                 {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
                   <p>{t('cartSizeInvalid')}</p>
                   {(() => {

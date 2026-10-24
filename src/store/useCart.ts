@@ -34,6 +34,8 @@ interface CartStore extends CartTotals {
   isDrawerOpen: boolean
   catalogPricesSynced: boolean
   catalogPricesSyncedFor: string | null
+  /** True after every catalog price request for the current scope failed. */
+  catalogSyncFailed: boolean
   priceUpdateNotice: boolean
   addItem: (product: NewCartItem, quantity?: number) => void
   syncCatalogPrices: (
@@ -41,7 +43,7 @@ interface CartStore extends CartTotals {
     activeVariants?: Array<{ id: string; productId: string; size: string | null }>,
     syncScope?: string,
   ) => void
-  setCatalogPricesSynced: (synced: boolean, syncScope?: string) => void
+  setCatalogPricesSynced: (synced: boolean, syncScope?: string, failed?: boolean) => void
   replaceItemVariant: (cartItemId: string, variantId: string, size: string | undefined) => boolean
   removeItem: (cartItemId: string) => void
   updateMeasurements: (cartItemId: string, measurements: Measurements) => void
@@ -177,6 +179,7 @@ export const useCart = create<CartStore>()(
       isDrawerOpen: false,
       catalogPricesSynced: false,
       catalogPricesSyncedFor: null,
+      catalogSyncFailed: false,
       priceUpdateNotice: false,
       subtotalAmount: 0,
       discountAmount: 0,
@@ -246,10 +249,10 @@ export const useCart = create<CartStore>()(
 
           return Object.keys(updates).length ? { ...item, ...updates } : item
         })
-        return { items, activeCartVariants: activeVariants, ...calculateCartTotals(items), catalogPricesSynced: true, catalogPricesSyncedFor: syncScope ?? null, priceUpdateNotice: state.priceUpdateNotice || changed }
+        return { items, activeCartVariants: activeVariants, ...calculateCartTotals(items), catalogPricesSynced: true, catalogPricesSyncedFor: syncScope ?? null, catalogSyncFailed: false, priceUpdateNotice: state.priceUpdateNotice || changed }
       }),
 
-      setCatalogPricesSynced: (catalogPricesSynced, syncScope) => set({ catalogPricesSynced, catalogPricesSyncedFor: syncScope ?? null }),
+      setCatalogPricesSynced: (catalogPricesSynced, syncScope, failed = false) => set({ catalogPricesSynced, catalogPricesSyncedFor: syncScope ?? null, catalogSyncFailed: failed }),
 
       replaceItemVariant: (cartItemId, variantId, size) => {
         let replaced = false

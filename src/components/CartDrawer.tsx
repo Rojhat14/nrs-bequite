@@ -13,7 +13,7 @@ import { useLocale } from '@/context/LocaleContext'
 import { allocateDisplayMinor } from '@/lib/i18n/money'
 
 export default function CartDrawer() {
-  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, shippingAmount, totalAmount, catalogPricesSynced, priceUpdateNotice } = useCart()
+  const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, shippingAmount, totalAmount, catalogPricesSynced, catalogSyncFailed, priceUpdateNotice } = useCart()
   const router = useRouter()
   const { locale, rate, t, minorMoney, fxAvailable } = useLocale()
   const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr
@@ -90,7 +90,11 @@ export default function CartDrawer() {
           </ul>
 
           <footer className="shrink-0 border-t border-nrs-ink/10 bg-nrs-warm-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-7">
-            {!catalogPricesSynced && <p role="status" className="mb-3 text-xs text-nrs-ink/65">{t('checkingCartPrices')}</p>}
+            {!catalogPricesSynced && !catalogSyncFailed && <p role="status" className="mb-3 text-xs text-nrs-ink/65">{t('checkingCartPrices')}</p>}
+            {!catalogPricesSynced && catalogSyncFailed && <p role="alert" className="mb-3 text-xs text-rose-700">
+              {locale === 'en' ? 'Prices could not be checked.' : locale === 'ar' ? 'تعذر التحقق من الأسعار.' : 'Fiyatlar kontrol edilemedi.'}{' '}
+              <button type="button" onClick={() => window.location.reload()} className="underline underline-offset-2">{locale === 'en' ? 'Reload' : locale === 'ar' ? 'إعادة التحميل' : 'Sayfayı yenile'}</button>
+            </p>}
             {catalogPricesSynced && priceUpdateNotice && <p role="status" className="mb-3 text-xs text-nrs-ink/65">{t('cartUpdated')}</p>}
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between gap-3"><dt className="text-nrs-ink/65">{t('productTotal')}</dt><dd className="tabular-nums">{minorMoney(displaySubtotal)}</dd></div>

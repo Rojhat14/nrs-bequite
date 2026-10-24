@@ -268,3 +268,106 @@ test('Checkout account registration and existing-account login return to the sam
     if (mode === 'signup') assert.ok(harness.calls.includes('profile-upsert'))
   })
 })
+
+function cartPriceSyncHarness(fetchImpl) {
+  const items = [{ id: 'dress', title: 'Elbise', price: '₺100', quantity: 1 }]
+  const syncCalls = []
+  const statusCalls = []
+  const store = { items, syncCatalogPrices: (...args) => syncCalls.push(args), setCatalogPricesSynced: (...args) => statusCalls.push(args) }
+  const refs = []
+  let hookIndex = 0
+  let effects = []
+  const fakeReact = {
+    useRef(initial) { const index = hookIndex++; if (!refs[index]) refs[index] = { current: initial }; return refs[index] },
+    useMemo(factory) { hookIndex++; return factory() },
+    useEffect(effect) { hookIndex++; effects.push(effect) },
+  }
+  const component = loader({
+    react: fakeReact,
+    '@/store/useCart': { useCart: selector => selector(store) },
+    '@/context/LocaleContext': { useLocale: () => ({ locale: 'tr' }) },
+    '@/context/AuthContext': { useAuth: () => ({ user: null, loading: false }) },
+  })('src/components/CartPriceSync.tsx').default
+  return { syncCalls, statusCalls, run() { hookIndex = 0; effects = []; component(); return effects[0]() }, install() { const old = global.fetch; global.fetch = fetchImpl; return () => { global.fetch = old } } }
+}
+const okCatalog = { ok: true, json: async () => ({ products: [{ id: 'dress', price: 100, compareAtPrice: null }], variants: [] }) }
+const waitFor = async (check, ms = 5000) => { const end = Date.now() + ms; while (!check()) { if (Date.now() > end) throw new Error('timeout'); await new Promise(resolve => setTimeout(resolve, 20)) } }
+
+test('CartPriceSync retries a failed catalog price request instead of leaving checkout on "checking prices"', async () => {
+  let requests = 0
+  const harness = cartPriceSyncHarness(async () => { requests++; return requests === 1 ? { ok: false, json: async () => ({}) } : okCatalog })
+  const restore = harness.install()
+  try {
+    harness.run()
+    await waitFor(() => harness.syncCalls.length === 1)
+    assert.equal(requests, 2)
+    assert.equal(harness.syncCalls[0][2], 'tr:guest:dress')
+    assert.equal(harness.statusCalls.some(call => call[2] === true), false)
+  } finally { restore() }
+})
+
+test('CartPriceSync reports a final failure after its retries so the customer is not left waiting', async () => {
+  let requests = 0
+  const harness = cartPriceSyncHarness(async () => { requests++; throw new TypeError('network down') })
+  const restore = harness.install()
+  try {
+    harness.run()
+    await waitFor(() => harness.statusCalls.some(call => call[2] === true), 8000)
+    assert.equal(requests, 3)
+    assert.equal(harness.syncCalls.length, 0)
+    assert.deepEqual(harness.statusCalls.at(-1), [false, 'tr:guest:dress', true])
+  } finally { restore() }
+})
+
+test('CartPriceSync requests again when an in-flight request is cancelled before its result is applied', async () => {
+  let requests = 0
+  const harness = cartPriceSyncHarness(async () => { requests++; return okCatalog })
+  const restore = harness.install()
+  try {
+    const cleanup = harness.run()
+    cleanup()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(harness.syncCalls.length, 0)
+    harness.run()
+    await waitFor(() => harness.syncCalls.length === 1)
+    assert.equal(requests, 2)
+    // A completed request is not repeated for the same cart.
+    harness.run()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(requests, 2)
+  } finally { restore() }
+})
+
+test('Signing in from checkout refreshes the server layout so card payment availability follows the new session', () => {
+  const React = require('react')
+  let refreshes = 0
+  const slots = []
+  let cursor = 0
+  const fakeReact = { ...React, useEffect(effect) { effect() }, useState(initial) {
+    const index = cursor++
+    if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial
+    return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value }]
+  } }
+  const AccountModal = () => null
+  const cart = { items: [{ id: 'dress', title: 'Elbise', price: '₺100', quantity: 1 }], subtotalAmount: 100, discountAmount: 0, shippingAmount: 0, totalAmount: 100,
+    catalogPricesSynced: true, catalogPricesSyncedFor: 'tr:guest:dress', catalogSyncFailed: false, activeCartVariants: [], priceUpdateNotice: false,
+    updateMeasurements() {}, replaceItemVariant() { return false } }
+  const Checkout = loader({
+    react: fakeReact,
+    'next/link': { __esModule: true, default: () => null },
+    'next/image': { __esModule: true, default: () => null },
+    'framer-motion': { m: { div: () => null } },
+    'next/navigation': { useRouter: () => ({ push() {}, refresh() { refreshes++ } }) },
+    '@/lib/feature-flags': { useCardPaymentEnabled: () => false },
+    '@/context/AuthContext': { useAuth: () => ({ user: null, profile: null, loading: false, profileLoading: false }) },
+    '@/components/AccountModal': { __esModule: true, default: AccountModal },
+    '@/components/CartWhatsappOrder': { __esModule: true, default: () => null },
+    '@/store/useCart': { getCartItemId: item => item.id, useCart: () => cart, parsePrice: price => Number(String(price).replace(/[^\d.]/g, '')) },
+  })('src/app/checkout/page.tsx').default
+  cursor = 0; Checkout()
+  cursor = 0; const tree = Checkout()
+  const modal = findNode(tree, node => node.type === AccountModal)
+  assert.ok(modal)
+  modal.props.onAuthenticated()
+  assert.equal(refreshes, 1)
+})
