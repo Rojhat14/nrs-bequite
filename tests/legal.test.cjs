@@ -471,3 +471,12 @@ test('A saved cart that asks for more than the stock left names the line and off
   fix.props.onClick();
   assert.deepEqual(updates, [['product::' + orderId, 1]]);
 });
+
+test('Stock held by an unfinished payment explains the wait instead of offering a quantity change', async () => {
+  const harness = checkoutHarness(true, true);
+  const tree = await cardCheckoutAfterQuote(harness, { ok: false, status: 409, json: async () => ({ code: 'STOCK_LIMIT', productId: 'product', variantId: orderId, available: 0, held: true, error: 'Bu ürünün stoğu şu anda tamamlanmamış bir ödeme için ayrılmış. Ödeme sayfasından ödeme yapmadan çıkıldıysa stok en geç 20 dakika içinde yeniden satışa açılır; lütfen sonra tekrar deneyin.' }) });
+  const html = renderToStaticMarkup(tree);
+  assert.match(html, /tamamlanmamış bir ödeme için ayrılmış/);
+  assert.match(html, /20 dakika/);
+  assert.doesNotMatch(html, /Adedi \d+ yap|stoğu tükendi\./);
+});

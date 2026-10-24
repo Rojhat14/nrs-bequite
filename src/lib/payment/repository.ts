@@ -22,6 +22,22 @@ import { isLiveObservationProduct, isLiveSingleFinalizeCheckout } from './garant
 import { allocateDisplayMinor, displayCurrency } from '@/lib/i18n/money'
 import { productSourceHash } from '@/lib/i18n/source-hash'
 
+// Stock taken by payment attempts that are still open (initiating/pending).
+// Read only to explain a stock shortage; any error just means "unknown".
+async function heldByUnfinishedPayments(db: ReturnType<typeof paymentDatabase>, variantId: string): Promise<number> {
+  try {
+    const reservations = await db.from('payment_stock_reservations').select('order_id,quantity,released').in('variant_id', [variantId])
+    if (reservations.error) return 0
+    const open = ((reservations.data ?? []) as { order_id: string; quantity: number; released: boolean }[]).filter(row => row.released === false)
+    if (!open.length) return 0
+    const orders = await db.from('payment_orders').select('order_id,state').in('order_id', open.map(row => row.order_id))
+    if (orders.error) return 0
+    const unfinished = new Set(((orders.data ?? []) as { order_id: string; state: string }[])
+      .filter(row => row.state === 'initiating' || row.state === 'pending').map(row => row.order_id))
+    return open.filter(row => unfinished.has(row.order_id)).reduce((sum, row) => sum + (Number.isSafeInteger(row.quantity) ? row.quantity : 0), 0)
+  } catch { return 0 }
+}
+
 export function paymentDatabase() {
   if ((process.env.PAYMENT_DATABASE_VERIFIED !== 'true' && process.env.ORDER_DATABASE_VERIFIED !== 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Payment DB unavailable.')
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -230,6 +246,20 @@ export function createPaymentRepository(manual = false): PaymentRepository {
       let subtotalMinor = 0, saleMinor = 0
       // The hidden payment-test product is not a sale-open catalog item and
       // its existing single-price authorization must remain unchanged.
+      // Explain a stock shortage before building lines (the line builder is
+      // synchronous). Stop at the first otherwise-invalid line so the existing
+      // product/size errors below keep their order.
+      for (const item of sorted) {
+        const product = products.data.find(p => p.id === item.productId)
+        const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)
+        if (!product || product.status !== 'active' || product.currency !== 'TRY' || !variant || variant.is_active !== true) break
+        const madeToOrderDress = isMadeToOrderDressVariant(product.id, product.fulfillment_mode, variant.size)
+        if (product.fulfillment_mode === 'made_to_order' && !madeToOrderDress) break
+        if (!madeToOrderDress && (!Number.isSafeInteger(variant.stock_quantity) || variant.stock_quantity < item.quantity)) {
+          const available = Number.isSafeInteger(variant.stock_quantity) ? Math.max(0, variant.stock_quantity) : 0
+          throw new CheckoutStockLimitError(item.productId, item.variantId, available, await heldByUnfinishedPayments(db, item.variantId))
+        }
+      }
       const lines = sorted.map(item => {
         const product = products.data.find(p => p.id === item.productId)
         const variant = variants.data.find(v => v.id === item.variantId && v.product_id === item.productId)

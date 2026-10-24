@@ -27,7 +27,12 @@ export class CheckoutProductUnavailableError extends Error {
  */
 export class CheckoutStockLimitError extends Error {
   readonly code = 'STOCK_LIMIT'
-  constructor(readonly productId: string, readonly variantId: string, readonly available: number) {
+  /**
+   * held: quantity of this size reserved by payment attempts that have not
+   * finished yet (a customer opened the bank page and left). The reservation
+   * is released by reconciliation after the bank link expires.
+   */
+  constructor(readonly productId: string, readonly variantId: string, readonly available: number, readonly held = 0) {
     super('Ürün veya seçilen beden stokta yok.')
     this.name = 'CheckoutStockLimitError'
   }

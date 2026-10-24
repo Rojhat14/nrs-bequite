@@ -23,8 +23,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof CheckoutVariantUnavailableError) return NextResponse.json({ code: error.code, productId: error.productId, error: 'Sepetinizdeki beden artık kullanılamıyor. Bu ürünü kaldırıp güncel bedenlerden yeniden seçin.' }, { status: 409 })
     if (error instanceof CheckoutProductUnavailableError) return NextResponse.json({ code: error.code, productId: error.productId, error: 'Sepetinizdeki bir ürün artık satışta değil. Ürünü sepetten çıkarın.' }, { status: 409 })
-    if (error instanceof CheckoutStockLimitError) return NextResponse.json({ code: error.code, productId: error.productId, variantId: error.variantId, available: error.available,
-      error: error.available > 0 ? `Sepetinizdeki bu üründen bu bedende stokta ${error.available} adet var. Adedi düzenleyip tekrar deneyin.` : 'Sepetinizdeki bu bedenin stoğu tükendi. Başka bir beden seçin ya da ürünü sepetten çıkarın.' }, { status: 409 })
+    if (error instanceof CheckoutStockLimitError) return NextResponse.json({ code: error.code, productId: error.productId, variantId: error.variantId, available: error.available, held: error.held > 0,
+      error: error.held > 0
+        ? 'Bu ürünün stoğu şu anda tamamlanmamış bir ödeme için ayrılmış. Ödeme sayfasından ödeme yapmadan çıkıldıysa stok en geç 20 dakika içinde yeniden satışa açılır; lütfen sonra tekrar deneyin.'
+        : error.available > 0 ? `Sepetinizdeki bu üründen bu bedende stokta ${error.available} adet var. Adedi düzenleyip tekrar deneyin.` : 'Sepetinizdeki bu bedenin stoğu tükendi. Başka bir beden seçin ya da ürünü sepetten çıkarın.' }, { status: 409 })
     if (error instanceof CheckoutCustomerFieldError) return NextResponse.json({ code: error.code, field: error.field, reason: error.reason }, { status: 422 })
     return NextResponse.json({ error: 'Ürün, stok veya teslimat bilgileri doğrulanamadı.' }, { status: 409 })
   }

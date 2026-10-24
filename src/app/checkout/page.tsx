@@ -34,7 +34,7 @@ export default function Checkout() {
   const router = useRouter()
   const [hydrated, setHydrated] = useState(false)
   const [acceptedSnapshot, setAcceptedSnapshot] = useState<string | null>(null)
-  const [checkoutError, setCheckoutError] = useState<{ message: string; errorCode?: string; trackingNumber?: string; payment?: boolean; lineIssue?: 'product' | 'stock'; stockLimit?: { variantId: string; available: number } } | null>(null)
+  const [checkoutError, setCheckoutError] = useState<{ message: string; errorCode?: string; trackingNumber?: string; payment?: boolean; lineIssue?: 'product' | 'stock'; stockLimit?: { variantId: string; available: number; held?: boolean } } | null>(null)
   const legalError = checkoutError && !checkoutError.payment ? checkoutError.message : ''
   const paymentFailure = checkoutError?.payment ? checkoutError : null
   const setLegalError = (message: string) => setCheckoutError(message ? { message } : null)
@@ -186,7 +186,7 @@ export default function Checkout() {
         if (data.code === 'STOCK_LIMIT' && typeof data.productId === 'string' && typeof data.variantId === 'string' && Number.isSafeInteger(data.available)) {
           setInvalidVariantProductId(data.productId)
           setCheckoutError({ message: typeof data.error === 'string' && data.error ? data.error : t('checkoutQuoteError'), lineIssue: 'stock',
-            stockLimit: { variantId: data.variantId, available: Math.max(0, data.available) } })
+            stockLimit: { variantId: data.variantId, available: Math.max(0, data.available), held: data.held === true } })
           return
         }
         if (data.code === 'CUSTOMER_FIELD_INVALID' && typeof data.field === 'string') {
@@ -454,7 +454,9 @@ export default function Checkout() {
                 </p>}
                 {invalidVariantItem && <div role="alert" className="space-y-2 rounded-sm border border-amber-800/30 bg-amber-50 p-3 text-sm">
                   <p>{checkoutError?.lineIssue === 'stock'
-                    ? (stockLimit && stockLimit.available > 0
+                    ? stockLimit?.held
+                      ? (locale === 'en' ? 'This size is reserved by an unfinished payment. If the bank page was left without paying, it returns to stock within about 20 minutes.' : locale === 'ar' ? 'هذا المقاس محجوز لعملية دفع لم تكتمل. إذا تُركت صفحة البنك دون دفع، يعود إلى المخزون خلال نحو 20 دقيقة.' : 'Bu beden tamamlanmamış bir ödeme için ayrılmış. Banka sayfasından ödeme yapmadan çıkıldıysa yaklaşık 20 dakika içinde yeniden satışa açılır.')
+                      : (stockLimit && stockLimit.available > 0
                       ? (locale === 'en' ? `Only ${stockLimit.available} left in this size; your bag has ${invalidVariantItem.quantity}.` : locale === 'ar' ? `المتوفر من هذا المقاس ${stockLimit.available} فقط؛ في حقيبتك ${invalidVariantItem.quantity}.` : `Bu bedenden stokta ${stockLimit.available} adet var; sepetinizde ${invalidVariantItem.quantity} adet bulunuyor.`)
                       : (locale === 'en' ? 'This size is out of stock.' : locale === 'ar' ? 'نفد هذا المقاس.' : 'Bu bedenin stoğu tükendi.'))
                     : checkoutError?.lineIssue === 'product'
@@ -480,7 +482,7 @@ export default function Checkout() {
                       </select>
                     </label> : <p className="text-xs text-nrs-ink/65">{t('noAvailableSizes')}</p>
                   })()}
-                  {stockLimit && stockLimit.available > 0 && stockLimit.available < invalidVariantItem.quantity && <button type="button" onClick={() => {
+                  {stockLimit && !stockLimit.held && stockLimit.available > 0 && stockLimit.available < invalidVariantItem.quantity && <button type="button" onClick={() => {
                     updateQuantity(getCartItemId(invalidVariantItem), stockLimit.available)
                     setInvalidVariantProductId(null)
                     setQuote(null); setQuoteKey(''); setAcceptedSnapshot(null); setLegalError('')
