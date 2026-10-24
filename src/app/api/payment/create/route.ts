@@ -9,9 +9,13 @@ import { randomBytes } from 'node:crypto'
 
 type PublicPaymentErrorCode = 'NRS-PAY-SESSION' | 'NRS-PAY-CART' | 'NRS-PAY-PRICE' | 'NRS-PAY-STOCK' | 'NRS-PAY-RPC' | 'NRS-PAY-BANK' | 'NRS-PAY-UNKNOWN'
 
-function categoryFor(stage: string, databaseCode?: string): PublicPaymentErrorCode {
-  // PostgreSQL P0001 is intentionally not inferred from its message: only the
-  // RPC boundary is known, so report the safe RPC category.
+function categoryFor(stage: string, databaseCode?: string, rpcReason?: string): PublicPaymentErrorCode {
+  // Only allowlisted RPC messages are classified (see rpcFailureReason); any
+  // other P0001 stays the generic RPC category.
+  if (rpcReason === 'price') return 'NRS-PAY-PRICE'
+  if (rpcReason === 'stock') return 'NRS-PAY-STOCK'
+  if (rpcReason === 'owner') return 'NRS-PAY-SESSION'
+  if (rpcReason === 'cart') return 'NRS-PAY-CART'
   if (stage === 'create_rpc' || databaseCode === 'P0001') return 'NRS-PAY-RPC'
   if (stage === 'handoff' || stage === 'store_redirect') return 'NRS-PAY-BANK'
   if (stage === 'request' && databaseCode) return 'NRS-PAY-SESSION'
@@ -22,12 +26,13 @@ function failedResponse(status: number, stage: string, options: {
   databaseCode?: string
   internalCode?: string
   resumeUrl?: string
+  rpcReason?: string
 } = {}) {
   const trackingNumber = randomBytes(8).toString('hex').toUpperCase()
-  const errorCode = categoryFor(stage, options.databaseCode)
+  const errorCode = categoryFor(stage, options.databaseCode, options.rpcReason)
   console.warn(JSON.stringify({
     event: 'payment_start_failed', endpoint: '/api/payment/create', status,
-    stage, sqlState: options.databaseCode, errorCode, trackingNumber,
+    stage, sqlState: options.databaseCode, rpcReason: options.rpcReason, errorCode, trackingNumber,
   }))
   const error = options.internalCode === 'UNRESOLVED_PAYMENT'
     ? 'Ödeme başlatılamadı. Bekleyen bir siparişiniz olabilir; durum netleşene kadar yeniden ödeme başlatmayın.'
@@ -92,6 +97,6 @@ export async function POST(request: Request) {
     const resumeUrl = diagnostic?.resumeOrderId && UUID.test(diagnostic.resumeOrderId)
       ? `/checkout/verify?orderId=${diagnostic.resumeOrderId}` : undefined
     return failedResponse(409, stage, { databaseCode: diagnostic?.databaseCode,
-      internalCode: diagnostic?.code, resumeUrl })
+      internalCode: diagnostic?.code, resumeUrl, rpcReason: diagnostic?.rpcReason })
   }
 }

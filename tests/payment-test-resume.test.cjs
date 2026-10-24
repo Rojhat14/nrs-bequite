@@ -99,3 +99,28 @@ test('Claimed single-finalize TEST account can create a distinct observation-onl
  assert.equal(result.order.id,nextId);assert.equal(calls.length,1);assert.equal(calls[0][1],'nrs_create_garanti_test_observation_order');
  assert.equal(calls[0][2].p_user_id,'owner');assert.notEqual(calls[0][2].p_order_id,id);assert.equal(calls[0][2].p_key,input.idempotencyKey);
 });
+
+test('Known order-RPC refusals get a specific public code and a safe log reason; unknown P0001 stays generic',async()=>{
+ const startError=loader()('src/lib/payment/start-error.ts');
+ assert.equal(startError.rpcFailureReason('quote changed'),'price');
+ assert.equal(startError.rpcFailureReason('total mismatch'),'price');
+ assert.equal(startError.rpcFailureReason('stock unavailable'),'stock');
+ assert.equal(startError.rpcFailureReason('Invalid order owner'),'owner');
+ assert.equal(startError.rpcFailureReason('invalid measurement range'),'cart');
+ assert.equal(startError.rpcFailureReason('some new database text'),undefined);
+ for (const [reason,code] of [['price','NRS-PAY-PRICE'],['stock','NRS-PAY-STOCK'],['owner','NRS-PAY-SESSION'],['cart','NRS-PAY-CART'],[undefined,'NRS-PAY-RPC']]) {
+  const load=loader({'@/lib/payment/provider':{paymentAvailable:()=>true,paymentAvailableForUser:()=>true,getPaymentProvider:()=>({})},
+   '@/lib/supabase/server':{createSupabaseServerClient:async()=>({auth:{getUser:async()=>({data:{user:{id:'owner'}}})}})},
+   '@/lib/payment/repository':{createPaymentRepository:()=>({})},
+   '@/lib/payment/service':{initiatePayment:async()=>{throw new (load('src/lib/payment/start-error.ts').PaymentStartError)('START_FAILED','create_rpc','RAW_DB_TEXT','P0001',undefined,reason)}}});
+  const warn=console.warn,logs=[];console.warn=x=>logs.push(x);process.env.PAYMENT_ENABLED='true';
+  try{
+   const route=load('src/app/api/payment/create/route.ts');
+   const r=await route.POST(new Request(origin+'/api/payment/create',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'}));
+   const data=await r.json();
+   assert.equal(data.errorCode,code);
+   const log=JSON.parse(logs[0]);assert.equal(log.errorCode,code);assert.equal(log.rpcReason,reason);
+   assert.equal(JSON.stringify({data,logs}).includes('RAW_DB_TEXT'),false);
+  }finally{console.warn=warn}
+ }
+});

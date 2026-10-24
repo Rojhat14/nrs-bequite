@@ -116,3 +116,22 @@ test('Guest access cookie is HttpOnly, scoped to the site, and never returned in
   const rejected = await route.POST(new Request('https://shop.example/api/payment/guest-access', { method: 'POST', headers: { origin: 'https://attacker.example' }, body: '{}' }))
   assert.equal(rejected.status, 403)
 })
+
+test('The order RPC rejects a translated product name (the EN/AR checkout failure) and accepts the catalog name with a display translation', async () => {
+  const db = new PGlite()
+  const rpc = 'SELECT public.nrs_create_payment_order($1::uuid,NULL,$2,$1::uuid,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7) AS result'
+  try {
+    await fixture.setup(db)
+    await db.exec(fs.readFileSync('supabase/migrations/20261024150000_guest_checkout_owner.sql', 'utf8'))
+    const guestHash = 'a'.repeat(64)
+    const args = summary => [fixture.orderId, guestHash, 'b'.repeat(64), JSON.stringify(fixture.items), JSON.stringify(fixture.customer),
+      JSON.stringify(fixture.historicalRecord(fixture.orderId, summary)), 'test-bank']
+    const translated = structuredClone(fixture.summary)
+    translated.items[0].name = 'Black Dress (translated)'
+    await assert.rejects(db.query(rpc, args(translated)), /quote changed/)
+    const canonical = structuredClone(fixture.summary)
+    canonical.items[0].localizedName = 'Black Dress (translated)'
+    canonical.items[0].localizedDescription = 'Translated description'
+    assert.equal((await db.query(rpc, args(canonical))).rows[0].result.created, true)
+  } finally { await db.close() }
+})

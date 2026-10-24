@@ -340,3 +340,30 @@ test('A stock shortage caused by an unfinished payment attempt is reported as he
   await assert.rejects(()=>repository.quote([{productId:'product',variantId:V,quantity:1}],customer),error=>error.code==='STOCK_LIMIT'&&error.held===0);
  }finally{for(const [k,v] of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v}}
 });
+
+test('An English or Arabic quote records the catalog name the order RPC verifies and keeps the translation for display only', async () => {
+ const V='88888888-8888-4888-8888-888888888888';
+ const product={id:'product',name:'Siyah Elbise',description:'Pamuklu elbise',fabric:null,care:null,price_amount:100,compare_at_price:null,currency:'TRY',status:'active',in_stock:true,payment_test_only:false,fulfillment_mode:'stock',categories:{name:'Elbise',slug:'elbiseler'},product_images:[]};
+ const {productSourceHash}=loader()('src/lib/i18n/source-hash.ts');
+ const tables={
+  products:[product],
+  product_variants:[{id:V,product_id:'product',size:'M',stock_quantity:5,is_active:true}],
+  storefront_translations:[{entity_id:'product',source_hash:productSourceHash(product),payload:{name:'Black Dress',description:'Cotton dress'}}],
+ };
+ const fakeDb={from(table){const q={select(){return q},in(column,keys){q.column=column;q.keys=keys;return q},eq(){return q},
+  then(resolve,reject){return Promise.resolve({data:tables[table].filter(row=>!q.keys||q.keys.includes(row[q.column])),error:null}).then(resolve,reject)}};return q},
+  storage:{from(){return {getPublicUrl:()=>({data:{publicUrl:''}})}}}};
+ const saved=Object.fromEntries(['ORDER_DATABASE_VERIFIED','SUPABASE_SERVICE_ROLE_KEY','NEXT_PUBLIC_SUPABASE_URL'].map(k=>[k,process.env[k]]));
+ Object.assign(process.env,{ORDER_DATABASE_VERIFIED:'true',SUPABASE_SERVICE_ROLE_KEY:'local-synthetic-only',NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1'});
+ try{
+  const repository=loader({'@supabase/supabase-js':{createClient:()=>fakeDb}})('src/lib/payment/repository.ts').createPaymentRepository(true);
+  const english=await repository.quote([{productId:'product',variantId:V,quantity:1}],customer,null,{locale:'en',rate:null});
+  assert.equal(english.summary.items[0].name,'Siyah Elbise');
+  assert.equal(english.summary.items[0].description,'Pamuklu elbise');
+  assert.equal(english.summary.items[0].localizedName,'Black Dress');
+  assert.equal(english.summary.items[0].localizedDescription,'Cotton dress');
+  const turkish=await repository.quote([{productId:'product',variantId:V,quantity:1}],customer,null,{locale:'tr',rate:null});
+  assert.equal(turkish.summary.items[0].name,'Siyah Elbise');
+  assert.equal(Object.hasOwn(turkish.summary.items[0],'localizedName'),false);
+ }finally{for(const [k,v] of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v}}
+});

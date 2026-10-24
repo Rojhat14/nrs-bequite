@@ -19,9 +19,9 @@ export default function LegalOrderSummary({ summary, preview = false }: { summar
     {preview && <p className="text-sm text-nrs-ink/65">{copy('Bu özet sipariş talebidir; ödeme veya kesin sipariş onayı değildir. Fiyat, stok ve teslimat bedeli sipariş teyidinde bildirilir.', 'This is an order request, not payment or final order confirmation. Price, stock and delivery charges are confirmed with the order.', 'هذا طلب شراء وليس دفعاً أو تأكيداً نهائياً. تُحدد الأسعار والتوفر ورسوم التوصيل عند تأكيد الطلب.')}</p>}
     <ul className="divide-y divide-nrs-ink/10">
       {summary.items.map((item, index) => <li key={`${item.productId}-${index}`} className="py-3 space-y-1 text-sm">
-        {item.image && <Image unoptimized src={item.image} alt={item.name} width={80} height={100} className="h-24 w-20 object-cover" />}
-        <p className="font-medium">{item.name}{item.size ? ` — ${copy('Beden', 'Size', 'المقاس')}: ${item.size}` : ''}</p>
-        <p className="text-nrs-ink/65">{item.description}</p>
+        {item.image && <Image unoptimized src={item.image} alt={item.localizedName ?? item.name} width={80} height={100} className="h-24 w-20 object-cover" />}
+        <p className="font-medium">{item.localizedName ?? item.name}{item.size ? ` — ${copy('Beden', 'Size', 'المقاس')}: ${item.size}` : ''}</p>
+        <p className="text-nrs-ink/65">{item.localizedDescription ?? item.description}</p>
         {item.measurements && <p>{copy('Özel ölçüler', 'Custom measurements', 'المقاسات الخاصة')}: {formatLocalizedMeasurements(item.measurements, locale) || copy('Belirtilmedi', 'Not specified', 'غير محدد')}</p>}
         <p>{locale === 'tr'
           ? `${item.quantity} adet × ${money(item.unitPrice)} = ${money(Math.round(item.unitPrice * 100) * item.quantity / 100)}`

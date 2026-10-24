@@ -1,6 +1,6 @@
 import { parseMeasurements, type Measurements, type MeasurementKind } from '@/lib/order-measurements'
 export interface LegalOrderSummary {
-  items: { productId: string; name: string; description: string; size?: string; variantId?: string; measurementKind?: MeasurementKind; image?: string; measurements?: Measurements; quantity: number; unitPrice: number; normalUnitPrice?: number; discountAmount?: number }[]
+  items: { productId: string; name: string; description: string; localizedName?: string; localizedDescription?: string; size?: string; variantId?: string; measurementKind?: MeasurementKind; image?: string; measurements?: Measurements; quantity: number; unitPrice: number; normalUnitPrice?: number; discountAmount?: number }[]
   buyer: { name: string; email: string; phone: string; address: string }
   orderNote?: string
   subtotal: number
@@ -46,7 +46,9 @@ export function isLegalOrderSummary(value: unknown): value is LegalOrderSummary 
   if (!Array.isArray(summary.items) || !summary.items.length || summary.items.length > 200) return false
   if (!summary.items.every(item => item && text(item.productId) && text(item.name) && text(item.description)
     && Number.isInteger(item.quantity) && item.quantity > 0 && money(item.unitPrice)
-    && (item.size === undefined || text(item.size)))) return false
+    && (item.size === undefined || text(item.size))
+    && (item.localizedName === undefined || text(item.localizedName))
+    && (item.localizedDescription === undefined || text(item.localizedDescription)))) return false
   try { for (const item of summary.items) parseMeasurements(item.measurements) } catch { return false }
   if (summary.orderNote !== undefined && (typeof summary.orderNote !== 'string' || summary.orderNote.length > 2000)) return false
   if (!summary.buyer || !Object.values({ name: summary.buyer.name, email: summary.buyer.email,

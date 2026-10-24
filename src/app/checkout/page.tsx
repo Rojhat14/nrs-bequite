@@ -537,7 +537,7 @@ export default function Checkout() {
                   {orderSummary.items.map((item, index) => <li key={`mobile-${item.productId}-${index}`} className="flex min-w-0 items-center justify-between gap-3 py-3">
                     {item.image ? <Image src={item.image} alt="" width={56} height={70} unoptimized className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas object-cover" /> : <span aria-hidden="true" className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas" />}
                     <div className="min-w-0">
-                      <p className="break-words text-sm leading-5">{item.name}</p>
+                      <p className="break-words text-sm leading-5">{item.localizedName ?? item.name}</p>
                       <p className="mt-1 text-xs text-nrs-ink/55">{item.size ? <>{t('sizeLabel')} <bdi dir="ltr">{item.size}</bdi> · </> : ''}{item.quantity} {t('pieces')}</p>
                     </div>
                     <span className="shrink-0 text-sm tabular-nums">{summaryDisplay?.itemLineMinor[index] !== undefined ? formatMinor(summaryDisplay.itemLineMinor[index], summaryDisplay.locale, summaryRate) : displaySummaryMoney(item.unitPrice * item.quantity)}</span>
@@ -563,7 +563,7 @@ export default function Checkout() {
                 {orderSummary.items.map((item, index) => <li key={`${item.productId}-${index}`} className="flex min-w-0 items-center justify-between gap-3 py-3">
                   {item.image ? <Image src={item.image} alt="" width={56} height={70} unoptimized className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas object-cover" /> : <span aria-hidden="true" className="h-[70px] w-14 shrink-0 rounded-sm bg-nrs-canvas" />}
                   <div className="min-w-0">
-                    <p className="break-words text-sm leading-5 text-nrs-ink">{item.name}</p>
+                    <p className="break-words text-sm leading-5 text-nrs-ink">{item.localizedName ?? item.name}</p>
                     <p className="mt-1 text-xs text-nrs-ink/55">{item.size ? <>{t('sizeLabel')} <bdi dir="ltr">{item.size}</bdi> · </> : ''}{item.quantity} {t('pieces')}</p>
                     {item.measurements && Object.keys(item.measurements).length > 0 && <details className="mt-1 min-w-0">
                       <summary className="inline-flex min-h-8 cursor-pointer items-center text-xs text-nrs-ink/60 underline underline-offset-2">{t('customMeasurements')}</summary>

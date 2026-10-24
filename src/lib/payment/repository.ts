@@ -14,7 +14,7 @@ import { GUEST_COOKIE, hashGuestToken } from './access'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { garantiLiveObservationOnly, garantiLiveSingleFinalizeArmed, garantiObservationOnly } from './garanti/config'
-import { PaymentStartError } from './start-error'
+import { PaymentStartError, rpcFailureReason } from './start-error'
 import { GarantiProvider } from './garanti/adapter'
 import { CheckoutProductUnavailableError, CheckoutStockLimitError, CheckoutVariantUnavailableError } from './variant-unavailable'
 import { isMadeToOrderVariant } from '@/lib/dress-sizes'
@@ -283,8 +283,15 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         const measurements = validateOptionalMeasurements(item.measurements)
         const images = product.product_images || []
         const image = images.find((row: { is_primary?: boolean }) => row.is_primary) || images[0]
+        // The order RPC compares name/description with the catalog row, so the
+        // recorded order keeps the canonical values. Translations (EN/AR) are
+        // carried separately for display; using them as the name made every
+        // non-Turkish checkout fail with 'quote changed' (NRS-PAY-RPC).
+        const canonicalDescription = product.description || product.name
         return { measurementKind: kind, ...(image ? { image: getProductImageUrl(db, image) || undefined } : {}), productId: item.productId, variantId: item.variantId,
-          ...(Object.keys(measurements).length ? { measurements } : {}), name: displayName, description: displayDescription,
+          ...(Object.keys(measurements).length ? { measurements } : {}), name: product.name, description: canonicalDescription,
+          ...(displayName !== product.name ? { localizedName: displayName } : {}),
+          ...(displayDescription !== canonicalDescription ? { localizedDescription: displayDescription } : {}),
           ...(variant.size ? { size: variant.size } : {}), quantity: item.quantity, unitPrice: priceMinor / 100 }
       })
       const shippingMinor = SHIPPING_MINOR
@@ -371,7 +378,7 @@ export function createPaymentRepository(manual = false): PaymentRepository {
         }
         throw new PaymentStartError(
           error?.code === 'P0001' && error.message === 'Unresolved payment exists; reconcile before a new attempt' ? 'UNRESOLVED_PAYMENT' : 'START_FAILED',
-          'create_rpc', 'Sipariş oluşturulamadı. Sepetinizi kontrol edin.', error?.code)
+          'create_rpc', 'Sipariş oluşturulamadı. Sepetinizi kontrol edin.', error?.code, undefined, rpcFailureReason(error?.message))
       }
       return data as { order: PaymentOrder; created: boolean }
     },
