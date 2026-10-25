@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { CheckCircle2, Clock3, MessageCircle, XCircle } from 'lucide-react'
 import LegalOrderSummary from '@/components/legal/LegalOrderSummary'
 import GarantiReconcileAction from '@/components/payment/GarantiReconcileAction'
+import MetaPurchase from '@/components/payment/MetaPurchase'
+import { LIVE_CONTROLLED_CATALOG_PRODUCT_ID, LIVE_OBSERVATION_PRODUCT_ID } from '@/lib/payment/garanti/live-observation-product'
 import { readAccessiblePaymentOrder } from '@/lib/payment/repository'
 import { getRequestLocale } from '@/lib/i18n/request-locale'
 import { localePrefix, message } from '@/lib/i18n/messages'
@@ -30,6 +32,11 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
       : cancelled ? t('verifiedCancelledBody')
         : verifiedFailure ? t('paymentFailureBody') : t('paymentUnknownBody')
 
+  const summary = order?.legal?.order_summary
+  // Controlled 3 TRY bank trials are not sales.
+  const reportPurchase = paid && Array.isArray(summary?.items) && summary.items.length > 0 && !summary.items.some(item =>
+    item.productId === LIVE_OBSERVATION_PRODUCT_ID || item.productId === LIVE_CONTROLLED_CATALOG_PRODUCT_ID)
+
   const Icon = paid ? CheckCircle2 : verifiedFailure || cancelled ? XCircle : Clock3
   const tone = paid ? 'border-emerald-900/15 bg-emerald-900/[0.035] text-emerald-950'
     : verifiedFailure || cancelled ? 'border-nrs-rosegold/30 bg-nrs-rosegold/[0.06] text-nrs-ink'
@@ -49,6 +56,8 @@ export default async function PaymentResult({ orderId, failure = false }: { orde
       </section>
 
       {order?.status === 'pending' && <GarantiReconcileAction orderId={order.id} />}
+      {reportPurchase && order && summary && <MetaPurchase orderId={order.id} total={summary.total}
+        items={summary.items.map(item => ({ productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice }))} />}
 
       {order?.legal?.order_summary && <details className="mt-4 rounded-sm border border-nrs-ink/10 bg-nrs-warm-white px-4 py-2">
         <summary className="flex min-h-11 cursor-pointer items-center font-serif text-lg">{t('orderDetails')}</summary>

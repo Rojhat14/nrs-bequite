@@ -27,3 +27,31 @@ test('commerce events are sent only after the consented pixel has loaded', () =>
   assert.equal(calls[2][3].num_items, 3);
   assert.equal(calls[2][3].value, 15070);
 });
+
+test('a paid order reports Purchase with the order total and a dedupe event ID', () => {
+  const events = load();
+  const calls = [];
+  global.window = { fbq: (...args) => calls.push(args) };
+  events.trackPurchase('order-uuid', [{ productId: 'dress', quantity: 1, unitPrice: 4290 }, { productId: 'suit', quantity: 2, unitPrice: 6490 }], 17270);
+  delete global.window;
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][2], 'Purchase');
+  assert.deepEqual(calls[0][3].content_ids, ['dress', 'suit']);
+  assert.equal(calls[0][3].value, 17270);
+  assert.equal(calls[0][3].num_items, 3);
+  assert.deepEqual(calls[0][4], { eventID: 'order-order-uuid' });
+});
+
+test('checkout pages stay unmeasured except the paid-order result page', () => {
+  const source = require('node:fs').readFileSync(path.resolve(__dirname, '..', 'src/components/MetaPixel.tsx'), 'utf8');
+  const rule = source.match(/if \(!allowed \|\| !pathname \|\| (.*)\) return/)[1];
+  const excluded = new Function('pathname', `return ${rule}`);
+  assert.equal(excluded('/checkout'), true);
+  assert.equal(excluded('/checkout/verify'), true);
+  assert.equal(excluded('/checkout/failure'), true);
+  assert.equal(excluded('/profile'), true);
+  assert.equal(excluded('/checkout/success'), false);
+  assert.equal(excluded('/product/dress'), false);
+  const result = require('node:fs').readFileSync(path.resolve(__dirname, '..', 'src/components/payment/PaymentResult.tsx'), 'utf8');
+  assert.match(result, /const reportPurchase = paid && /);
+});

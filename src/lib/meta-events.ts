@@ -6,15 +6,16 @@ type MetaContent = { id: string; quantity: number; item_price: number }
 /** Sends a standard commerce event only when MetaPixel has already loaded,
  * which happens solely after advertising consent and outside checkout and
  * profile pages. content_ids are catalogue product IDs (see meta-product-feed). */
-function track(event: 'ViewContent' | 'AddToCart' | 'InitiateCheckout', contents: MetaContent[], name?: string) {
+function track(event: 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purchase', contents: MetaContent[], name?: string,
+  options: { value?: number; eventID?: string } = {}) {
   if (typeof window === 'undefined' || !window.fbq || !contents.length) return
-  const value = Math.round(contents.reduce((sum, item) => sum + item.item_price * item.quantity, 0) * 100) / 100
+  const value = options.value ?? Math.round(contents.reduce((sum, item) => sum + item.item_price * item.quantity, 0) * 100) / 100
   try {
     window.fbq('trackSingle', META_PIXEL_ID, event, {
       content_ids: contents.map(item => item.id), content_type: 'product', contents,
       num_items: contents.reduce((sum, item) => sum + item.quantity, 0), value, currency: 'TRY',
       ...(name ? { content_name: name } : {}),
-    })
+    }, ...(options.eventID ? [{ eventID: options.eventID }] : []))
   } catch { /* measurement must never break shopping */ }
 }
 
@@ -28,4 +29,10 @@ export function trackAddToCart(product: { id: string; name: string; priceAmount?
 
 export function trackInitiateCheckout(items: Pick<Item, 'id' | 'price' | 'quantity'>[]) {
   track('InitiateCheckout', items.map(item => ({ id: item.id, quantity: item.quantity, item_price: parsePrice(item.price) })))
+}
+
+/** value is the paid order total in TRY; the order ID lets Meta drop duplicates. */
+export function trackPurchase(orderId: string, items: { productId: string; quantity: number; unitPrice: number }[], total: number) {
+  track('Purchase', items.map(item => ({ id: item.productId, quantity: item.quantity, item_price: item.unitPrice })), undefined,
+    { value: total, eventID: `order-${orderId}` })
 }

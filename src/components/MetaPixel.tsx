@@ -40,7 +40,8 @@ export default function MetaPixel() {
   }, [])
 
   useEffect(() => {
-    if (!allowed || !pathname || /^\/(admin|checkout|profile)(\/|$)/.test(pathname)) return
+    // Checkout stays unmeasured except the paid-order result page (Purchase).
+    if (!allowed || !pathname || (/^\/(admin|checkout|profile)(\/|$)/.test(pathname) && !/^\/checkout\/success(\/|$)/.test(pathname))) return
     if (!window.fbq) {
       // Queue commands before the asynchronous Meta library is downloaded.
       const fbq = ((...args: unknown[]) => {
