@@ -10,6 +10,7 @@ import { useDialog } from '@/hooks/useDialog'
 import CartWhatsappOrder from '@/components/CartWhatsappOrder'
 import { useLocale } from '@/context/LocaleContext'
 import { allocateDisplayMinor } from '@/lib/i18n/money'
+import { trackInitiateCheckout } from '@/lib/meta-events'
 
 export default function CartDrawer() {
   const { items, isDrawerOpen, closeDrawer, removeItem, updateQuantity, shippingAmount, totalAmount, catalogPricesSynced, catalogSyncFailed, priceUpdateNotice } = useCart()
@@ -98,7 +99,7 @@ export default function CartDrawer() {
             </dl>
             <p className="mt-1 text-[11px] text-nrs-ink/50">{locale === 'en' ? 'Shipping terms are shown before payment.' : locale === 'ar' ? 'تُعرض شروط الشحن قبل الدفع.' : 'Kargo ve teslimat koşulları ödeme öncesinde gösterilir.'}</p>
             {locale !== 'tr' && <p className="mt-1 text-[11px] text-nrs-ink/50">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
-            <button type="button" aria-label={t('checkout')} disabled={!catalogPricesSynced} onClick={() => { closeDrawer(); router.push('/checkout') }}
+            <button type="button" aria-label={t('checkout')} disabled={!catalogPricesSynced} onClick={() => { trackInitiateCheckout(items); closeDrawer(); router.push('/checkout') }}
               className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-sm bg-nrs-charcoal px-4 text-sm font-medium text-nrs-ivory hover:bg-nrs-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60">
               {catalogPricesSynced ? <>{t('checkout')} <ArrowRight size={16} /></> : locale === 'en' ? 'Checking prices…' : locale === 'ar' ? 'جارٍ التحقق من الأسعار…' : 'Fiyatlar kontrol ediliyor…'}
             </button>

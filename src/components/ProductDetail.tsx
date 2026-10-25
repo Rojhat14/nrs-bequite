@@ -15,6 +15,7 @@ import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { useRouter } from 'next/navigation';
 import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
 import { useLocale } from '@/context/LocaleContext';
+import { trackAddToCart, trackInitiateCheckout, trackViewContent } from '@/lib/meta-events'
 import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOptions } from '@/lib/dress-sizes'
 
 interface ProductDetailProps {
@@ -42,6 +43,8 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
   const touchStartX = useRef<number | null>(null);
   useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1) }, [product.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product page
+  useEffect(() => { trackViewContent(product) }, [product.id])
   useEffect(() => {
     let active = true;
     const checkWishlist = async () => {
@@ -113,7 +116,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     // visits otherwise and checkout later rejects the line).
     const alreadyInBag = (bagItems ?? []).find(item => item.id === product.id && item.variantId === selectedVariant.id)?.quantity ?? 0
     if (!madeToOrder && alreadyInBag + quantity > selectedVariant.stock) {
-      if (checkout && alreadyInBag > 0) { setOrderError(''); router.push('/checkout'); return; }
+      if (checkout && alreadyInBag > 0) { setOrderError(''); trackInitiateCheckout(bagItems ?? []); router.push('/checkout'); return; }
       setOrderError(copy(`Bu bedenden sepetinizde zaten ${alreadyInBag} adet var; stokta ${selectedVariant.stock} adet bulunuyor.`, `Your bag already has ${alreadyInBag} in this size; ${selectedVariant.stock} in stock.`, `في حقيبتك ${alreadyInBag} من هذا المقاس؛ المتوفر ${selectedVariant.stock}.`)); return;
     }
     addItem({
@@ -122,8 +125,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       size: selectedVariant?.size ?? undefined, variantId: selectedVariant?.id,
       compareAtPrice: product.compareAtPrice,
     }, quantity);
+    trackAddToCart(product, quantity);
     setOrderError('');
-    if (checkout) router.push('/checkout');
+    if (checkout) {
+      trackInitiateCheckout([...(bagItems ?? []).filter(item => !(item.id === product.id && item.variantId === selectedVariant.id)),
+        { id: product.id, price: product.price, quantity: alreadyInBag + quantity }]);
+      router.push('/checkout');
+    }
     else openDrawer();
   }
   const galleryImages = product.galleryImages?.length

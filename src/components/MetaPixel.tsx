@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { COOKIE_CONSENT_EVENT, readAdvertisingConsent } from '@/lib/cookie-consent'
 
-const PIXEL_ID = '1141376638847457'
+export const META_PIXEL_ID = '1141376638847457'
+const PIXEL_ID = META_PIXEL_ID
 
 type PixelFunction = ((...args: unknown[]) => void) & {
   callMethod?: (...args: unknown[]) => void
