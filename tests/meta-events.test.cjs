@@ -55,3 +55,20 @@ test('checkout pages stay unmeasured except the paid-order result page', () => {
   const result = require('node:fs').readFileSync(path.resolve(__dirname, '..', 'src/components/payment/PaymentResult.tsx'), 'utf8');
   assert.match(result, /const reportPurchase = paid && /);
 });
+
+test('ViewContent waits for the pixel that initialises after the product page mounts', t => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const events = load();
+  const calls = [];
+  global.window = { setInterval, clearInterval };
+  const cancel = events.trackViewContent({ id: 'dress', name: 'Dress', priceAmount: 4290, price: '₺4.290' });
+  t.mock.timers.tick(250);
+  assert.equal(calls.length, 0);
+  window.fbq = (...args) => calls.push(args);
+  t.mock.timers.tick(250);
+  t.mock.timers.tick(1000);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][2], 'ViewContent');
+  assert.equal(typeof cancel, 'function');
+  delete global.window;
+});

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { trackPurchase } from '@/lib/meta-events'
+import { trackPurchase, whenPixelReady } from '@/lib/meta-events'
 
 type PurchaseLine = { productId: string; quantity: number; unitPrice: number }
 
@@ -12,16 +12,10 @@ export default function MetaPurchase({ orderId, items, total }: { orderId: strin
   useEffect(() => {
     const key = `nrs-meta-purchase-${orderId}`
     try { if (localStorage.getItem(key)) return } catch { /* storage may be blocked */ }
-    let attempts = 0
-    const timer = window.setInterval(() => {
-      attempts += 1
-      if (window.fbq) {
-        window.clearInterval(timer)
-        trackPurchase(orderId, items, total)
-        try { localStorage.setItem(key, '1') } catch { /* storage may be blocked */ }
-      } else if (attempts >= 40) window.clearInterval(timer)
-    }, 250)
-    return () => window.clearInterval(timer)
+    return whenPixelReady(() => {
+      trackPurchase(orderId, items, total)
+      try { localStorage.setItem(key, '1') } catch { /* storage may be blocked */ }
+    })
   }, [orderId, items, total])
   return null
 }

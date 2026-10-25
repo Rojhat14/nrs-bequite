@@ -19,8 +19,25 @@ function track(event: 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purcha
   } catch { /* measurement must never break shopping */ }
 }
 
+/** Runs callback once MetaPixel has set up window.fbq. On page load the pixel
+ * initialises in its own effect, after the page's effects, so events fired
+ * on mount must wait. Gives up after 10s (no consent means no pixel).
+ * Returns a cancel function for effect cleanup. */
+export function whenPixelReady(callback: () => void) {
+  if (typeof window === 'undefined') return () => {}
+  if (window.fbq) { callback(); return () => {} }
+  let attempts = 0
+  const timer = window.setInterval(() => {
+    attempts += 1
+    if (window.fbq) { window.clearInterval(timer); callback() }
+    else if (attempts >= 40) window.clearInterval(timer)
+  }, 250)
+  return () => window.clearInterval(timer)
+}
+
 export function trackViewContent(product: { id: string; name: string; priceAmount?: number | null; price: string }) {
-  track('ViewContent', [{ id: product.id, quantity: 1, item_price: product.priceAmount ?? parsePrice(product.price) }], product.name)
+  return whenPixelReady(() =>
+    track('ViewContent', [{ id: product.id, quantity: 1, item_price: product.priceAmount ?? parsePrice(product.price) }], product.name))
 }
 
 export function trackAddToCart(product: { id: string; name: string; priceAmount?: number | null; price: string }, quantity: number) {

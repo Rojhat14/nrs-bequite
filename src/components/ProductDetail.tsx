@@ -44,7 +44,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   const touchStartX = useRef<number | null>(null);
   useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1) }, [product.id])
   // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product page
-  useEffect(() => { trackViewContent(product) }, [product.id])
+  useEffect(() => trackViewContent(product), [product.id])
   useEffect(() => {
     let active = true;
     const checkWishlist = async () => {
