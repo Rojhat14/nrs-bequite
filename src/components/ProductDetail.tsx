@@ -7,8 +7,6 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { lookupWishlist } from '@/lib/wishlistClient';
 import { ShoppingBag, Heart, ArrowLeft, ArrowRight, Truck, Clock3, Scissors, Ruler } from 'lucide-react';
-import Link from 'next/link';
-import { localePrefix } from '@/lib/i18n/messages';
 import Image from 'next/image';
 import { whatsappNumber, whatsappUrl } from '@/lib/storefront-config';
 import { buildWhatsappOrderMessage, whatsappSelectionError } from '@/lib/whatsapp-order';
@@ -283,11 +281,9 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
                     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      <Link href={`${localePrefix(locale)}/size-guide`} className="inline-flex min-h-9 items-center gap-1.5 text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
-                        <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />{copy('Beden rehberi', 'Size guide', 'دليل المقاسات')}
-                      </Link>
                       {whatsappNumber && <a href={whatsappUrl(copy(`Merhaba, ${product.name} için beden danışmak istiyorum.`, `Hello, I would like size advice for ${product.name}.`, `مرحبًا، أود استشارة بخصوص مقاس ${product.name}.`)) ?? undefined}
-                        target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
+                        target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
+                        <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />
                         {copy('Bedeninizi WhatsApp’tan danışın', 'Ask about your size on WhatsApp', 'استشيري مقاسك عبر واتساب')}
                       </a>}
                     </span>
