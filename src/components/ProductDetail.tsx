@@ -15,6 +15,7 @@ import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { useRouter } from 'next/navigation';
 import CardPaymentNotice from '@/components/payment/CardPaymentNotice';
 import { useLocale } from '@/context/LocaleContext';
+import { parseProductDescription } from '@/lib/product-description'
 import { trackAddToCart, trackInitiateCheckout, trackViewContent } from '@/lib/meta-events'
 import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOptions } from '@/lib/dress-sizes'
 
@@ -368,9 +369,21 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               <div className="space-y-10">
                 <div className="space-y-4">
                   <h3 className="text-xs uppercase tracking-widest text-nrs-ink font-medium">{copy('Ürün hikayesi', 'Product story', 'قصة المنتج')}</h3>
-                  <p className="text-nrs-ink/60 leading-relaxed font-sans italic">
-                    {product.description}
-                  </p>
+                  {(() => {
+                    const story = parseProductDescription(product.description)
+                    return <div className="space-y-4 font-sans text-[15px] leading-7 text-nrs-ink/70">
+                      {story.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                      {story.bullets.length > 0 && <div className="space-y-3 pt-2">
+                        {story.heading && <p className="text-[10px] uppercase tracking-[0.2em] text-nrs-ink/55">{story.heading}</p>}
+                        <ul className="divide-y divide-nrs-ink/10 border-y border-nrs-ink/10">
+                          {story.bullets.map((bullet, index) => <li key={index} className="grid gap-1 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
+                            {bullet.label && <span className="text-xs uppercase tracking-widest text-nrs-ink">{bullet.label}</span>}
+                            <span className={bullet.label ? '' : 'sm:col-span-2'}>{bullet.text}</span>
+                          </li>)}
+                        </ul>
+                      </div>}
+                    </div>
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
