@@ -6,7 +6,9 @@ import { parsePrice, useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { lookupWishlist } from '@/lib/wishlistClient';
-import { ShoppingBag, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Heart, ArrowLeft, ArrowRight, Truck, Clock3, Scissors, Ruler } from 'lucide-react';
+import Link from 'next/link';
+import { localePrefix } from '@/lib/i18n/messages';
 import Image from 'next/image';
 import { whatsappNumber, whatsappUrl } from '@/lib/storefront-config';
 import { buildWhatsappOrderMessage, whatsappSelectionError } from '@/lib/whatsapp-order';
@@ -266,12 +268,30 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   <p className="text-2xl font-serif text-nrs-ink/80">{product.priceAmount == null ? product.price : money(product.priceAmount)}</p>
                 </div>
                 {locale !== 'tr' && <p className="max-w-md text-xs text-nrs-ink/55">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
+                {/* The delivery promise near the price answers the first questions
+                    shoppers have before choosing a size (same terms as checkout). */}
+                <ul aria-label={copy('Teslimat bilgileri', 'Delivery details', 'تفاصيل التوصيل')} className="grid grid-cols-1 gap-2 pt-2 text-xs text-nrs-ink/75 sm:grid-cols-3">
+                  <li className="flex items-center gap-2"><Truck size={15} strokeWidth={1.5} aria-hidden="true" />{copy('Türkiye geneli ücretsiz kargo', 'Free shipping within Türkiye', 'شحن مجاني داخل تركيا')}</li>
+                  <li className="flex items-center gap-2"><Clock3 size={15} strokeWidth={1.5} aria-hidden="true" />{copy('7–10 iş günü teslimat', 'Delivered in 7–10 business days', 'التوصيل خلال 7–10 أيام عمل')}</li>
+                  <li className="flex items-center gap-2"><Scissors size={15} strokeWidth={1.5} aria-hidden="true" />{copy('Siparişinize özel üretim', 'Made to order for you', 'يُصنع خصيصًا لطلبك')}</li>
+                </ul>
               </div>
 
               <div className="space-y-8 py-10 border-y border-nrs-ink/10">
                 <div className="space-y-5">
                   {variants.length > 0 && <>
-                  <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
+                    <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <Link href={`${localePrefix(locale)}/size-guide`} className="inline-flex min-h-9 items-center gap-1.5 text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
+                        <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />{copy('Beden rehberi', 'Size guide', 'دليل المقاسات')}
+                      </Link>
+                      {whatsappNumber && <a href={whatsappUrl(copy(`Merhaba, ${product.name} için beden danışmak istiyorum.`, `Hello, I would like size advice for ${product.name}.`, `مرحبًا، أود استشارة بخصوص مقاس ${product.name}.`)) ?? undefined}
+                        target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
+                        {copy('Bedeninizi WhatsApp’tan danışın', 'Ask about your size on WhatsApp', 'استشيري مقاسك عبر واتساب')}
+                      </a>}
+                    </span>
+                  </div>
                   <div role="group" aria-label={copy('Beden seçin', 'Select a size', 'اختاري المقاس')} aria-describedby={orderError ? 'product-size-error' : undefined} className="flex flex-wrap gap-3">
                     {variants.map((variant) => (
                       <button
