@@ -163,17 +163,17 @@ export default function ProductDetail({ product }: ProductDetailProps) {
   return (
     <div className="min-h-screen bg-nrs-canvas flex">
       <main className="w-full flex-1 pb-32">
-        <div className="max-w-7xl mx-auto px-6 pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-16">
+        <div className="max-w-7xl mx-auto px-6 pt-[calc(var(--nrs-header-height)+0.75rem)] lg:pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
           <div className="lg:col-span-7 min-w-0 space-y-6">
             <div
-              className={`nrs-fade-up product-gallery relative grid gap-3 ${galleryImages.length > 1 ? 'grid-cols-[3rem_minmax(0,1fr)] sm:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
+              className={`nrs-fade-up product-gallery relative -mx-6 grid gap-3 sm:mx-0 ${galleryImages.length > 1 ? 'grid-cols-1 lg:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
               role="region"
               aria-label={copy('Ürün görsel galerisi', 'Product image gallery', 'معرض صور المنتج')}
               tabIndex={galleryImages.length > 1 ? 0 : undefined}
               onKeyDown={handleGalleryKeyDown}
             >
               <div
-                className="relative h-full min-h-0 min-w-0 overflow-hidden"
+                className="relative aspect-[2/3] min-h-0 min-w-0 overflow-hidden lg:aspect-auto lg:h-full"
                 onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null }}
                 onTouchEnd={(event) => {
                   const startX = touchStartX.current
@@ -190,7 +190,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   alt={activeImage.altText || product.name}
                   fill
                   priority={activeImageIndex === Math.max(0, primaryImageIndex)}
-                  sizes="(max-width: 639px) calc(100vw - 108px), (max-width: 1023px) calc(100vw - 140px), (max-width: 1279px) 50vw, 590px"
+                  sizes="(max-width: 639px) 100vw, (max-width: 1023px) calc(100vw - 48px), (max-width: 1279px) 50vw, 590px"
                   className="object-contain"
                   onError={() => markImageBroken(activeImageIndex)}
                 />
@@ -202,7 +202,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   type="button"
                   onClick={() => moveImage(-1)}
                   aria-label={copy('Önceki ürün görseli', 'Previous product image', 'الصورة السابقة للمنتج')}
-                  className="absolute left-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
+                  className="absolute left-4 top-1/2 z-10 hidden -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white sm:block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
                 >
                   <ArrowLeft size={18} strokeWidth={1.4} />
                 </button>
@@ -210,15 +210,19 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   type="button"
                   onClick={() => moveImage(1)}
                   aria-label={copy('Sonraki ürün görseli', 'Next product image', 'الصورة التالية للمنتج')}
-                  className="absolute right-4 top-1/2 z-10 -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
+                  className="absolute right-4 top-1/2 z-10 hidden -translate-y-1/2 border border-white/70 bg-white/75 p-2.5 text-nrs-black shadow-sm backdrop-blur-sm transition hover:bg-white sm:block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-nrs-ink"
                 >
                   <ArrowRight size={18} strokeWidth={1.4} />
                 </button>
+                {/* Phones swipe; the counter shows there is more to see. */}
+                <span aria-hidden="true" className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 bg-white/80 px-3 py-1 text-[10px] tracking-[0.25em] text-nrs-ink backdrop-blur-sm sm:hidden">
+                  {activeImageIndex + 1} / {galleryImages.length}
+                </span>
               </>}
               <button
                 onClick={toggleWishlist}
                 disabled={wishlistBusy}
-                className="absolute top-6 right-6 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-colors z-10"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-3 bg-white/80 backdrop-blur-sm rounded-full text-nrs-black hover:text-nrs-rosegold transition-colors z-10"
                 aria-label={isWishlisted ? 'Favorilerden çıkar' : 'Favorilere ekle'}
                 aria-pressed={isWishlisted}
               >
@@ -226,7 +230,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
               </button>
               </div>
 
-              {galleryImages.length > 1 && <div className="order-first flex min-h-0 flex-col gap-3 overflow-y-auto overflow-x-hidden">
+              {galleryImages.length > 1 && <div className="flex min-h-0 gap-2 overflow-x-auto px-6 sm:px-0 lg:order-first lg:flex-col lg:gap-3 lg:overflow-y-auto lg:overflow-x-hidden">
                 {galleryImages.map((image, index) => (
                   <button
                     type="button"
@@ -234,13 +238,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     onClick={() => setActiveImageIndex(index)}
                     aria-label={copy(`${index + 1}. ürün görselini göster`, `Show product image ${index + 1}`, `عرض صورة المنتج ${index + 1}`)}
                     aria-pressed={activeImageIndex === index}
-                    className={`relative h-12 w-12 shrink-0 sm:h-20 sm:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-ink opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
+                    className={`relative h-16 w-12 shrink-0 lg:h-20 lg:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-ink opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
                   >
                     {!brokenImages.has(index) ? <Image
                       src={image.url}
                       alt={image.altText || `${product.name} — ${index + 1}`}
                       fill
-                      sizes="(max-width: 639px) 48px, 80px"
+                      sizes="(max-width: 1023px) 48px, 80px"
                       className="object-contain"
                       onError={() => markImageBroken(index)}
                     /> : <span className="absolute inset-0 bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
@@ -250,16 +254,16 @@ export default function ProductDetail({ product }: ProductDetailProps) {
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col justify-start pt-12">
+          <div className="lg:col-span-5 flex flex-col justify-start lg:pt-12">
             <div
               style={{ animationDelay: '0.2s' }}
-              className="nrs-fade-side space-y-10"
+              className="nrs-fade-side space-y-8 lg:space-y-10"
             >
               <div className="space-y-4">
                 <span className="text-xs uppercase tracking-[0.3em] text-nrs-rosegold font-sans">
                   {product.category}
                 </span>
-                <h1 className="text-4xl md:text-6xl font-serif text-nrs-ink leading-tight tracking-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif text-nrs-ink leading-tight tracking-tight">
                   {product.name}
                 </h1>
                 <div className="flex items-baseline gap-3">
@@ -275,7 +279,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 </ul>
               </div>
 
-              <div className="space-y-8 py-10 border-y border-nrs-ink/10">
+              <div className="space-y-8 py-8 lg:py-10 border-y border-nrs-ink/10">
                 <div className="space-y-5">
                   {variants.length > 0 && <>
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -331,7 +335,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     {copy('Ödeme / Siparişe geç', 'Continue to checkout', 'المتابعة إلى الدفع')}
                   </button>
                   <CardPaymentNotice id="product-card-payment-status" />
-                  <p className="mt-3 text-sm leading-6">{copy('Kişisel ölçüler isteğe bağlıdır; seçtiğiniz bedenle devam edebilirsiniz.', 'Personal measurements are optional; you can continue with your selected size.', 'القياسات الشخصية اختيارية؛ يمكنك المتابعة بالمقاس الذي اخترته.')} {t('deliveryPromise')}</p>
+                  <p className="text-xs leading-5 text-nrs-ink/60">{copy('Kişisel ölçüler isteğe bağlıdır; seçtiğiniz bedenle devam edebilirsiniz.', 'Personal measurements are optional; you can continue with your selected size.', 'القياسات الشخصية اختيارية؛ يمكنك المتابعة بالمقاس الذي اخترته.')}</p>
                   <button type="button" disabled={!product.inStock || !hasRealVariantInventory || !whatsappNumber}
                     aria-label={copy(`WhatsApp üzerinden ${product.name} için sipariş ver`, `Request ${product.name} on WhatsApp`, `اطلبي ${product.name} عبر واتساب`)}
                     aria-describedby={orderError ? 'product-size-error' : undefined}
@@ -347,11 +351,17 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                       const href = whatsappUrl(message || undefined);
                       if (href) { setOrderError(''); window.open(href, '_blank', 'noopener,noreferrer'); }
                     }}
-                    className="flex min-h-12 w-full items-center justify-center gap-3 bg-[#25D366] px-4 py-5 uppercase tracking-widest text-xs text-nrs-ink enabled:hover:bg-[#20bd5a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    className="flex min-h-12 w-full items-center justify-center gap-3 border border-nrs-ink/25 bg-transparent px-4 py-4 uppercase tracking-widest text-xs text-nrs-ink enabled:hover:border-nrs-ink enabled:hover:bg-nrs-panel transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                     <WhatsAppIcon />
                     {copy('WhatsApp ile sipariş talebi', 'Request via WhatsApp', 'طلب عبر واتساب')}
                   </button>
-                  <BankTransferInfo />
+                  <details className="group border-t border-nrs-ink/10 pt-3">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-xs uppercase tracking-widest text-nrs-ink/70 [&::-webkit-details-marker]:hidden">
+                      {copy('Havale / EFT ile ödeme', 'Pay by bank transfer', 'الدفع بالتحويل البنكي')}
+                      <span aria-hidden="true" className="text-base transition-transform group-open:rotate-45">+</span>
+                    </summary>
+                    <div className="pt-2"><BankTransferInfo /></div>
+                  </details>
                 </div>
               </div>
 

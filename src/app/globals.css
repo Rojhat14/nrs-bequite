@@ -50,8 +50,12 @@ html { scroll-padding-top: calc(var(--nrs-header-height) + 1rem); }
 }
 
 /* Side thumbnails let the main image use the remaining viewport height. */
-.product-gallery {
-  height: calc(100svh - max(8rem, var(--nrs-header-height) + 1rem) - 1.5rem);
+/* Desktop gallery fills the viewport beside the details; phones stack a
+   full-width 2:3 image instead (see ProductDetail). */
+@media (min-width: 1024px) {
+  .product-gallery {
+    height: calc(100svh - max(8rem, var(--nrs-header-height) + 1rem) - 1.5rem);
+  }
 }
 
 h1, h2, h3, h4, .font-serif {
