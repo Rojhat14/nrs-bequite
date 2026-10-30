@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import type { Product } from '@/data/products';
 import { parsePrice, useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
@@ -18,12 +19,18 @@ import { useLocale } from '@/context/LocaleContext';
 import { parseProductDescription } from '@/lib/product-description'
 import { trackAddToCart, trackInitiateCheckout, trackViewContent } from '@/lib/meta-events'
 import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOptions } from '@/lib/dress-sizes'
+import { normalizeSizeLabel, sizeButtonLabel, sizeChartRow, type BodyMeasurements } from '@/lib/size-chart'
+import { LOOK_PART_LABELS, type LookPartKind } from '@/lib/look-families'
+import SizeGuideDialog from '@/components/SizeGuideDialog'
+
+export type LookItem = { id: string; slug: string; name: string; kind: LookPartKind; price: string; priceAmount: number | null }
 
 interface ProductDetailProps {
   product: Product;
+  look?: LookItem[];
 }
 
-export default function ProductDetail({ product }: ProductDetailProps) {
+export default function ProductDetail({ product, look }: ProductDetailProps) {
   const router = useRouter();
   const addItem = useCart(state => state.addItem);
   const bagItems = useCart(state => state.items);
@@ -42,8 +49,11 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     return Math.max(0, primaryIndex)
   });
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurements | null>(null);
+  const closeSizeGuide = useCallback(() => setSizeGuideOpen(false), []);
   const touchStartX = useRef<number | null>(null);
-  useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1) }, [product.id])
+  useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1); setBodyMeasurements(null) }, [product.id])
   // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product page
   useEffect(() => trackViewContent(product), [product.id])
   useEffect(() => {
@@ -95,12 +105,26 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     }
   };
 
-  const actualVariants = (product.variants ?? []).map((variant) => ({ id: variant.id, label: variant.size ?? 'Tek beden', size: variant.size ?? undefined, stock: variant.stock_quantity }))
+  // A stray unsized row next to S–XL showed up as a confusing "Tek beden"
+  // button; only offer it when the product has no sizes at all.
+  const sizedVariantRows = (product.variants ?? []).filter((variant) => variant.size)
+  const actualVariants = (sizedVariantRows.length ? sizedVariantRows : product.variants ?? []).map((variant) => ({ id: variant.id, label: variant.size ? normalizeSizeLabel(variant.size) : 'Tek beden', size: variant.size ?? undefined, stock: variant.stock_quantity }))
   const numericDress = isNumericDressProduct(product)
   const madeToOrder = product.fulfillmentMode === 'made_to_order'
   const variants = sortActualVariantOptions(numericDress ? numericDressVariantOptions(actualVariants) ?? actualVariants : actualVariants)
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
   const hasRealVariantInventory = actualVariants.length > 0
+  const sizeLabels = variants.filter((variant) => variant.size).map((variant) => variant.label)
+  const hasSizeChart = sizeLabels.some((label) => sizeChartRow(label))
+  const selectedRow = selectedVariant ? sizeChartRow(selectedVariant.label) : undefined
+  const currentLook = look?.find((item) => item.id === product.id)
+  const lookSet = look?.find((item) => item.kind === 'set')
+  const lookPieces = look?.filter((item) => item.kind !== 'set') ?? []
+  const piecesTotal = lookPieces.reduce((sum, item) => sum + (item.priceAmount ?? 0), 0)
+  const setSaving = lookSet?.priceAmount != null && lookPieces.every((item) => item.priceAmount != null) ? piecesTotal - lookSet.priceAmount : 0
+  const partLabel = (kind: LookPartKind) => copy(LOOK_PART_LABELS[kind].tr, LOOK_PART_LABELS[kind].en, LOOK_PART_LABELS[kind].ar)
+  const measurementSummary = bodyMeasurements ? ([['chest', copy('Göğüs', 'Bust', 'الصدر')], ['waist', copy('Bel', 'Waist', 'الخصر')], ['hips', copy('Basen', 'Hips', 'الورك')]] as const)
+    .filter(([field]) => bodyMeasurements[field]).map(([field, label]) => `${label} ${bodyMeasurements[field]}`).join(' · ') : ''
   function addSelection(checkout = false) {
     if (!product.inStock) return;
     if (variants.length > 0 && !selectedVariant) {
@@ -125,6 +149,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
       category: product.category, price: product.price, image: product.image,
       size: selectedVariant?.size ?? undefined, variantId: selectedVariant?.id,
       compareAtPrice: product.compareAtPrice,
+      ...(bodyMeasurements && Object.keys(bodyMeasurements).length ? { measurements: bodyMeasurements } : {}),
     }, quantity);
     trackAddToCart(product, quantity);
     setOrderError('');
@@ -278,6 +303,19 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   <li className="flex items-center gap-2"><Clock3 size={15} strokeWidth={1.5} aria-hidden="true" />{copy('7–10 iş günü teslimat', 'Delivered in 7–10 business days', 'التوصيل خلال 7–10 أيام عمل')}</li>
                   <li className="flex items-center gap-2"><Scissors size={15} strokeWidth={1.5} aria-hidden="true" />{copy('Siparişinize özel üretim', 'Made to order for you', 'يُصنع خصيصًا لطلبك')}</li>
                 </ul>
+                {currentLook && look && <div className="mt-2 border border-nrs-ink/15 bg-nrs-panel p-4 text-sm">
+                  <p className="leading-6 text-nrs-ink/80">{currentLook.kind === 'set'
+                    ? copy('Bu fiyata fotoğraftaki takımın tamamı dahildir. Parçaları ayrı ayrı da alabilirsiniz:', 'This price includes the complete set shown. You can also buy the pieces separately:', 'يشمل هذا السعر الطقم الكامل الظاهر في الصورة. يمكنك أيضاً شراء القطع منفصلة:')
+                    : copy(`Bu sayfada yalnızca ${partLabel(currentLook.kind).toLocaleLowerCase('tr-TR')} satılır. Fotoğraftaki diğer parçalar ayrı satılır:`, `This page sells the ${partLabel(currentLook.kind).toLowerCase()} only. The other pieces shown are sold separately:`, `تُباع في هذه الصفحة ${partLabel(currentLook.kind)} فقط. القطع الأخرى في الصورة تُباع منفصلة:`)}</p>
+                  <ul className="mt-3 divide-y divide-nrs-ink/10 border-y border-nrs-ink/10">
+                    {[...(lookSet ? [lookSet] : []), ...lookPieces].map((item) => <li key={item.id}>
+                      {item.id === product.id
+                        ? <span className="flex min-h-11 items-center justify-between gap-3 font-medium"><span>{partLabel(item.kind)} <span className="text-xs font-normal text-nrs-ink/55">({copy('bu sayfa', 'this page', 'هذه الصفحة')})</span></span><span className="tabular-nums">{item.priceAmount == null ? item.price : money(item.priceAmount)}</span></span>
+                        : <Link href={`/product/${encodeURIComponent(item.slug)}`} className="flex min-h-11 items-center justify-between gap-3 underline-offset-4 hover:underline"><span>{partLabel(item.kind)}</span><span className="tabular-nums">{item.priceAmount == null ? item.price : money(item.priceAmount)}</span></Link>}
+                    </li>)}
+                  </ul>
+                  {setSaving > 0 && <p className="mt-2 text-xs text-nrs-ink/65">{copy(`Takım olarak aldığınızda parçaların toplamına göre ${money(setSaving)} avantajlısınız.`, `Buying the set saves ${money(setSaving)} compared with the pieces.`, `شراء الطقم يوفر ${money(setSaving)} مقارنة بالقطع منفصلة.`)}</p>}
+                </div>}
               </div>
 
               <div className="space-y-8 py-8 lg:py-10 border-y border-nrs-ink/10">
@@ -286,7 +324,12 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
                     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      {whatsappNumber && <a href={whatsappUrl(copy(`Merhaba, ${product.name} için beden danışmak istiyorum.`, `Hello, I would like size advice for ${product.name}.`, `مرحبًا، أود استشارة بخصوص مقاس ${product.name}.`)) ?? undefined}
+                      {hasSizeChart && <button type="button" onClick={() => setSizeGuideOpen(true)}
+                        className="inline-flex min-h-9 items-center gap-1.5 font-medium text-nrs-ink underline underline-offset-4">
+                        <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />
+                        {copy('Beden tablosu · Bedenimi bul', 'Size chart · Find my size', 'جدول المقاسات · اعرفي مقاسك')}
+                      </button>}
+                      {!hasSizeChart && whatsappNumber && <a href={whatsappUrl(copy(`Merhaba, ${product.name} için beden danışmak istiyorum.`, `Hello, I would like size advice for ${product.name}.`, `مرحبًا، أود استشارة بخصوص مقاس ${product.name}.`)) ?? undefined}
                         target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
                         <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />
                         {copy('Bedeninizi WhatsApp’tan danışın', 'Ask about your size on WhatsApp', 'استشيري مقاسك عبر واتساب')}
@@ -307,10 +350,18 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                             : 'bg-transparent text-nrs-ink border-nrs-ink/20 hover:border-nrs-ink'
                         }`}
                       >
-                        {variant.label}
+                        {variant.size ? sizeButtonLabel(variant.label) : variant.label}
                       </button>
                     ))}
                   </div>
+                  {selectedRow && <p className="text-xs leading-5 text-nrs-ink/65">{copy(
+                    `${selectedRow.letter} · ${selectedRow.numeric} beden, vücut ölçüsü göğüs ${selectedRow.chest.join('–')}, bel ${selectedRow.waist.join('–')}, basen ${selectedRow.hips.join('–')} cm olanlara göre dikilir.`,
+                    `Size ${selectedRow.letter} · ${selectedRow.numeric} is cut for a ${selectedRow.chest.join('–')} cm bust, ${selectedRow.waist.join('–')} cm waist and ${selectedRow.hips.join('–')} cm hips.`,
+                    `يُخاط المقاس ${selectedRow.letter} · ${selectedRow.numeric} لصدر ${selectedRow.chest.join('–')} وخصر ${selectedRow.waist.join('–')} وورك ${selectedRow.hips.join('–')} سم.`)}</p>}
+                  {measurementSummary && <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-nrs-ink/75">
+                    <span>{copy('Siparişe eklenecek ölçüleriniz:', 'Measurements added to your order:', 'القياسات التي ستُضاف إلى طلبك:')} <span className="tabular-nums">{measurementSummary} cm</span></span>
+                    <button type="button" onClick={() => setBodyMeasurements(null)} className="underline underline-offset-4 text-nrs-ink/60 hover:text-nrs-ink">{copy('Kaldır', 'Remove', 'إزالة')}</button>
+                  </p>}
                   {orderError && <p id="product-size-error" role="alert" className="text-sm text-red-700">{orderError}</p>}
                   </>}
                 </div>
@@ -336,7 +387,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     {copy('Ödeme / Siparişe geç', 'Continue to checkout', 'المتابعة إلى الدفع')}
                   </button>
                   <CardPaymentNotice id="product-card-payment-status" />
-                  <p className="text-xs leading-5 text-nrs-ink/60">{copy('Kişisel ölçüler isteğe bağlıdır; seçtiğiniz bedenle devam edebilirsiniz.', 'Personal measurements are optional; you can continue with your selected size.', 'القياسات الشخصية اختيارية؛ يمكنك المتابعة بالمقاس الذي اخترته.')}</p>
+                  {hasSizeChart && <p className="text-xs leading-5 text-nrs-ink/60">{copy('Bedeninizden emin değilseniz “Bedenimi bul” ile ölçülerinizi girin; atölyemiz dikimde ölçülerinizi esas alır.', 'Not sure about your size? Use “Find my size” to add your measurements; our atelier cuts to them.', 'غير متأكدة من مقاسك؟ استخدمي «اعرفي مقاسك» لإضافة قياساتك؛ وسيعتمدها مشغلنا عند الخياطة.')}</p>}
                   <button type="button" disabled={!product.inStock || !hasRealVariantInventory || !whatsappNumber}
                     aria-label={copy(`WhatsApp üzerinden ${product.name} için sipariş ver`, `Request ${product.name} on WhatsApp`, `اطلبي ${product.name} عبر واتساب`)}
                     aria-describedby={orderError ? 'product-size-error' : undefined}
@@ -396,21 +447,21 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                   </div>
                   <div className="space-y-4">
                     <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{copy('Kalıp ve bakım', 'Fit and care', 'القصة والعناية')}</h4>
-                    <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || copy('Bakım bilgisi yakında eklenecektir.', 'Care information will be added soon.', 'ستُضاف معلومات العناية قريباً.')}</p>
+                    <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || copy('Ürün etiketindeki bakım talimatlarını izlemenizi öneririz.', 'Please follow the care instructions on the garment label.', 'يُرجى اتباع تعليمات العناية الموجودة على ملصق القطعة.')}</p>
                   </div>
-                </div>
-
-                <div className="pt-8 space-y-4">
-                  <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{copy('Stil önerisi', 'Style notes', 'اقتراحات التنسيق')}</h4>
-                  <p className="text-sm font-sans text-nrs-ink/70 italic leading-relaxed">
-                    {copy('Ton sür ton bir pantolonla tamamlayarak güçlü bir takım görünümü yaratabilir veya sade bir elbisenin üzerine taşıyarak daha sofistike bir akşam görünümü elde edebilirsiniz.', 'Pair it with coordinating trousers for a composed look, or layer it over a simple dress for a more refined evening outfit.', 'نسّقيه مع بنطال بدرجات متقاربة لإطلالة متناسقة، أو ارتديه فوق فستان بسيط لإطلالة مسائية أكثر أناقة.')}
-                  </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </main>
+      <SizeGuideDialog open={sizeGuideOpen} onClose={closeSizeGuide} productName={product.name} availableSizes={sizeLabels}
+        initialMeasurements={bodyMeasurements ?? undefined}
+        onApply={(size, measurements) => {
+          const variant = variants.find((item) => item.label === size)
+          if (variant?.id) { setSelectedVariantId(variant.id); setOrderError('') }
+          setBodyMeasurements(measurements && Object.keys(measurements).length ? measurements : null)
+        }} />
     </div>
   );
 }

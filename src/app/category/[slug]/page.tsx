@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import ProductListing from '@/components/ProductListing'
 import CategoryHero from '@/components/CategoryHero'
-import { getCategoryCatalog, getStorefrontProducts } from '@/lib/products'
+import { JUMPSUIT_CATEGORY_SLUG, getCategoryCatalog, getStorefrontProducts, isJumpsuitProduct } from '@/lib/products'
 import { getCategoryEditorialImage } from '@/lib/editorialImages'
 import { isHomeCategory } from '@/lib/home-category'
 import { getHomeCategoryCover } from '@/lib/storage/category-covers'
@@ -27,6 +27,7 @@ const categoryBanners: Record<string, { title: string; description: string }> = 
   blazers: { title: 'KADIN CEKET & BLAZER', description: 'Güçlü bir siluet, doğru kesimle başlar. Modern terzilik anlayışıyla tasarlanmış seçkin parçalar.' },
   'alt-giyim': { title: 'KADIN ALT GİYİM', description: 'Dengeli siluetler ve özenli kesimler. Modern terziliği rahatlık ve zarafetle birleştiren tasarımlar.' },
   bottoms: { title: 'KADIN ALT GİYİM', description: 'Dengeli siluetler ve özenli kesimler. Modern terziliği rahatlık ve zarafetle birleştiren tasarımlar.' },
+  tulumlar: { title: 'KADIN TULUM MODELLERİ', description: 'Tek parçada tamamlanan görünüm. Davetten günlüğe, saten ve ipeksi dokularda tulumlar.' },
   takimlar: { title: 'KADIN TAKIM KOLEKSİYONU', description: 'Bir bütün olarak tasarlanan siluetler. Dengeli bir görünüm sunan rafine takım seçkileri.' },
   suits: { title: 'KADIN TAKIM KOLEKSİYONU', description: 'Bir bütün olarak tasarlanan siluetler. Dengeli bir görünüm sunan rafine takım seçkileri.' },
   bedding: { title: 'NRS HOME', description: 'Nevresim ve ev tekstili koleksiyonumuzu keşfedin.' },
@@ -39,6 +40,15 @@ const categoryBanners: Record<string, { title: string; description: string }> = 
 
 async function getPageData(slug: string) {
   const catalog = await getCategoryCatalog(slug)
+  if (!catalog.category && slug.toLowerCase() === JUMPSUIT_CATEGORY_SLUG) {
+    const products = await getStorefrontProducts()
+    return {
+      category: { id: '', name: 'Tulumlar', slug: JUMPSUIT_CATEGORY_SLUG, description: null, sort_order: 0 },
+      products: products.filter(isJumpsuitProduct),
+    }
+  }
+  // Jumpsuits have their own category; keep them out of the dress and set lists.
+  if (catalog.category && catalog.category.slug !== JUMPSUIT_CATEGORY_SLUG) return { ...catalog, products: catalog.products.filter(product => !isJumpsuitProduct(product)) }
   if (!catalog.category && ['sale', 'indirim'].includes(slug.toLowerCase())) {
     const products = await getStorefrontProducts()
     return {

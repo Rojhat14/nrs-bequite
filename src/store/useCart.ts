@@ -179,6 +179,8 @@ export const useCart = create<CartStore>()(
                   price: product.price,
                   compareAtPrice: product.compareAtPrice ?? null,
                   ...(!item.variantId && product.variantId ? { variantId: product.variantId } : {}),
+                  // Newly entered measurements from the size finder replace older ones.
+                  ...(product.measurements && Object.keys(product.measurements).length ? { measurements: product.measurements } : {}),
                   quantity: item.quantity + quantity,
                 }
               : item)

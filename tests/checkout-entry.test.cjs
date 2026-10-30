@@ -14,7 +14,7 @@ function productHarness({ stock = 2, inStock = true, variants = true, bag = [] }
   let cursor = 0;
   const slots = [], additions = [], routes = [], drawers = [];
   const store = { items: bag, addItem: (...args) => additions.push(args), openDrawer: () => drawers.push(true) };
-  const fakeReact = { ...React, useEffect() {}, useRef: () => ({ current: null }), useState(initial) {
+  const fakeReact = { ...React, useEffect() {}, useCallback: fn => fn, useRef: () => ({ current: null }), useState(initial) {
     const index = cursor++;
     if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
     return [slots[index], value => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }];
@@ -44,7 +44,7 @@ test('Product checkout entry reports a missing size beside the picker and requir
   tree = h.render();
   assert.ok(find(tree, node => node.type === 'p' && node.props.id === 'product-size-error'));
   assert.equal(find(tree, node => node.type === 'p' && node.props.id === 'whatsapp-order-error'), null);
-  find(tree, node => node.type === 'button' && node.props.children === 'M').props.onClick();
+  find(tree, node => node.type === 'button' && node.props.children === 'M · 38').props.onClick();
   tree = h.render();
   assert.equal(checkout().props.disabled, false);
   find(tree, node => node.type === 'input' && node.props.type === 'number').props.onChange({ target: { value: '3' } });
@@ -153,7 +153,7 @@ test('Localized checkout shell uses a compact header and only the necessary shor
 test('Adding a size again counts what is already in the bag, so a saved cart cannot outgrow the stock', () => {
   const h = productHarness({ stock: 2, bag: [{ id: 'product-1', variantId: 'variant-1', quantity: 2 }] });
   let tree = h.render();
-  find(tree, node => node.type === 'button' && node.props.children === 'M').props.onClick();
+  find(tree, node => node.type === 'button' && node.props.children === 'M · 38').props.onClick();
   tree = h.render();
   find(tree, node => node.type === 'button' && [].concat(node.props.children).includes('Sepete ekle')).props.onClick();
   assert.equal(h.additions.length, 0);

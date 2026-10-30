@@ -321,6 +321,7 @@ const readStorefrontCategories = unstable_cache(async function readStorefrontCat
       let categories = (data ?? []) as unknown as StorefrontCategory[]
       if (locale !== 'tr' && categories.length) categories = await localizeTaxonomyRows(
         supabase, 'category', categories, locale)
+      categories = withJumpsuitCategory(categories, locale)
       return categories.some(isHomeCategory)
         ? await Promise.all(categories.map(async category => isHomeCategory(category)
           ? { ...category, name: locale === 'ar' ? 'المنزل' : 'Home', imageUrl: await getHomeCategoryCover(category.id) } : category))
@@ -331,6 +332,25 @@ const readStorefrontCategories = unstable_cache(async function readStorefrontCat
   }
   return getLegacyCategories()
 }, ['storefront-categories-v1'], { revalidate: STOREFRONT_CACHE_SECONDS, tags: [STOREFRONT_CACHE_TAG] })
+
+/** Jumpsuits were filed under Elbiseler/Takımlar. Until the catalogue has its
+ * own "tulumlar" row, list a route-backed category right after the dresses. */
+export const JUMPSUIT_CATEGORY_SLUG = 'tulumlar'
+export function isJumpsuitProduct(product: Pick<Product, 'id' | 'slug'>) {
+  // Some IDs are opaque ("111111111"); the URL slug still names the garment.
+  return [product.id, product.slug ?? ''].some(value => /(^|-)tulum(-|$)/.test(value))
+}
+function withJumpsuitCategory(categories: StorefrontCategory[], locale: Locale) {
+  if (categories.some(category => category.slug === JUMPSUIT_CATEGORY_SLUG)) return categories
+  const dresses = categories.find(category => ['elbiseler', 'dresses'].includes(category.slug))
+  const jumpsuits: StorefrontCategory = {
+    id: '', slug: JUMPSUIT_CATEGORY_SLUG, description: null,
+    name: locale === 'en' ? 'Jumpsuits' : locale === 'ar' ? 'جمبسوت' : 'Tulumlar',
+    sort_order: (dresses?.sort_order ?? 0) + 0.5,
+  }
+  const index = dresses ? categories.indexOf(dresses) + 1 : 0
+  return [...categories.slice(0, index), jumpsuits, ...categories.slice(index)]
+}
 
 export const getStorefrontCategories = cache(async function getStorefrontCategories(): Promise<StorefrontCategory[]> {
   return readStorefrontCategories(await getRequestLocale())

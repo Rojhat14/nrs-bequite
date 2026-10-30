@@ -113,6 +113,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
   const categoryOrder = [
     { slugs: ['elbiseler', 'dresses'], names: ['elbiseler'], fallback: 'elbiseler', label: 'ELBİSELER', key: 'dresses' as const },
+    { slugs: ['tulumlar', 'jumpsuits'], names: ['tulumlar'], fallback: 'tulumlar', label: 'TULUMLAR', key: 'jumpsuits' as const },
     { slugs: ['ust-giyim', 'tops'], names: ['üst giyim'], fallback: 'ust-giyim', label: 'ÜST GİYİM', key: 'tops' as const },
     { slugs: ['ceketler-blazerlar', 'blazers'], names: ['ceketler & blazerlar'], fallback: 'ceketler-blazerlar', label: 'CEKETLER & BLAZERLAR', key: 'blazers' as const },
     { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM', key: 'bottoms' as const },
