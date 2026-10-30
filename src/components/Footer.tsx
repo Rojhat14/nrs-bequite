@@ -22,11 +22,11 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-1 flex flex-col items-start space-y-6">
             <Link href={`${prefix}/`} className="flex flex-col items-start group">
               <Image
-                src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
-                alt="NRS Logo"
-                width={160}
-                height={64}
-                className="h-16 w-auto object-contain transition-transform duration-700 group-hover:scale-105"
+                src="/Logo/nrs-wordmark.png"
+                alt="NRS Boutique Luminous"
+                width={660}
+                height={320}
+                className="h-14 w-auto object-contain transition-transform duration-700 group-hover:scale-105"
               />
               <span className="text-[10px] uppercase tracking-[0.4em] font-sans text-nrs-ink/60 mt-4">
                 {copy('Zarafetin Sanatı', 'The Art of Elegance', 'فن الأناقة')}
@@ -50,8 +50,9 @@ export default function Footer() {
             </h4>
             <nav className="flex flex-col gap-3">
               {[
-                { name: copy('Yeni Gelenler', 'New arrivals', 'وصل حديثاً'), href: `${prefix}/` },
+                { name: copy('Yeni Gelenler', 'New arrivals', 'وصل حديثاً'), href: `${prefix}/collections/yeni-gelenler` },
                 { name: copy('Elbiseler', 'Dresses', 'فساتين'), href: `${prefix}/category/elbiseler` },
+                { name: copy('Tulumlar', 'Jumpsuits', 'جمبسوت'), href: `${prefix}/category/tulumlar` },
                 { name: copy('Üst Giyim', 'Tops', 'قمصان وبلوزات'), href: `${prefix}/category/ust-giyim` },
                 { name: copy('Ceketler & Blazerlar', 'Jackets & blazers', 'سترات وبليزرات'), href: `${prefix}/category/ceketler-blazerlar` },
                 { name: copy('Alt Giyim', 'Bottoms', 'ملابس سفلية'), href: `${prefix}/category/alt-giyim` },
@@ -81,7 +82,6 @@ export default function Footer() {
                 { name: copy('NRS Hakkında', 'About NRS', 'عن NRS'), href: `${prefix}/about` },
                 { name: copy('NRS Kadını', 'The NRS Woman', 'امرأة NRS'), href: `${prefix}/about#woman` },
                 { name: copy('Atölye', 'The Atelier', 'المشغل'), href: `${prefix}/about#atelier` },
-                { name: copy('Özel Liste', 'Private list', 'القائمة الخاصة'), href: `${prefix}/#newsletter` },
                 { name: t('contact'), href: `${prefix}/contact` },
               ].map((link) => (
                 <Link
@@ -133,6 +133,7 @@ export default function Footer() {
           </div>
         </nav>
 
+        <p className="mb-8 text-xs leading-6 text-nrs-ink/55">{copy('Kredi ve banka kartıyla 3D Secure güvenli ödeme · Havale / EFT · Türkiye geneli ücretsiz kargo', '3D Secure card payment · Bank transfer · Free shipping within Türkiye', 'دفع آمن بالبطاقة عبر 3D Secure · تحويل بنكي · شحن مجاني داخل تركيا')}</p>
         <div className="pt-10 border-t border-nrs-ink/5 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-[10px] uppercase tracking-widest text-nrs-ink/30 font-sans">
             © {new Date().getFullYear()} NRS. {copy('Tüm Hakları Saklıdır.', 'All rights reserved.', 'جميع الحقوق محفوظة.')}

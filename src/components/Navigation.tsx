@@ -114,10 +114,10 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
   const categoryOrder = [
     { slugs: ['elbiseler', 'dresses'], names: ['elbiseler'], fallback: 'elbiseler', label: 'ELBİSELER', key: 'dresses' as const },
     { slugs: ['tulumlar', 'jumpsuits'], names: ['tulumlar'], fallback: 'tulumlar', label: 'TULUMLAR', key: 'jumpsuits' as const },
-    { slugs: ['ust-giyim', 'tops'], names: ['üst giyim'], fallback: 'ust-giyim', label: 'ÜST GİYİM', key: 'tops' as const },
-    { slugs: ['ceketler-blazerlar', 'blazers'], names: ['ceketler & blazerlar'], fallback: 'ceketler-blazerlar', label: 'CEKETLER & BLAZERLAR', key: 'blazers' as const },
-    { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM', key: 'bottoms' as const },
     { slugs: ['takimlar', 'suits'], names: ['takımlar'], fallback: 'takimlar', label: 'TAKIMLAR', key: 'sets' as const },
+    { slugs: ['ceketler-blazerlar', 'blazers'], names: ['ceketler & blazerlar'], fallback: 'ceketler-blazerlar', label: 'CEKETLER & BLAZERLAR', key: 'blazers' as const },
+    { slugs: ['ust-giyim', 'tops'], names: ['üst giyim'], fallback: 'ust-giyim', label: 'ÜST GİYİM', key: 'tops' as const },
+    { slugs: ['alt-giyim', 'bottoms'], names: ['alt giyim'], fallback: 'alt-giyim', label: 'ALT GİYİM', key: 'bottoms' as const },
     { slugs: ['dis-giyim'], names: ['dış giyim'], fallback: 'dis-giyim', label: 'DIŞ GİYİM', key: 'outerwear' as const },
     { slugs: ['bedding', 'home', 'nevresim'], names: ['home', 'bedding', 'nevresim'], fallback: 'bedding', label: 'HOME', key: 'bedding' as const },
   ];
@@ -129,10 +129,10 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     const collection = collections.find((entry) => entry.slug === slug)
     return collection ? `/collections/${encodeURIComponent(collection.slug)}` : fallback
   };
+  // The top bar fits on one line: Home and Koleksiyonlar live in the drawer.
   const navLinks = [
     { name: t('newArrivals').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: collectionHref('yeni-gelenler', '/') },
-    ...categoryLinks,
-    { name: t('collections').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: '/collections' },
+    ...categoryLinks.filter((_, index) => categoryOrder[index].key !== 'bedding'),
     { name: t('sale').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: collectionHref('indirim', '/category/sale') },
   ];
 
@@ -251,6 +251,11 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     >
       <AccountModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} />
 
+      <div className="bg-nrs-charcoal px-4 py-2 text-center text-[10px] uppercase tracking-[0.2em] text-nrs-ivory/90 sm:text-[10.5px]">
+        <span className="sm:hidden">{locale === 'en' ? 'Free shipping · Made to order' : locale === 'ar' ? 'شحن مجاني · تفصيل حسب الطلب' : 'Ücretsiz kargo · Siparişe özel dikim'}</span>
+        <span className="hidden sm:inline">{locale === 'en' ? 'Free shipping within Türkiye · Made to order in 7–10 business days · ' : locale === 'ar' ? 'شحن مجاني داخل تركيا · تفصيل حسب الطلب خلال 7–10 أيام عمل · ' : 'Türkiye geneli ücretsiz kargo · 7–10 iş gününde siparişe özel dikim · '}
+          <Link href="/size-guide" className="underline underline-offset-4 hover:text-nrs-ivory">{locale === 'en' ? 'Find my size' : locale === 'ar' ? 'اعرفي مقاسك' : 'Bedenimi bul'}</Link></span>
+      </div>
       <nav className={`transition-all duration-500 ease-in-out ${styles.container}`}>
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="flex justify-between items-center">
@@ -277,15 +282,15 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
             <div className="hidden md:flex flex-col items-center justify-center w-1/3">
               <div className="flex justify-center relative">
-                <Link href="/" className="flex flex-col items-center justify-center cursor-pointer group relative">
+                <Link href="/" aria-label="NRS Boutique Luminous" className="flex flex-col items-center justify-center cursor-pointer group relative py-2 focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4">
                   <Image
-                    src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
-                    alt="NRS Logo"
-                    width={180}
-                    height={72}
+                    src="/Logo/nrs-wordmark.png"
+                    alt="NRS Boutique Luminous"
+                    width={660}
+                    height={320}
                     priority
                     data-intro-target="logo"
-                    className={`h-16 md:h-24 w-auto object-contain transition-all duration-1000 group-hover:scale-105 ${styles.logo} ${logoOpacity}`}
+                    className={`h-12 xl:h-14 w-auto object-contain transition-all duration-1000 group-hover:scale-[1.03] ${styles.logo} ${logoOpacity}`}
                   />
                 </Link>
               </div>
@@ -332,13 +337,14 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               >
                 <Menu size={22} strokeWidth={1.2} />
               </button>
-              <Link href="/" className="cursor-pointer">
+              <Link href="/" aria-label="NRS Boutique Luminous" className="cursor-pointer py-2 focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4">
                 <Image
-                  src="/Logo/Gemini_Generated_Image_fy30oqfy30oqfy30.png"
-                  alt="NRS Logo"
-                  width={180}
-                  height={72}
-                  className={`h-12 w-auto object-contain ${styles.logo}`}
+                  src="/Logo/nrs-wordmark.png"
+                  alt="NRS Boutique Luminous"
+                  width={660}
+                  height={320}
+                  priority
+                  className={`h-10 w-auto object-contain ${styles.logo}`}
                   data-intro-target="logo"
                 />
               </Link>
@@ -368,12 +374,12 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
             </div>
           </div>
 
-          <div className="hidden lg:flex flex-wrap justify-center gap-x-6 gap-y-3 -mt-4">
+          <div className="hidden lg:flex flex-nowrap justify-center gap-x-5 xl:gap-x-8 pb-3 pt-1">
             {navLinks.map((link) => (
               <button
                 key={link.name}
                 onClick={() => handleNavClick(link.href)}
-                className={`text-[10px] uppercase tracking-[0.3em] ${styles.text} opacity-50 hover:opacity-100 transition-all duration-700 font-sans relative group whitespace-nowrap flex-shrink-0`}
+                className={`text-[10.5px] uppercase tracking-[0.2em] ${styles.text} opacity-70 hover:opacity-100 transition-all duration-500 font-sans relative group whitespace-nowrap flex-shrink-0 focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4`}
               >
                 {link.name}
                 <span className={`absolute -bottom-1 left-0 w-0 h-px transition-all duration-700 group-hover:w-full ${styles.text === 'text-nrs-ink' ? 'bg-nrs-black' : 'bg-nrs-canvas'}`}></span>

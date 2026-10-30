@@ -43,6 +43,7 @@ function loader(mocks = {}) {
             checkoutQuoteError: 'Sipariş özeti doğrulanamadı.', checkoutSaveError: 'Sipariş talebi kaydedilemedi.',
             checkoutConsentError: 'Sipariş özetini yeniden inceleyip sözleşmeleri kabul edin.', checkoutPaymentError: 'Ödeme başlatılamadı; sipariş özetini yeniden doğrulayın.' })[key] || key,
           money: amount => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount),
+          priceTag: amount => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: amount % 1 ? 2 : 0 }).format(amount),
           minorMoney: minor => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(minor / 100),
         }), LocaleProvider: ({ children }) => children,
       };

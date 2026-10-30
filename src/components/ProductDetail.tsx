@@ -36,7 +36,7 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
   const bagItems = useCart(state => state.items);
   const openDrawer = useCart(state => state.openDrawer);
   const { user } = useAuth();
-  const { locale, rate, money, t, fxAvailable } = useLocale();
+  const { locale, rate, priceTag, t, fxAvailable } = useLocale();
   const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr
   const userId = user?.id;
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -190,7 +190,7 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
     <div className="min-h-screen bg-nrs-canvas flex">
       <main className="w-full flex-1 pb-32">
         <div className="max-w-7xl mx-auto px-6 pt-[calc(var(--nrs-header-height)+0.75rem)] lg:pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
-          <div className="lg:col-span-7 min-w-0 space-y-6">
+          <div className="lg:col-span-7 min-w-0 space-y-6 lg:sticky lg:top-[calc(var(--nrs-header-height)+1rem)] lg:self-start">
             <div
               className={`nrs-fade-up product-gallery relative -mx-6 grid gap-3 sm:mx-0 ${galleryImages.length > 1 ? 'grid-cols-1 lg:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
               role="region"
@@ -289,11 +289,11 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                 <span className="text-xs uppercase tracking-[0.3em] text-nrs-rosegold font-sans">
                   {product.category}
                 </span>
-                <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif text-nrs-ink leading-tight tracking-tight">
+                <h1 className="text-3xl sm:text-4xl xl:text-[2.75rem] font-serif text-nrs-ink leading-[1.1] tracking-tight">
                   {product.name}
                 </h1>
                 <div className="flex items-baseline gap-3">
-                  <p className="text-2xl font-serif text-nrs-ink/80">{product.priceAmount == null ? product.price : money(product.priceAmount)}</p>
+                  <p className="text-2xl font-sans font-light tabular-nums text-nrs-ink">{product.priceAmount == null ? product.price : priceTag(product.priceAmount)}</p>
                 </div>
                 {locale !== 'tr' && <p className="max-w-md text-xs text-nrs-ink/55">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
                 {/* The delivery promise near the price answers the first questions
@@ -310,11 +310,11 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                   <ul className="mt-3 divide-y divide-nrs-ink/10 border-y border-nrs-ink/10">
                     {[...(lookSet ? [lookSet] : []), ...lookPieces].map((item) => <li key={item.id}>
                       {item.id === product.id
-                        ? <span className="flex min-h-11 items-center justify-between gap-3 font-medium"><span>{partLabel(item.kind)} <span className="text-xs font-normal text-nrs-ink/55">({copy('bu sayfa', 'this page', 'هذه الصفحة')})</span></span><span className="tabular-nums">{item.priceAmount == null ? item.price : money(item.priceAmount)}</span></span>
-                        : <Link href={`/product/${encodeURIComponent(item.slug)}`} className="flex min-h-11 items-center justify-between gap-3 underline-offset-4 hover:underline"><span>{partLabel(item.kind)}</span><span className="tabular-nums">{item.priceAmount == null ? item.price : money(item.priceAmount)}</span></Link>}
+                        ? <span className="flex min-h-11 items-center justify-between gap-3 font-medium"><span>{partLabel(item.kind)} <span className="text-xs font-normal text-nrs-ink/55">({copy('bu sayfa', 'this page', 'هذه الصفحة')})</span></span><span className="tabular-nums">{item.priceAmount == null ? item.price : priceTag(item.priceAmount)}</span></span>
+                        : <Link href={`/product/${encodeURIComponent(item.slug)}`} className="flex min-h-11 items-center justify-between gap-3 underline-offset-4 hover:underline"><span>{partLabel(item.kind)}</span><span className="tabular-nums">{item.priceAmount == null ? item.price : priceTag(item.priceAmount)}</span></Link>}
                     </li>)}
                   </ul>
-                  {setSaving > 0 && <p className="mt-2 text-xs text-nrs-ink/65">{copy(`Takım olarak aldığınızda parçaların toplamına göre ${money(setSaving)} avantajlısınız.`, `Buying the set saves ${money(setSaving)} compared with the pieces.`, `شراء الطقم يوفر ${money(setSaving)} مقارنة بالقطع منفصلة.`)}</p>}
+                  {setSaving > 0 && <p className="mt-2 text-xs text-nrs-ink/65">{copy(`Takım olarak aldığınızda parçaların toplamına göre ${priceTag(setSaving)} avantajlısınız.`, `Buying the set saves ${priceTag(setSaving)} compared with the pieces.`, `شراء الطقم يوفر ${priceTag(setSaving)} مقارنة بالقطع منفصلة.`)}</p>}
                 </div>}
               </div>
 
@@ -442,7 +442,6 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                     <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{t('details')}</h4>
                     <ul className="text-sm font-sans text-nrs-ink/70 space-y-2">
                       {product.details.fabric && <li>{product.details.fabric}</li>}
-                      {product.category && <li>{product.category}</li>}
                     </ul>
                   </div>
                   <div className="space-y-4">

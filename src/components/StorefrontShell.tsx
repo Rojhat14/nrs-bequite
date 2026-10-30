@@ -8,7 +8,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import CartDrawer from '@/components/CartDrawer'
 import CartPriceSync from '@/components/CartPriceSync'
 import Navigation from '@/components/Navigation'
-import Newsletter from '@/components/Newsletter'
 import LanguageSelector from '@/components/LanguageSelector'
 import { useLocale } from '@/context/LocaleContext'
 import { localePrefix } from '@/lib/i18n/messages'
@@ -55,7 +54,6 @@ export default function StorefrontShell({ children, categories, collections, foo
       <CartPriceSync />
       {children}
       {footer}
-      <Newsletter />
       <CartDrawer />
     </StorefrontCatalogProvider>
   )

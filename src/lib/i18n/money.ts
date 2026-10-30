@@ -25,6 +25,16 @@ export function formatMoney(amountTry: number, locale: Locale, rate: DisplayRate
   }).format(minor / 100)
 }
 
+/** Shop-window price: whole amounts drop the ",00" (₺4.290); checkout and
+ * legal summaries keep formatMoney's two decimals. */
+export function formatPriceTag(amountTry: number, locale: Locale, rate: DisplayRate | null) {
+  const minor = tryToDisplayMinor(Math.round(amountTry * 100), locale, rate)
+  const digits = minor % 100 === 0 ? 0 : 2
+  return new Intl.NumberFormat(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR', {
+    style: 'currency', currency: displayCurrency(locale, rate), minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(minor / 100)
+}
+
 /** Largest-remainder allocation makes rounded USD line values add to the displayed total. */
 export function allocateDisplayMinor(valuesTryMinor: number[], locale: Locale, rate: DisplayRate | null) {
   if (locale === 'tr' || !rate) return valuesTryMinor.map(value => Math.round(value))

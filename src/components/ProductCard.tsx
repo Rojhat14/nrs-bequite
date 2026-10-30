@@ -24,7 +24,7 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
   const openDrawer = useCart(state => state.openDrawer);
   const router = useRouter();
   const { user } = useAuth();
-  const { locale, money, t, fxAvailable } = useLocale();
+  const { locale, priceTag, t, fxAvailable } = useLocale();
   const userId = user?.id;
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
@@ -143,7 +143,7 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
           <Link href={`/product/${encodeURIComponent(product.slug || product.id)}`}>{product.name}</Link>
         </h3>
           <p className="text-sm font-sans text-nrs-ink/60 font-light">
-          {product.priceAmount == null ? product.price : money(product.priceAmount)}
+          {product.priceAmount == null ? product.price : priceTag(product.priceAmount)}
         </p>
         {locale !== 'tr' && !fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('fxUnavailable')}</p>}
         {locale !== 'tr' && fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('currencyNote')}</p>}
