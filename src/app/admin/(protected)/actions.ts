@@ -358,6 +358,31 @@ export async function updateOrderStatus(form: FormData): Promise<ActionResult> {
   return { ok: true, message: 'Sipariş durumu güncellendi.' }
 }
 
+export async function setOrderArchived(form: FormData): Promise<ActionResult> {
+  await requireAdmin()
+  const orderId = text(form, 'order_id')
+  const archived = text(form, 'archived') === 'true'
+  if (!orderId) return failure('Sipariş bulunamadı.')
+  const supabase = await createSupabaseServerClient()
+  const { error } = await supabase.rpc('nrs_admin_set_order_archived', { p_order_id: orderId, p_archived: archived })
+  if (error) return failure(error.code === 'PGRST202' ? 'Arşiv özelliği için veritabanı güncellemesi henüz çalıştırılmadı.'
+    : error.code === '22023' ? 'Yalnızca ödenmemiş ve iptal edilmiş siparişler listeden kaldırılabilir.' : 'Sipariş güncellenemedi.')
+  revalidatePath('/admin/orders')
+  revalidatePath(`/admin/orders/${encodeURIComponent(orderId)}`)
+  revalidatePath('/admin')
+  return { ok: true, message: archived ? 'Sipariş listeden kaldırıldı (arşivde saklanıyor).' : 'Sipariş yeniden listeye alındı.' }
+}
+
+export async function archiveUnpaidCancelledOrders(): Promise<ActionResult> {
+  await requireAdmin()
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.rpc('nrs_admin_archive_unpaid_cancelled_orders')
+  if (error) return failure(error.code === 'PGRST202' ? 'Arşiv özelliği için veritabanı güncellemesi henüz çalıştırılmadı.' : 'Siparişler arşivlenemedi.')
+  revalidatePath('/admin/orders')
+  revalidatePath('/admin')
+  return { ok: true, message: `${Number(data) || 0} ödenmemiş iptal sipariş listeden kaldırıldı.` }
+}
+
 export async function setImagePrimary(form: FormData): Promise<ActionResult> {
   await requireAdmin()
   const id = text(form, 'id')

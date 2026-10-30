@@ -84,6 +84,7 @@ export interface OrderRow {
   manual_paid_at?: string | null
   manual_payment_reference?: string | null
   payment_id: string | null
+  admin_archived_at?: string | null
   created_at: string
 }
 

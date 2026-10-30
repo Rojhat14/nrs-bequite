@@ -7,6 +7,7 @@ import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import AdminDatabaseState from '@/components/admin/AdminDatabaseState'
 import AdminStatusBadge from '@/components/admin/AdminStatusBadge'
 import OrderStatusForm from '@/components/admin/OrderStatusForm'
+import { OrderArchiveButton } from '@/components/admin/OrderArchiveButton'
 import { getOrderDetail, isMissingTable } from '@/lib/admin/data'
 import { formatDate, formatMoney } from '@/lib/admin/types'
 
@@ -21,7 +22,9 @@ export default async function AdminOrderDetailPage({ params: paramsPromise }: { 
   const order = data.order
   return <div className="mx-auto max-w-6xl">
     <AdminPageHeader title="Sipariş detayı" description={`Sipariş ${order.id}`} />
-    <div className="mb-6 flex flex-wrap items-center gap-3"><AdminStatusBadge value={order.status} /><span className="text-xs text-[#8A8479]">Oluşturulma: {formatDate(order.created_at)}</span></div>
+    <div className="mb-6 flex flex-wrap items-center gap-3"><AdminStatusBadge value={order.status} /><span className="text-xs text-[#8A8479]">Oluşturulma: {formatDate(order.created_at)}</span>
+      {order.admin_archived_at && <span className="text-xs text-[#8A8479]">Arşivde · {formatDate(order.admin_archived_at)}</span>}
+      {order.status === 'cancelled' && !order.manual_paid_at && (!data.payment || data.payment.state === 'failed') && 'admin_archived_at' in order && <span className="ml-auto"><OrderArchiveButton orderId={order.id} archived={Boolean(order.admin_archived_at)} /></span>}</div>
     <div className="grid gap-5 lg:grid-cols-2">
       <section className="border border-[#E4DED2] bg-white p-5"><h2 className="mb-4 font-serif text-xl">Müşteri</h2><dl className="space-y-3 text-sm"><Info label="Ad" value={order.customer_name} /><Info label="E-posta" value={order.customer_email} /><Info label="Telefon" value={order.customer_phone} /></dl><p className="mt-5 border-t border-[#EEE9DF] pt-4 text-[10px] text-[#9A9385]">{order.user_id ? `Hesap kullanıcısı · ${order.user_id}` : 'Misafir siparişi'}</p></section>
       <section className="border border-[#E4DED2] bg-white p-5"><h2 className="mb-4 font-serif text-xl">Teslimat</h2><dl className="space-y-3 text-sm"><Info label="Adres" value={order.shipping_address_full || order.shipping_address} /><Info label="Şehir" value={order.shipping_city} /><Info label="İlçe" value={order.shipping_district} /><Info label="Posta kodu" value={order.shipping_postal_code} /></dl></section>

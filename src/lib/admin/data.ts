@@ -133,15 +133,28 @@ export async function getInventoryRows(options: { page?: number; filter?: string
   return { variants, products, count: count ?? 0, page, pageCount: Math.max(1, Math.ceil((count ?? 0) / pageSize)), error }
 }
 
-export async function getOrderList(options: { page?: number; status?: string; query?: string } = {}) {
+export async function getOrderList(options: { page?: number; status?: string; query?: string; archived?: boolean } = {}) {
   const supabase = await createSupabaseServerClient()
   const page = Math.max(1, Math.floor(options.page ?? 1))
-  let query = supabase.from('orders').select('*', { count: 'exact' }).order('created_at', { ascending: false })
-  if (options.status) query = query.eq('status', options.status)
-  const queryText = options.query?.trim().slice(0, 80) ?? ''
-  if (queryText) query = query.ilike('customer_email', `%${queryText}%`)
-  const { data, count, error } = await query.range((page - 1) * pageSize, page * pageSize - 1)
-  return { orders: (data ?? []) as unknown as OrderRow[], count: count ?? 0, page, pageCount: Math.max(1, Math.ceil((count ?? 0) / pageSize)), error }
+  const build = (withArchive: boolean) => {
+    let query = supabase.from('orders').select('*', { count: 'exact' }).order('created_at', { ascending: false })
+    if (withArchive) query = options.archived ? query.not('admin_archived_at', 'is', null) : query.is('admin_archived_at', null)
+    if (options.status) query = query.eq('status', options.status)
+    const queryText = options.query?.trim().slice(0, 80) ?? ''
+    if (queryText) query = query.ilike('customer_email', `%${queryText}%`)
+    return query.range((page - 1) * pageSize, page * pageSize - 1)
+  }
+  let { data, count, error } = await build(true)
+  // Before the archive migration runs the column is missing: list everything.
+  const archiveReady = error?.code !== '42703'
+  if (!archiveReady) ({ data, count, error } = options.archived ? { data: [], count: 0, error: null } : await build(false))
+  // Unpaid cancelled orders still on the active list, for the bulk button.
+  let archivable = 0
+  if (archiveReady && !options.archived) {
+    const { data: cancelled } = await supabase.from('orders').select('id,manual_paid_at').eq('status', 'cancelled').is('admin_archived_at', null).limit(500)
+    archivable = (cancelled ?? []).filter(order => !order.manual_paid_at).length
+  }
+  return { orders: (data ?? []) as unknown as OrderRow[], count: count ?? 0, page, pageCount: Math.max(1, Math.ceil((count ?? 0) / pageSize)), error, archiveReady, archivable }
 }
 
 export async function getOrderDetail(id: string) {
