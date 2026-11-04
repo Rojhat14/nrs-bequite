@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 
 export default async function PodyumPage() {
   const products = await getStorefrontProducts()
-  const byId = new Map(products.map(product => [product.id, product]))
+  // Some older products have an ID that differs from their slug, so match both.
+  const byId = new Map(products.flatMap(product => [[product.id, product], ...(product.slug ? [[product.slug, product] as const] : [])] as const))
   // A piece that is removed or sold out drops out of its look, and a look with
   // no pieces left drops off the runway, so nobody meets a dead end.
   const looks: CatwalkLook[] = CATWALK_LOOKS.flatMap(look => {
