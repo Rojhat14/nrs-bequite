@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
-import { Inter, Noto_Naskh_Arabic, Playfair_Display } from 'next/font/google'
+import { Bodoni_Moda, Jost, Noto_Naskh_Arabic } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import { LocaleProvider } from '@/context/LocaleContext'
@@ -17,9 +17,9 @@ import type { Locale } from '@/lib/i18n/messages'
 import { getCurrentUsdTryRate } from '@/lib/i18n/rates'
 import { getRequestLocale } from '@/lib/i18n/request-locale'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
-const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' })
-const arabic = Noto_Naskh_Arabic({ subsets: ['arabic', 'latin'], variable: '--font-arabic', display: 'swap' })
+const sans = Jost({ subsets: ['latin', 'latin-ext'], variable: '--font-sans', display: 'swap' })
+const serif = Bodoni_Moda({ subsets: ['latin', 'latin-ext'], variable: '--font-serif', display: 'swap', axes: ['opsz'] })
+const arabic = Noto_Naskh_Arabic({ subsets: ['arabic', 'latin'], variable: '--font-arabic', display: 'swap', preload: false })
 const metadataCopy = {
   tr: { title: 'NRS | Çağdaş Kadın Modası', description: 'NRS — modern kadın için tasarlanan rafine siluetler, seçkin dokular ve zamansız tasarımlar.' },
   en: { title: 'NRS | Contemporary Womenswear', description: 'Refined silhouettes, considered textures and timeless contemporary designs by NRS Bequite Luminous.' },
@@ -67,7 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   return (
     <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} suppressHydrationWarning>
-      <body className={`${inter.variable} ${playfair.variable} ${arabic.variable} ${locale === 'ar' ? 'font-arabic' : 'font-sans'} bg-nrs-canvas text-nrs-ink`}>
+      <body className={`${sans.variable} ${serif.variable} ${arabic.variable} ${locale === 'ar' ? 'font-arabic' : 'font-sans'} bg-nrs-canvas text-nrs-ink`}>
         <LocaleProvider locale={locale} rate={rate}>
           <MetaPixel /><CookieConsent />
           <CardPaymentProvider value={cardPaymentEnabled}><AuthProvider>

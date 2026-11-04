@@ -3,14 +3,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { canOptimizeImage } from '@/lib/imageOptimization';
-import { ShoppingBag, Heart } from 'lucide-react';
-import { useCart } from '@/store/useCart';
+import { Heart } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { lookupWishlist } from '@/lib/wishlistClient';
 import { Product } from '@/data/products';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLocale } from '@/context/LocaleContext';
 
 interface ProductCardProps {
@@ -20,9 +18,6 @@ interface ProductCardProps {
 }
 
 export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767px) 50vw, (max-width: 1023px) 33vw, (max-width: 1279px) 25vw, 288px' }: ProductCardProps) => {
-  const addItem = useCart(state => state.addItem);
-  const openDrawer = useCart(state => state.openDrawer);
-  const router = useRouter();
   const { user } = useAuth();
   const { locale, priceTag, t, fxAvailable } = useLocale();
   const userId = user?.id;
@@ -81,9 +76,11 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
     }
   };
 
+  const href = `/product/${encodeURIComponent(product.slug || product.id)}`;
+
   return (
-    <div className="group cursor-pointer block">
-      <div className="relative aspect-[3/4] overflow-hidden bg-nrs-black/5 mb-8">
+    <div className="group relative block bg-nrs-canvas">
+      <div className="relative aspect-[2/3] overflow-hidden bg-nrs-warm-white">
         {product.image ? <div className="nrs-fade-in absolute inset-0" style={{ animationDuration: '0.5s' }}>
           <Image
             src={product.image}
@@ -92,61 +89,42 @@ export const ProductCard = ({ product, onProductClick, sizes = '(max-width: 767p
             sizes={sizes}
             loading="lazy"
             unoptimized={!canOptimizeImage(product.image)}
-            className="object-cover transition-transform duration-1000 group-hover:scale-105"
+            className="object-cover object-top transition-transform duration-[1200ms] group-hover:scale-[1.025]"
           />
-        </div> : <div className="h-full w-full bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
+          {/* A second angle appears on hover where the product has one. */}
+          {product.hoverImage && product.hoverImage !== product.image && <Image
+            src={product.hoverImage}
+            alt=""
+            fill
+            sizes={sizes}
+            loading="lazy"
+            unoptimized={!canOptimizeImage(product.hoverImage)}
+            className="hidden object-cover object-top opacity-0 transition-opacity duration-700 group-hover:opacity-100 md:block"
+          />}
+        </div> : <div className="h-full w-full bg-nrs-panel" aria-hidden="true" />}
 
-        {/* Hover Overlay */}
-        <div className="absolute inset-0 bg-nrs-black/0 group-hover:bg-nrs-black/5 transition-all duration-700" />
+        <Link href={href} aria-label={`${product.name} ürününü incele`} className="absolute inset-0 z-10" />
 
-        <Link
-          href={`/product/${encodeURIComponent(product.slug || product.id)}`}
-          aria-label={`${product.name} ürününü incele`}
-          className="absolute inset-0 z-10"
-        />
-
-        {/* Wishlist Button - Refined */}
         <button
           onClick={toggleWishlist}
           disabled={wishlistBusy}
           aria-label={isWishlisted ? 'Favorilerden çıkar' : 'Favorilere ekle'}
           aria-pressed={isWishlisted}
-          className="product-card-favorite absolute top-3 right-3 sm:top-5 sm:right-5 p-2.5 bg-white/90 backdrop-blur-md rounded-full text-nrs-black hover:text-nrs-rosegold transition-all duration-500 z-20 transform translate-y-[-10px] opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+          className="absolute end-1.5 top-1.5 z-20 inline-flex h-11 w-11 items-center justify-center text-nrs-ink hover:opacity-60"
         >
-          <Heart size={16} fill={isWishlisted ? 'currentColor' : 'none'} strokeWidth={1.2} />
-        </button>
-
-        {/* Quick Add Button - Minimal & Elegant */}
-        <button
-          disabled={!product.inStock}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (product.variants?.length) {
-              router.push(`/product/${encodeURIComponent(product.slug || product.id)}`);
-              return;
-            }
-            addItem({ id: product.id, slug: product.slug, title: product.name, category: product.category, price: product.price, image: product.image, compareAtPrice: product.compareAtPrice });
-            openDrawer();
-          }}
-          className="product-card-quick-add absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 px-4 sm:px-6 py-3 bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-700 transform translate-y-4 group-hover:translate-y-0 group-focus-within:translate-y-0 z-20"
-        >
-          İncele
+          <Heart size={17} fill={isWishlisted ? 'currentColor' : 'none'} strokeWidth={1.2} />
         </button>
       </div>
 
-      <div className="space-y-3 text-center md:text-left">
-        <span className="text-[9px] uppercase tracking-[0.3em] text-nrs-ink/60 font-sans block">
-          {product.category}
-        </span>
-        <h3 className="text-lg font-serif text-nrs-ink group-hover:text-nrs-rosegold transition-colors duration-500 leading-tight">
-          <Link href={`/product/${encodeURIComponent(product.slug || product.id)}`}>{product.name}</Link>
+      <div className="px-3 pb-5 pt-3 md:px-4">
+        <h3 className="font-sans text-[14.5px] leading-snug text-nrs-ink">
+          <Link href={href}>{product.name}</Link>
         </h3>
-          <p className="text-sm font-sans text-nrs-ink/60 font-light">
+        <p className="mt-1 text-[13px] tabular-nums text-nrs-ink/60">
           {product.priceAmount == null ? product.price : priceTag(product.priceAmount)}
         </p>
-        {locale !== 'tr' && !fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('fxUnavailable')}</p>}
-        {locale !== 'tr' && fxAvailable && <p className="text-[10px] text-nrs-ink/50">{t('currencyNote')}</p>}
+        {locale !== 'tr' && !fxAvailable && <p className="mt-1 text-[10px] text-nrs-ink/50">{t('fxUnavailable')}</p>}
+        {locale !== 'tr' && fxAvailable && <p className="mt-1 text-[10px] text-nrs-ink/50">{t('currencyNote')}</p>}
       </div>
     </div>
   );

@@ -22,6 +22,13 @@ export default function CategoryHero({ title, description, image, children }: Ca
     setImageUnavailable(!image)
   }, [image])
 
+  if (!children) {
+    return <header className="px-4 pb-8 pt-[calc(var(--nrs-header-height)+2.75rem)] text-center md:pb-10 md:pt-[calc(var(--nrs-header-height)+4rem)]">
+      <h1 className="nrs-fade-up nrs-display font-serif text-[2.6rem] leading-[1.05] md:text-7xl">{title}</h1>
+      {description && <p className="nrs-fade-up mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-nrs-ink/60" style={{ animationDelay: '0.15s' }}>{description}</p>}
+    </header>
+  }
+
   return (
     <section className={`relative ${children ? 'min-h-[max(60svh,calc(var(--nrs-header-height)+22rem))]' : 'h-[60svh] min-h-[calc(var(--nrs-header-height)+22rem)]'} w-full overflow-hidden`}>
       {image && !imageUnavailable ? <div className="nrs-settle absolute inset-0">

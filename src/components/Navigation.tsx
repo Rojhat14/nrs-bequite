@@ -15,6 +15,7 @@ import { getCollectionPresentation } from '@/lib/collectionPresentation';
 import { isHomeCategory, HOME_CATEGORY_IMAGE, HOME_CATEGORY_THUMBNAIL } from '@/lib/home-category';
 import { canOptimizeImage } from '@/lib/imageOptimization';
 import { useLocale } from '@/context/LocaleContext';
+import { localePrefix } from '@/lib/i18n/messages';
 import LanguageSelector from '@/components/LanguageSelector';
 
 // Navigation Mode Definition for Adaptive UI
@@ -130,12 +131,6 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     return collection ? `/collections/${encodeURIComponent(collection.slug)}` : fallback
   };
   // The top bar fits on one line: Home and Koleksiyonlar live in the drawer.
-  const navLinks = [
-    { name: t('newArrivals').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: collectionHref('yeni-gelenler', '/') },
-    ...categoryLinks.filter((_, index) => categoryOrder[index].key !== 'bedding'),
-    { name: t('sale').toLocaleUpperCase(locale === 'ar' ? 'ar' : locale === 'en' ? 'en-US' : 'tr-TR'), href: collectionHref('indirim', '/category/sale') },
-  ];
-
   const openMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     drawerOpenerRef.current = event.currentTarget;
     setIsMenuOpen(true);
@@ -183,11 +178,6 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
     };
   }, [isMenuOpen, closeMenu]);
 
-  const handleNavClick = (href: string) => {
-    closeMenu();
-    router.push(href);
-  };
-
   // Adaptive Style Logic
   const getNavStyles = () => {
     const solidPages = ['/profile', '/checkout', '/about', '/contact', '/shipping', '/returns', '/faq', '/size-guide', '/care-guide'];
@@ -195,7 +185,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
     if (isSolidPage || initialMode === 'solid' || isScrolled) {
       return {
-        container: 'bg-nrs-canvas/95 backdrop-blur-md py-1 shadow-sm',
+        container: 'bg-nrs-canvas/95 backdrop-blur-md py-1 border-b border-nrs-ink/10',
         text: 'text-nrs-ink',
         logo: 'filter-none',
         announcement: 'bg-nrs-black text-nrs-ivory'
@@ -211,17 +201,17 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
       };
     }
 
-    if (initialMode === 'transparent' || (initialMode === 'adaptive' && pathname === '/')) {
+    if (initialMode === 'transparent' || (initialMode === 'adaptive' && /^\/(?:en|ar)?\/?$/.test(pathname ?? ''))) {
       return {
-        container: 'bg-transparent py-2',
-        text: 'text-nrs-ink',
-        logo: 'filter-none',
+        container: 'nrs-nav-clear bg-transparent py-1',
+        text: 'text-white',
+        logo: 'nrs-wordmark-light',
         announcement: 'bg-nrs-black text-nrs-ivory'
       };
     }
 
     return {
-      container: 'bg-nrs-canvas py-1',
+      container: 'bg-nrs-canvas py-1 border-b border-nrs-ink/10',
       text: 'text-nrs-ink',
       logo: 'filter-none',
       announcement: 'bg-nrs-black text-nrs-ivory'
@@ -257,7 +247,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
           <Link href="/size-guide" className="underline underline-offset-4 hover:text-nrs-ivory">{locale === 'en' ? 'Find my size' : locale === 'ar' ? 'اعرفي مقاسك' : 'Bedenimi bul'}</Link></span>
       </div>
       <nav className={`transition-all duration-500 ease-in-out ${styles.container}`}>
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
+        <div className="px-4 md:px-8">
           <div className="flex justify-between items-center">
             <div className="hidden md:flex items-center justify-start gap-3 w-1/3">
               <button
@@ -267,16 +257,18 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                 aria-haspopup="dialog"
                 aria-expanded={isMenuOpen}
                 aria-controls={drawerId}
-                className={`inline-flex min-h-11 min-w-11 items-center justify-center ${styles.text} opacity-70 transition-all duration-300 hover:opacity-100 hover:translate-x-0.5 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2`}
+                className={`inline-flex min-h-11 items-center ${styles.text} opacity-70 hover:opacity-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2`}
               >
                 <Menu size={21} strokeWidth={1.25} />
+                <span className="ms-2 text-[13px] tracking-[0.06em]">{locale === 'ar' ? 'القائمة' : locale === 'en' ? 'Menu' : 'Menü'}</span>
               </button>
               <button
                 aria-label={t('search')}
                 onClick={() => router.push('/search')}
-                className={`p-2 ${styles.text} opacity-60 hover:opacity-100 transition-all duration-500 transform hover:scale-110`}
+                className={`inline-flex min-h-11 items-center gap-2 px-2 ${styles.text} opacity-70 hover:opacity-100`}
               >
                 <Search size={18} strokeWidth={1} />
+                <span className="hidden text-[13px] tracking-[0.06em] lg:inline">{locale === 'ar' ? 'بحث' : locale === 'en' ? 'Search' : 'Ara'}</span>
               </button>
             </div>
 
@@ -290,7 +282,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                     height={320}
                     priority
                     data-intro-target="logo"
-                    className={`h-12 xl:h-14 w-auto object-contain transition-all duration-1000 group-hover:scale-[1.03] ${styles.logo} ${logoOpacity}`}
+                    className={`h-11 xl:h-12 w-auto object-contain ${styles.logo} ${logoOpacity}`}
                   />
                 </Link>
               </div>
@@ -374,18 +366,6 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
             </div>
           </div>
 
-          <div className="hidden lg:flex flex-nowrap justify-center gap-x-5 xl:gap-x-8 pb-3 pt-1">
-            {navLinks.map((link) => (
-              <button
-                key={link.name}
-                onClick={() => handleNavClick(link.href)}
-                className={`text-[10.5px] uppercase tracking-[0.2em] ${styles.text} opacity-70 hover:opacity-100 transition-all duration-500 font-sans relative group whitespace-nowrap flex-shrink-0 focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4`}
-              >
-                {link.name}
-                <span className={`absolute -bottom-1 left-0 w-0 h-px transition-all duration-700 group-hover:w-full ${styles.text === 'text-nrs-ink' ? 'bg-nrs-black' : 'bg-nrs-canvas'}`}></span>
-              </button>
-            ))}
-          </div>
         </div>
 
         <AnimatePresence onExitComplete={() => {
@@ -415,12 +395,11 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               animate={{ x: 0 }}
               exit={{ x: reduceMotion ? 0 : locale === 'ar' ? '100%' : '-100%' }}
               transition={{ duration: reduceMotion ? 0.1 : 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className={`fixed inset-y-0 z-[121] flex h-[100dvh] w-[92vw] max-w-[410px] flex-col bg-nrs-canvas text-nrs-ink shadow-[16px_0_50px_rgba(20,18,15,0.12)] ${locale === 'ar' ? 'right-0 border-l border-nrs-ink/10' : 'left-0 border-r border-nrs-ink/10'}`}
+              className={`fixed inset-y-0 z-[121] flex h-[100dvh] w-[92vw] max-w-[480px] flex-col bg-nrs-canvas text-nrs-ink shadow-[16px_0_50px_rgba(20,18,15,0.12)] ${locale === 'ar' ? 'right-0 border-l border-nrs-ink/10' : 'left-0 border-r border-nrs-ink/10'}`}
             >
-              <div className="flex items-start justify-between border-b border-nrs-ink/10 px-7 pb-6 pt-8 sm:px-9">
+              <div className="flex items-start justify-between border-b border-nrs-ink/10 px-7 pb-5 pt-6 sm:px-9">
                 <div>
                   <h2 id={drawerTitleId} className="font-serif text-3xl tracking-[0.18em]">NRS</h2>
-                  <p className="mt-2 text-[9px] uppercase tracking-[0.3em] text-nrs-ink/60">{t('shop')}</p>
                 </div>
                 <button
                   ref={closeButtonRef}
@@ -434,14 +413,19 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               </div>
 
               <div className="flex-1 overflow-y-auto px-7 py-7 sm:px-9">
+                <nav aria-label={t('shop')} className="mb-9 space-y-1">
+                  <Link href={`${localePrefix(locale)}/collections/yeni-gelenler`} onClick={() => closeMenu()} className="flex min-h-12 items-center font-serif text-[28px] leading-tight text-nrs-ink hover:opacity-60">{t('newArrivals')}</Link>
+                  <Link href={`${localePrefix(locale)}/podyum`} onClick={() => closeMenu()} className="flex min-h-12 items-center font-serif text-[28px] leading-tight text-nrs-ink hover:opacity-60">{locale === 'en' ? 'Runway' : locale === 'ar' ? 'عرض الأزياء' : 'Podyum'}</Link>
+                  <Link href={`${localePrefix(locale)}/category/sale`} onClick={() => closeMenu()} className="flex min-h-12 items-center font-serif text-[28px] leading-tight text-nrs-ink hover:opacity-60">{t('sale')}</Link>
+                </nav>
                 <section aria-labelledby={drawerCategoriesId}>
-                  <h3 id={drawerCategoriesId} className="mb-4 text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">{t('categories')}</h3>
-                  <nav className="space-y-1">
+                  <h3 id={drawerCategoriesId} className="mb-3 text-[11px] uppercase tracking-[0.2em] text-nrs-ink/60">{t('categories')}</h3>
+                  <nav className="space-y-0">
                     {categories.map((category) => <Link
                       key={category.id || category.slug}
                       href={`/category/${encodeURIComponent(category.slug)}`}
                       onClick={() => closeMenu()}
-                      className="group flex min-h-11 items-center justify-between border-b border-nrs-ink/[0.06] py-2 text-[15px] font-serif tracking-wide text-nrs-ink/75 transition-all duration-300 hover:translate-x-1 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
+                      className="group flex min-h-11 items-center justify-between py-1.5 font-serif text-[21px] leading-tight text-nrs-ink/80 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
                     >
                       <span className="flex items-center gap-3">
                         {isHomeCategory(category) && <Image
@@ -457,7 +441,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
 
                 <section aria-labelledby={drawerCollectionsId} className="mt-9">
                   <div className="mb-4 flex items-center justify-between">
-                    <h3 id={drawerCollectionsId} className="text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">{t('collections')}</h3>
+                    <h3 id={drawerCollectionsId} className="text-[11px] uppercase tracking-[0.2em] text-nrs-ink/60">{t('collections')}</h3>
                     <Link href="/collections" onClick={() => closeMenu()} className="text-[9px] uppercase tracking-[0.15em] text-nrs-ink/60 transition-colors hover:text-nrs-ink">{t('all')}</Link>
                   </div>
                   <nav className="space-y-1">
@@ -465,7 +449,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
                       key={collection.id || collection.slug}
                       href={`/collections/${encodeURIComponent(collection.slug)}`}
                       onClick={() => closeMenu()}
-                      className="group flex min-h-11 items-center justify-between border-b border-nrs-ink/[0.06] py-2 text-[15px] font-serif tracking-wide text-nrs-ink/75 transition-all duration-300 hover:translate-x-1 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
+                      className="group flex min-h-11 items-center justify-between py-1.5 font-serif text-[21px] leading-tight text-nrs-ink/80 hover:text-nrs-ink focus-visible:outline focus-visible:outline-1"
                     >
                       <span>{getCollectionPresentation(collection).name}</span><span className="text-xs opacity-0 transition-opacity group-hover:opacity-60">→</span>
                     </Link>)}

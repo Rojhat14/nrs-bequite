@@ -7,7 +7,7 @@ import { parsePrice, useCart } from '@/store/useCart';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { lookupWishlist } from '@/lib/wishlistClient';
-import { ShoppingBag, Heart, ArrowLeft, ArrowRight, Truck, Clock3, Scissors, Ruler } from 'lucide-react';
+import { Heart, ArrowLeft, ArrowRight, Truck, Clock3, Scissors, Ruler } from 'lucide-react';
 import Image from 'next/image';
 import { whatsappNumber, whatsappUrl } from '@/lib/storefront-config';
 import { buildWhatsappOrderMessage, whatsappSelectionError } from '@/lib/whatsapp-order';
@@ -22,15 +22,19 @@ import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOpt
 import { normalizeSizeLabel, sizeButtonLabel, sizeChartRow, type BodyMeasurements } from '@/lib/size-chart'
 import { LOOK_PART_LABELS, type LookPartKind } from '@/lib/look-families'
 import SizeGuideDialog from '@/components/SizeGuideDialog'
+import FitFinder, { readFitAnswers } from '@/components/FitFinder'
+import { FIT_FINDER_ENABLED, recommendFit } from '@/lib/fit-estimate'
+import { ProductCard } from '@/components/ProductCard'
 
 export type LookItem = { id: string; slug: string; name: string; kind: LookPartKind; price: string; priceAmount: number | null }
 
 interface ProductDetailProps {
   product: Product;
   look?: LookItem[];
+  related?: Product[];
 }
 
-export default function ProductDetail({ product, look }: ProductDetailProps) {
+export default function ProductDetail({ product, look, related = [] }: ProductDetailProps) {
   const router = useRouter();
   const addItem = useCart(state => state.addItem);
   const bagItems = useCart(state => state.items);
@@ -50,10 +54,20 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
   });
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [fitOpen, setFitOpen] = useState(false);
+  const [fitHint, setFitHint] = useState<string | null>(null);
   const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurements | null>(null);
   const closeSizeGuide = useCallback(() => setSizeGuideOpen(false), []);
   const touchStartX = useRef<number | null>(null);
   useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1); setBodyMeasurements(null) }, [product.id])
+  // Once the shopper has answered, later product pages can suggest a size. Only
+  // for sizes this product sells; the answers stay in this browser.
+  useEffect(() => {
+    if (fitOpen || !FIT_FINDER_ENABLED) return
+    const saved = readFitAnswers()
+    const labels = sortActualVariantOptions((product.variants ?? []).filter(variant => variant.size).map(variant => ({ id: variant.id, label: normalizeSizeLabel(variant.size!), size: variant.size!, stock: variant.stock_quantity }))).map(variant => variant.label)
+    setFitHint(saved.done ? recommendFit(saved, labels, product.slug || product.id)?.size ?? null : null)
+  }, [fitOpen, product.id, product.slug, product.variants])
   // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product page
   useEffect(() => trackViewContent(product), [product.id])
   useEffect(() => {
@@ -112,7 +126,8 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
   const numericDress = isNumericDressProduct(product)
   const madeToOrder = product.fulfillmentMode === 'made_to_order'
   const variants = sortActualVariantOptions(numericDress ? numericDressVariantOptions(actualVariants) ?? actualVariants : actualVariants)
-  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
+  const currentVariant = variants.find((variant) => variant.id === selectedVariantId)
+  const selectedVariant = currentVariant
   const hasRealVariantInventory = actualVariants.length > 0
   const sizeLabels = variants.filter((variant) => variant.size).map((variant) => variant.label)
   const hasSizeChart = sizeLabels.some((label) => sizeChartRow(label))
@@ -125,7 +140,8 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
   const partLabel = (kind: LookPartKind) => copy(LOOK_PART_LABELS[kind].tr, LOOK_PART_LABELS[kind].en, LOOK_PART_LABELS[kind].ar)
   const measurementSummary = bodyMeasurements ? ([['chest', copy('Göğüs', 'Bust', 'الصدر')], ['waist', copy('Bel', 'Waist', 'الخصر')], ['hips', copy('Basen', 'Hips', 'الورك')]] as const)
     .filter(([field]) => bodyMeasurements[field]).map(([field, label]) => `${label} ${bodyMeasurements[field]}`).join(' · ') : ''
-  function addSelection(checkout = false) {
+  function addSelection(checkout = false, sizeOverride?: typeof currentVariant) {
+    const selectedVariant = sizeOverride ?? currentVariant;
     if (!product.inStock) return;
     if (variants.length > 0 && !selectedVariant) {
       setOrderError(copy('Lütfen bir beden seçin.', 'Please select a size.', 'يُرجى اختيار المقاس.')); return;
@@ -171,6 +187,20 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
     setBrokenImages(new Set())
   }, [product.id, primaryImageIndex])
 
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const [showBuyBar, setShowBuyBar] = useState(false)
+  useEffect(() => {
+    const button = addButtonRef.current
+    if (!button) return
+    // A scroll listener, because a fast flick can jump clean over the button
+    // without an IntersectionObserver ever seeing it cross the viewport.
+    let frame = 0
+    const update = () => { frame = 0; setShowBuyBar(button.getBoundingClientRect().bottom < 0) }
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(frame) }
+  }, [])
+
   function moveImage(direction: -1 | 1) {
     if (galleryImages.length < 2) return
     setActiveImageIndex((current) => (current + direction + galleryImages.length) % galleryImages.length)
@@ -188,18 +218,25 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
 
   return (
     <div className="min-h-screen bg-nrs-canvas flex">
-      <main className="w-full flex-1 pb-32">
-        <div className="max-w-7xl mx-auto px-6 pt-[calc(var(--nrs-header-height)+0.75rem)] lg:pt-[max(8rem,calc(var(--nrs-header-height)+1rem))] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
-          <div className="lg:col-span-7 min-w-0 space-y-6 lg:sticky lg:top-[calc(var(--nrs-header-height)+1rem)] lg:self-start">
+      <main className="w-full min-w-0 flex-1 pb-16">
+        <div className="pt-[var(--nrs-header-height)] grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
+          {/* Desktop: every angle at once, like a lookbook page. */}
+          {galleryImages.length > 0 && <div className="hidden min-w-0 grid-cols-2 content-start lg:grid">
+            {galleryImages.map((image, index) => !brokenImages.has(index) && <div key={`${image.sortOrder}-${image.url}`} className={`relative aspect-[2/3] bg-nrs-warm-white shadow-[0_0_0_0.5px_rgba(20,18,16,0.13)] ${galleryImages.length === 1 ? 'col-span-2' : ''}`}>
+              <Image src={image.url} alt={image.altText || product.name} fill sizes="(min-width: 1024px) 30vw, 1px" loading={index < 2 ? 'eager' : 'lazy'} className="object-cover object-top" onError={() => markImageBroken(index)} />
+            </div>)}
+          </div>}
+          {/* Phones and tablets: one full-width image at a time. */}
+          <div className="min-w-0 lg:hidden">
             <div
-              className={`nrs-fade-up product-gallery relative -mx-6 grid gap-3 sm:mx-0 ${galleryImages.length > 1 ? 'grid-cols-1 lg:grid-cols-[5rem_minmax(0,1fr)]' : 'grid-cols-1'}`}
+              className={`nrs-fade-up product-gallery relative grid gap-2`}
               role="region"
               aria-label={copy('Ürün görsel galerisi', 'Product image gallery', 'معرض صور المنتج')}
               tabIndex={galleryImages.length > 1 ? 0 : undefined}
               onKeyDown={handleGalleryKeyDown}
             >
               <div
-                className="relative aspect-[2/3] min-h-0 min-w-0 overflow-hidden lg:aspect-auto lg:h-full"
+                className="relative aspect-[2/3] min-h-0 min-w-0 overflow-hidden bg-nrs-warm-white"
                 onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null }}
                 onTouchEnd={(event) => {
                   const startX = touchStartX.current
@@ -217,7 +254,7 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                   fill
                   priority={activeImageIndex === Math.max(0, primaryImageIndex)}
                   sizes="(max-width: 639px) 100vw, (max-width: 1023px) calc(100vw - 48px), (max-width: 1279px) 50vw, 590px"
-                  className="object-contain"
+                  className="object-cover object-top"
                   onError={() => markImageBroken(activeImageIndex)}
                 />
               ) : (
@@ -256,7 +293,7 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
               </button>
               </div>
 
-              {galleryImages.length > 1 && <div className="flex min-h-0 gap-2 overflow-x-auto px-6 sm:px-0 lg:order-first lg:flex-col lg:gap-3 lg:overflow-y-auto lg:overflow-x-hidden">
+              {galleryImages.length > 1 && <div className="flex min-h-0 gap-2 overflow-x-auto px-4">
                 {galleryImages.map((image, index) => (
                   <button
                     type="button"
@@ -264,14 +301,14 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                     onClick={() => setActiveImageIndex(index)}
                     aria-label={copy(`${index + 1}. ürün görselini göster`, `Show product image ${index + 1}`, `عرض صورة المنتج ${index + 1}`)}
                     aria-pressed={activeImageIndex === index}
-                    className={`relative h-16 w-12 shrink-0 lg:h-20 lg:w-20 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-ink opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
+                    className={`relative h-16 w-12 shrink-0 overflow-hidden border transition ${activeImageIndex === index ? 'border-nrs-ink opacity-100' : 'border-transparent opacity-65 hover:opacity-100'}`}
                   >
                     {!brokenImages.has(index) ? <Image
                       src={image.url}
                       alt={image.altText || `${product.name} — ${index + 1}`}
                       fill
-                      sizes="(max-width: 1023px) 48px, 80px"
-                      className="object-contain"
+                      sizes="48px"
+                      className="object-cover object-top"
                       onError={() => markImageBroken(index)}
                     /> : <span className="absolute inset-0 bg-gradient-to-br from-nrs-black/5 to-nrs-black/10" aria-hidden="true" />}
                   </button>
@@ -280,30 +317,30 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col justify-start lg:pt-12">
+          <div className="flex min-w-0 flex-col justify-start px-4 pt-6 lg:sticky lg:top-[var(--nrs-header-height)] lg:max-h-[calc(100svh-var(--nrs-header-height))] lg:self-start lg:overflow-y-auto lg:px-[clamp(1.5rem,3.4vw,3.5rem)] lg:pb-12 lg:pt-10 [scrollbar-width:thin]">
             <div
               style={{ animationDelay: '0.2s' }}
-              className="nrs-fade-side space-y-8 lg:space-y-10"
+              className="nrs-fade-side space-y-7"
             >
-              <div className="space-y-4">
-                <span className="text-xs uppercase tracking-[0.3em] text-nrs-rosegold font-sans">
+              <div className="space-y-3">
+                <span className="text-[12.5px] text-nrs-ink/60 font-sans">
                   {product.category}
                 </span>
-                <h1 className="text-3xl sm:text-4xl xl:text-[2.75rem] font-serif text-nrs-ink leading-[1.1] tracking-tight">
+                <h1 className="text-[1.9rem] xl:text-[2.35rem] font-serif text-nrs-ink leading-[1.12]">
                   {product.name}
                 </h1>
                 <div className="flex items-baseline gap-3">
-                  <p className="text-2xl font-sans font-light tabular-nums text-nrs-ink">{product.priceAmount == null ? product.price : priceTag(product.priceAmount)}</p>
+                  <p className="text-[17px] font-sans tabular-nums text-nrs-ink">{product.priceAmount == null ? product.price : priceTag(product.priceAmount)}</p>
                 </div>
                 {locale !== 'tr' && <p className="max-w-md text-xs text-nrs-ink/55">{fxAvailable ? t('currencyNote') : t('fxUnavailable')}</p>}
                 {/* The delivery promise near the price answers the first questions
                     shoppers have before choosing a size (same terms as checkout). */}
-                <ul aria-label={copy('Teslimat bilgileri', 'Delivery details', 'تفاصيل التوصيل')} className="grid grid-cols-1 gap-2 pt-2 text-xs text-nrs-ink/75 sm:grid-cols-3">
+                <ul aria-label={copy('Teslimat bilgileri', 'Delivery details', 'تفاصيل التوصيل')} className="grid grid-cols-1 gap-1.5 pt-1 text-[13px] text-nrs-ink/70">
                   <li className="flex items-center gap-2"><Truck size={15} strokeWidth={1.5} aria-hidden="true" />{copy('Türkiye geneli ücretsiz kargo', 'Free shipping within Türkiye', 'شحن مجاني داخل تركيا')}</li>
                   <li className="flex items-center gap-2"><Clock3 size={15} strokeWidth={1.5} aria-hidden="true" />{copy('7–10 iş günü teslimat', 'Delivered in 7–10 business days', 'التوصيل خلال 7–10 أيام عمل')}</li>
                   <li className="flex items-center gap-2"><Scissors size={15} strokeWidth={1.5} aria-hidden="true" />{copy('Siparişinize özel üretim', 'Made to order for you', 'يُصنع خصيصًا لطلبك')}</li>
                 </ul>
-                {currentLook && look && <div className="mt-2 border border-nrs-ink/15 bg-nrs-panel p-4 text-sm">
+                {currentLook && look && <div className="mt-2 border border-nrs-ink/10 bg-nrs-warm-white p-4 text-sm">
                   <p className="leading-6 text-nrs-ink/80">{currentLook.kind === 'set'
                     ? copy('Bu fiyata fotoğraftaki takımın tamamı dahildir. Parçaları ayrı ayrı da alabilirsiniz:', 'This price includes the complete set shown. You can also buy the pieces separately:', 'يشمل هذا السعر الطقم الكامل الظاهر في الصورة. يمكنك أيضاً شراء القطع منفصلة:')
                     : copy(`Bu sayfada yalnızca ${partLabel(currentLook.kind).toLocaleLowerCase('tr-TR')} satılır. Fotoğraftaki diğer parçalar ayrı satılır:`, `This page sells the ${partLabel(currentLook.kind).toLowerCase()} only. The other pieces shown are sold separately:`, `تُباع في هذه الصفحة ${partLabel(currentLook.kind)} فقط. القطع الأخرى في الصورة تُباع منفصلة:`)}</p>
@@ -318,16 +355,20 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                 </div>}
               </div>
 
-              <div className="space-y-8 py-8 lg:py-10 border-y border-nrs-ink/10">
+              <div className="space-y-6 py-6 border-y border-nrs-ink/10">
                 <div className="space-y-5">
                   {variants.length > 0 && <>
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
-                    <p className="text-xs uppercase tracking-widest text-nrs-ink/60 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
+                    <p className="text-[13px] text-nrs-ink/70 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
                     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      {hasSizeChart && <button type="button" onClick={() => setSizeGuideOpen(true)}
+                      {hasSizeChart && <button type="button" onClick={() => FIT_FINDER_ENABLED ? setFitOpen(true) : setSizeGuideOpen(true)}
                         className="inline-flex min-h-9 items-center gap-1.5 font-medium text-nrs-ink underline underline-offset-4">
                         <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />
-                        {copy('Beden tablosu · Bedenimi bul', 'Size chart · Find my size', 'جدول المقاسات · اعرفي مقاسك')}
+                        {FIT_FINDER_ENABLED ? copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك') : copy('Beden tablosu · Bedenimi bul', 'Size chart · Find my size', 'جدول المقاسات · اعرفي مقاسك')}
+                      </button>}
+                      {hasSizeChart && FIT_FINDER_ENABLED && <button type="button" onClick={() => setSizeGuideOpen(true)}
+                        className="inline-flex min-h-9 items-center text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
+                        {copy('Beden tablosu', 'Size chart', 'جدول المقاسات')}
                       </button>}
                       {!hasSizeChart && whatsappNumber && <a href={whatsappUrl(copy(`Merhaba, ${product.name} için beden danışmak istiyorum.`, `Hello, I would like size advice for ${product.name}.`, `مرحبًا، أود استشارة بخصوص مقاس ${product.name}.`)) ?? undefined}
                         target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
@@ -336,7 +377,7 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                       </a>}
                     </span>
                   </div>
-                  <div role="group" aria-label={copy('Beden seçin', 'Select a size', 'اختاري المقاس')} aria-describedby={orderError ? 'product-size-error' : undefined} className="flex flex-wrap gap-3">
+                  <div role="group" aria-label={copy('Beden seçin', 'Select a size', 'اختاري المقاس')} aria-describedby={orderError ? 'product-size-error' : undefined} className="flex flex-wrap gap-1.5">
                     {variants.map((variant) => (
                       <button
                         key={variant.label}
@@ -344,16 +385,18 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                         disabled={!variant.id || (!madeToOrder && variant.stock < 1)}
                         onClick={() => { setSelectedVariantId(variant.id); setOrderError(''); setQuantity(1); }}
                         aria-pressed={selectedVariantId === variant.id}
-                        className={`min-w-12 h-12 px-3 text-xs font-sans transition-all duration-500 border disabled:cursor-not-allowed disabled:opacity-35 ${
+                        className={`min-w-12 h-11 px-3 text-[13px] font-sans transition-colors duration-200 border disabled:cursor-not-allowed disabled:opacity-35 ${
                           selectedVariantId === variant.id
-                            ? 'bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory border-nrs-ink'
-                            : 'bg-transparent text-nrs-ink border-nrs-ink/20 hover:border-nrs-ink'
+                            ? 'bg-nrs-ink text-nrs-ivory border-nrs-ink'
+                            : 'bg-transparent text-nrs-ink border-nrs-ink/15 hover:border-nrs-ink'
                         }`}
                       >
                         {variant.size ? sizeButtonLabel(variant.label) : variant.label}
                       </button>
                     ))}
                   </div>
+                  {fitHint && !selectedVariant && <button type="button" onClick={() => { const variant = variants.find(item => item.label === fitHint); if (variant?.id) { setSelectedVariantId(variant.id); setOrderError('') } }}
+                    className="block text-start text-[13px] text-nrs-ink/70 hover:text-nrs-ink">{copy('Yanıtlarınıza göre önerimiz:', 'Suggested from your answers:', 'اقتراحنا بحسب إجاباتك:')} <span className="underline underline-offset-4">{sizeButtonLabel(fitHint)}</span></button>}
                   {selectedRow && <p className="text-xs leading-5 text-nrs-ink/65">{copy(
                     `${selectedRow.letter} · ${selectedRow.numeric} beden, vücut ölçüsü göğüs ${selectedRow.chest.join('–')}, bel ${selectedRow.waist.join('–')}, basen ${selectedRow.hips.join('–')} cm olanlara göre dikilir.`,
                     `Size ${selectedRow.letter} · ${selectedRow.numeric} is cut for a ${selectedRow.chest.join('–')} cm bust, ${selectedRow.waist.join('–')} cm waist and ${selectedRow.hips.join('–')} cm hips.`,
@@ -366,24 +409,24 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                   </>}
                 </div>
 
-                <div className="flex flex-col gap-4 pt-4">
+                <div className="flex flex-col gap-2.5">
                   <label className="flex items-center justify-between gap-4 text-xs text-nrs-ink/65">
                     {copy('Adet', 'Quantity', 'الكمية')}
                     <input type="number" min={1} value={quantity}
                       onChange={(event) => setQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
-                      className="min-h-12 w-20 border border-nrs-ink/20 bg-transparent px-3 text-nrs-ink" />
+                      className="min-h-11 w-20 border border-nrs-ink/15 bg-transparent px-3 text-nrs-ink" />
                   </label>
                   <button
+                    ref={addButtonRef}
                     onClick={() => addSelection()}
                     disabled={!product.inStock || !hasRealVariantInventory}
-                    className="w-full bg-nrs-charcoal ring-1 ring-inset ring-nrs-ivory/25 text-nrs-ivory py-5 uppercase tracking-widest text-xs font-sans enabled:hover:bg-white enabled:hover:text-nrs-ink transition-all duration-700 flex items-center justify-center gap-3"
+                    className="w-full border border-nrs-ink bg-nrs-ink py-4 text-[12.5px] uppercase tracking-[0.16em] text-nrs-ivory font-sans enabled:hover:bg-transparent enabled:hover:text-nrs-ink flex items-center justify-center gap-3"
                   >
-                    <ShoppingBag size={18} />
                     {t('addToBag')}
                   </button>
                   <button type="button" onClick={() => addSelection(true)}
                     disabled={!product.inStock || !hasRealVariantInventory}
-                    className="flex min-h-12 w-full items-center justify-center border border-nrs-ink/25 px-4 py-4 text-center text-xs uppercase tracking-widest text-nrs-ink enabled:hover:bg-nrs-ink enabled:hover:text-nrs-canvas disabled:cursor-not-allowed disabled:opacity-40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    className="flex min-h-12 w-full items-center justify-center border border-nrs-ink px-4 py-4 text-center text-[12.5px] uppercase tracking-[0.16em] text-nrs-ink enabled:hover:bg-nrs-ink enabled:hover:text-nrs-ivory disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                     {copy('Ödeme / Siparişe geç', 'Continue to checkout', 'المتابعة إلى الدفع')}
                   </button>
                   <CardPaymentNotice id="product-card-payment-status" />
@@ -403,12 +446,12 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                       const href = whatsappUrl(message || undefined);
                       if (href) { setOrderError(''); window.open(href, '_blank', 'noopener,noreferrer'); }
                     }}
-                    className="flex min-h-12 w-full items-center justify-center gap-3 border border-nrs-ink/25 bg-transparent px-4 py-4 uppercase tracking-widest text-xs text-nrs-ink enabled:hover:border-nrs-ink enabled:hover:bg-nrs-panel transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    className="flex min-h-12 w-full items-center justify-center gap-3 border border-nrs-ink/20 bg-transparent px-4 py-4 uppercase tracking-[0.16em] text-[12.5px] text-nrs-ink enabled:hover:border-nrs-ink disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                     <WhatsAppIcon />
                     {copy('WhatsApp ile sipariş talebi', 'Request via WhatsApp', 'طلب عبر واتساب')}
                   </button>
                   <details className="group border-t border-nrs-ink/10 pt-3">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-xs uppercase tracking-widest text-nrs-ink/70 [&::-webkit-details-marker]:hidden">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[14px] text-nrs-ink/75 [&::-webkit-details-marker]:hidden">
                       {copy('Havale / EFT ile ödeme', 'Pay by bank transfer', 'الدفع بالتحويل البنكي')}
                       <span aria-hidden="true" className="text-base transition-transform group-open:rotate-45">+</span>
                     </summary>
@@ -417,12 +460,12 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                 </div>
               </div>
 
-              <div className="space-y-10">
-                <div className="space-y-4">
-                  <h3 className="text-xs uppercase tracking-widest text-nrs-ink font-medium">{copy('Ürün hikayesi', 'Product story', 'قصة المنتج')}</h3>
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <h3 className="font-sans text-[14px] text-nrs-ink">{copy('Ürün hikayesi', 'Product story', 'قصة المنتج')}</h3>
                   {(() => {
                     const story = parseProductDescription(product.description)
-                    return <div className="space-y-4 font-sans text-[15px] leading-7 text-nrs-ink/70">
+                    return <div className="space-y-3 font-sans text-[14.5px] leading-7 text-nrs-ink/70">
                       {story.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
                       {story.bullets.length > 0 && <div className="space-y-3 pt-2">
                         {story.heading && <p className="text-[10px] uppercase tracking-[0.2em] text-nrs-ink/55">{story.heading}</p>}
@@ -437,15 +480,13 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
                   })()}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-6">
+                <div className="grid grid-cols-1 gap-8">
+                  {product.details.fabric && <div className="space-y-4">
+                    <h4 className="font-sans text-[14px] text-nrs-ink">{t('details')}</h4>
+                    <p className="text-sm font-sans text-nrs-ink/70">{product.details.fabric}</p>
+                  </div>}
                   <div className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{t('details')}</h4>
-                    <ul className="text-sm font-sans text-nrs-ink/70 space-y-2">
-                      {product.details.fabric && <li>{product.details.fabric}</li>}
-                    </ul>
-                  </div>
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-nrs-ink/60 font-bold">{copy('Kalıp ve bakım', 'Fit and care', 'القصة والعناية')}</h4>
+                    <h4 className="font-sans text-[14px] text-nrs-ink">{copy('Kalıp ve bakım', 'Fit and care', 'القصة والعناية')}</h4>
                     <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || copy('Ürün etiketindeki bakım talimatlarını izlemenizi öneririz.', 'Please follow the care instructions on the garment label.', 'يُرجى اتباع تعليمات العناية الموجودة على ملصق القطعة.')}</p>
                   </div>
                 </div>
@@ -453,7 +494,34 @@ export default function ProductDetail({ product, look }: ProductDetailProps) {
             </div>
           </div>
         </div>
+        {related.length > 0 && <section className="pt-14 md:pt-20">
+          <h2 className="mb-6 px-4 font-serif text-[1.75rem] md:px-8 md:text-4xl">{copy('Bunları da beğenebilirsiniz', 'You may also like', 'قد يعجبك أيضاً')}</h2>
+          <div className="nrs-grid border-t border-nrs-ink/10">
+            {related.map(item => <ProductCard key={item.id} product={item} />)}
+          </div>
+        </section>}
       </main>
+      {/* Phones: the price and button stay in reach once the main button scrolls away. */}
+      <div className={`fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-nrs-ink/10 bg-nrs-canvas px-4 py-2.5 transition-transform duration-300 lg:hidden ${showBuyBar ? 'translate-y-0' : 'translate-y-full'}`} aria-hidden={!showBuyBar}>
+        <span className="shrink-0 text-[14px] tabular-nums">{product.priceAmount == null ? product.price : priceTag(product.priceAmount)}</span>
+        <button type="button" tabIndex={showBuyBar ? 0 : -1} disabled={!product.inStock || !hasRealVariantInventory} onClick={() => { if (variants.length > 0 && !selectedVariant) addButtonRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); addSelection() }}
+          className="min-h-12 flex-1 border border-nrs-ink bg-nrs-ink text-[12px] uppercase tracking-[0.14em] text-nrs-ivory disabled:opacity-40">{t('addToBag')}</button>
+      </div>
+      <FitFinder open={fitOpen} onClose={() => setFitOpen(false)} productName={product.name} productKey={product.slug || product.id}
+        productImage={product.image} priceLabel={product.priceAmount == null ? product.price : priceTag(product.priceAmount)} availableSizes={sizeLabels}
+        onExactMeasurements={() => { setFitOpen(false); setSizeGuideOpen(true) }}
+        onSelect={(size) => {
+          const variant = variants.find((item) => item.label === size)
+          if (variant?.id) { setSelectedVariantId(variant.id); setOrderError('') }
+          setFitOpen(false)
+        }}
+        onAddToBag={(size) => {
+          const variant = variants.find((item) => item.label === size)
+          if (!variant?.id) return
+          setSelectedVariantId(variant.id)
+          setFitOpen(false)
+          addSelection(false, variant)
+        }} />
       <SizeGuideDialog open={sizeGuideOpen} onClose={closeSizeGuide} productName={product.name} availableSizes={sizeLabels}
         initialMeasurements={bodyMeasurements ?? undefined}
         onApply={(size, measurements) => {
