@@ -19,7 +19,7 @@ import { getRequestLocale } from '@/lib/i18n/request-locale'
 
 const sans = Jost({ subsets: ['latin', 'latin-ext'], variable: '--font-sans', display: 'swap' })
 const serif = Bodoni_Moda({ subsets: ['latin', 'latin-ext'], variable: '--font-serif', display: 'swap', axes: ['opsz'] })
-const arabic = Noto_Naskh_Arabic({ subsets: ['arabic', 'latin'], variable: '--font-arabic', display: 'swap' })
+const arabic = Noto_Naskh_Arabic({ subsets: ['arabic', 'latin'], variable: '--font-arabic', display: 'swap', preload: false })
 const metadataCopy = {
   tr: { title: 'NRS | Çağdaş Kadın Modası', description: 'NRS — modern kadın için tasarlanan rafine siluetler, seçkin dokular ve zamansız tasarımlar.' },
   en: { title: 'NRS | Contemporary Womenswear', description: 'Refined silhouettes, considered textures and timeless contemporary designs by NRS Bequite Luminous.' },

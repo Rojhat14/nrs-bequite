@@ -192,9 +192,13 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
   useEffect(() => {
     const button = addButtonRef.current
     if (!button) return
-    const observer = new IntersectionObserver(([entry]) => setShowBuyBar(!entry.isIntersecting && entry.boundingClientRect.top < 0))
-    observer.observe(button)
-    return () => observer.disconnect()
+    // A scroll listener, because a fast flick can jump clean over the button
+    // without an IntersectionObserver ever seeing it cross the viewport.
+    let frame = 0
+    const update = () => { frame = 0; setShowBuyBar(button.getBoundingClientRect().bottom < 0) }
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(frame) }
   }, [])
 
   function moveImage(direction: -1 | 1) {
@@ -477,12 +481,10 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
                 </div>
 
                 <div className="grid grid-cols-1 gap-8">
-                  <div className="space-y-4">
+                  {product.details.fabric && <div className="space-y-4">
                     <h4 className="font-sans text-[14px] text-nrs-ink">{t('details')}</h4>
-                    <ul className="text-sm font-sans text-nrs-ink/70 space-y-2">
-                      {product.details.fabric && <li>{product.details.fabric}</li>}
-                    </ul>
-                  </div>
+                    <p className="text-sm font-sans text-nrs-ink/70">{product.details.fabric}</p>
+                  </div>}
                   <div className="space-y-4">
                     <h4 className="font-sans text-[14px] text-nrs-ink">{copy('Kalıp ve bakım', 'Fit and care', 'القصة والعناية')}</h4>
                     <p className="text-sm font-sans text-nrs-ink/70 leading-relaxed">{product.details.care || copy('Ürün etiketindeki bakım talimatlarını izlemenizi öneririz.', 'Please follow the care instructions on the garment label.', 'يُرجى اتباع تعليمات العناية الموجودة على ملصق القطعة.')}</p>

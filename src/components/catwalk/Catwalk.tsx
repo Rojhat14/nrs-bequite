@@ -69,6 +69,8 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
   const [playing, setPlaying] = useState(true)
   const [visible, setVisible] = useState(false)
   const [walking, setWalking] = useState(false)
+  // On the home page the models only download as the runway comes near.
+  const [near, setNear] = useState(!embedded)
 
   const rootRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -219,6 +221,8 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
     if (reducedMotion()) setPlaying(false)
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.55 })
     observer.observe(root)
+    const nearObserver = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setNear(true); nearObserver.disconnect() } }, { rootMargin: '400px 0px' })
+    nearObserver.observe(root)
     return () => {
       window.removeEventListener('resize', onResize)
       window.clearTimeout(timer)
@@ -226,6 +230,7 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
       window.clearTimeout(wrapTimer.current)
       window.clearTimeout(walkTimer.current)
       observer.disconnect()
+      nearObserver.disconnect()
     }
   }, [layout])
 
@@ -350,7 +355,7 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
               else goTo(index)
             }}
           >
-            <Image src={item.image} alt="" width={item.width} height={item.height} sizes="(max-width: 820px) 60vw, 34vw" priority={!embedded && index === 0} draggable={false} />
+            {near && <Image src={item.image} alt="" width={item.width} height={item.height} sizes="(max-width: 820px) 60vw, 34vw" priority={!embedded && index === 0} draggable={false} />}
           </button>
           <span className={styles.shadow} aria-hidden="true" />
           {isFront && item.pieces.map((piece, pieceIndex) => <button
