@@ -23,7 +23,7 @@ import { normalizeSizeLabel, sizeButtonLabel, sizeChartRow, type BodyMeasurement
 import { LOOK_PART_LABELS, type LookPartKind } from '@/lib/look-families'
 import SizeGuideDialog from '@/components/SizeGuideDialog'
 import FitFinder, { readFitAnswers } from '@/components/FitFinder'
-import { recommendFit } from '@/lib/fit-estimate'
+import { FIT_FINDER_ENABLED, recommendFit } from '@/lib/fit-estimate'
 import { ProductCard } from '@/components/ProductCard'
 
 export type LookItem = { id: string; slug: string; name: string; kind: LookPartKind; price: string; priceAmount: number | null }
@@ -63,7 +63,7 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
   // Once the shopper has answered, later product pages can suggest a size. Only
   // for sizes this product sells; the answers stay in this browser.
   useEffect(() => {
-    if (fitOpen) return
+    if (fitOpen || !FIT_FINDER_ENABLED) return
     const saved = readFitAnswers()
     const labels = sortActualVariantOptions((product.variants ?? []).filter(variant => variant.size).map(variant => ({ id: variant.id, label: normalizeSizeLabel(variant.size!), size: variant.size!, stock: variant.stock_quantity }))).map(variant => variant.label)
     setFitHint(saved.done ? recommendFit(saved, labels, product.slug || product.id)?.size ?? null : null)
@@ -361,12 +361,12 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <p className="text-[13px] text-nrs-ink/70 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
                     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      {hasSizeChart && <button type="button" onClick={() => setFitOpen(true)}
+                      {hasSizeChart && <button type="button" onClick={() => FIT_FINDER_ENABLED ? setFitOpen(true) : setSizeGuideOpen(true)}
                         className="inline-flex min-h-9 items-center gap-1.5 font-medium text-nrs-ink underline underline-offset-4">
                         <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />
-                        {copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك')}
+                        {FIT_FINDER_ENABLED ? copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك') : copy('Beden tablosu · Bedenimi bul', 'Size chart · Find my size', 'جدول المقاسات · اعرفي مقاسك')}
                       </button>}
-                      {hasSizeChart && <button type="button" onClick={() => setSizeGuideOpen(true)}
+                      {hasSizeChart && FIT_FINDER_ENABLED && <button type="button" onClick={() => setSizeGuideOpen(true)}
                         className="inline-flex min-h-9 items-center text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
                         {copy('Beden tablosu', 'Size chart', 'جدول المقاسات')}
                       </button>}

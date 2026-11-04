@@ -8,6 +8,10 @@ export type FitAnswers = { heightCm: number; weightKg: number; chest: ShapeAnswe
 export type FitArea = 'chest' | 'waist' | 'hips'
 export type FitLevel = 'tight' | 'right' | 'relaxed' | 'loose'
 
+/** Off until the estimate is checked against real customers from the atelier.
+ * While off, shoppers use the size chart and exact-measurement dialog instead. */
+export const FIT_FINDER_ENABLED = false
+
 export const FIT_LIMITS = { height: [145, 195], weight: [40, 130] } as const
 export const FIT_DEFAULTS: FitAnswers = { heightCm: 165, weightKg: 60, chest: 0, waist: 0, hips: 0 }
 

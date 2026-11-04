@@ -9,6 +9,7 @@ import SizeGuideDialog from '@/components/SizeGuideDialog'
 import { useLocale } from '@/context/LocaleContext'
 import type { Product } from '@/data/products'
 import type { CatwalkLookConfig } from '@/lib/catwalk-looks'
+import { FIT_FINDER_ENABLED } from '@/lib/fit-estimate'
 import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOptions } from '@/lib/dress-sizes'
 import { localePrefix } from '@/lib/i18n/messages'
 import { canOptimizeImage } from '@/lib/imageOptimization'
@@ -444,7 +445,7 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
                 : <>
                   <div className={styles.sizeHead}>
                     <span>{copy('Beden', 'Size', 'المقاس')}</span>
-                    {hasChart && <button type="button" onClick={() => setFitFor(product)}><Ruler size={13} strokeWidth={1.5} aria-hidden="true" />{copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك')}</button>}
+                    {hasChart && <button type="button" onClick={() => FIT_FINDER_ENABLED ? setFitFor(product) : setGuideFor(product)}><Ruler size={13} strokeWidth={1.5} aria-hidden="true" />{copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك')}</button>}
                   </div>
                   <div className={styles.sizes} role="group" aria-label={copy('Beden seçin', 'Select a size', 'اختاري المقاس')}>
                     {options.map(option => <button
