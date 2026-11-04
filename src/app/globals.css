@@ -116,6 +116,7 @@ a, button {
 .nrs-wordmark-light { filter: brightness(0) invert(1); }
 
 /* Header laid over the home page photographs. */
-.nrs-nav-clear button, .nrs-nav-clear a { color: #fff; }
-.nrs-nav-clear [aria-current='true'] { background: #fff; color: #141210; }
-.nrs-nav-clear [aria-current='true']:hover { color: #141210; }
+/* White only on the bar itself: the menu and account panels open on a light background. */
+.nrs-nav-clear :is(button, a):not(.nrs-nav-panel *) { color: #fff; }
+.nrs-nav-clear [aria-current='true']:not(.nrs-nav-panel *) { background: #fff; color: #141210; }
+.nrs-nav-clear [aria-current='true']:not(.nrs-nav-panel *):hover { color: #141210; }

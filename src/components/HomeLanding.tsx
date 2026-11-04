@@ -21,6 +21,7 @@ export type HomeSelection = {
   tailoring: Product | null
   coat: Product | null
   coatFrom: number | null
+  coats: Product[]
   lowestPrice: number | null
   looks: CatwalkLook[]
 }
@@ -50,7 +51,7 @@ export default function HomeLanding({ selection }: { selection: HomeSelection })
   const coatDetail = selection.coat?.galleryImages?.[selection.coat.galleryImages.length - 1]?.url ?? selection.coat?.image
 
   return <main className="bg-nrs-canvas text-nrs-ink">
-    <section className="relative h-[100svh] min-h-[560px] overflow-hidden bg-nrs-ink">
+    <section className={`relative min-h-[560px] overflow-hidden bg-nrs-ink ${selection.coatFrom != null ? 'h-[calc(100svh-4rem)]' : 'h-[100svh]'}`}>
       <div className="absolute inset-0 grid grid-cols-1 gap-px md:grid-cols-3">
         {selection.hero.slice(0, 3).map((product, index) => <Link key={product.id} href={href(`/product/${encodeURIComponent(product.slug || product.id)}`)} aria-label={product.name}
           className={`relative block overflow-hidden ${index > 0 ? 'hidden md:block' : ''}`}>
@@ -71,10 +72,10 @@ export default function HomeLanding({ selection }: { selection: HomeSelection })
       </div>
     </section>
 
-    {selection.coatFrom != null && <Link href={href('/category/dis-giyim')} className="flex min-h-12 flex-wrap items-center justify-center gap-x-3 bg-nrs-ink px-4 py-3 text-center text-[13px] tracking-[0.04em] text-nrs-ivory hover:text-nrs-ivory/70">
-      <span>{copy('Kış kabanları', 'Winter coats', 'معاطف الشتاء')}</span>
-      <span className="tabular-nums">{copy(`Başlangıç fiyatı ${priceTag(selection.coatFrom)}`, `From ${priceTag(selection.coatFrom)}`, `تبدأ من ${priceTag(selection.coatFrom)}`)}</span>
-    </Link>}
+    {selection.coatFrom != null && <a href="#kabanlar" className="flex min-h-16 flex-wrap items-center justify-center gap-x-4 bg-nrs-ivory px-4 py-3 text-center text-nrs-ink hover:bg-nrs-warm-white">
+      <span className="font-serif text-[1.35rem] leading-tight md:text-[1.6rem]">{copy('Yeni kış kabanları', 'New winter coats', 'معاطف الشتاء الجديدة')}</span>
+      <span className="text-[14px] tabular-nums tracking-[0.04em] underline underline-offset-4">{copy(`Başlangıç fiyatı ${priceTag(selection.coatFrom)}`, `From ${priceTag(selection.coatFrom)}`, `تبدأ من ${priceTag(selection.coatFrom)}`)}</span>
+    </a>}
 
     <section aria-label={copy('Alışveriş ayrıcalıkları', 'Shopping benefits', 'مزايا التسوق')} className="border-b border-nrs-ink/10">
       <ul className="grid grid-cols-2 lg:grid-cols-4">
@@ -93,6 +94,16 @@ export default function HomeLanding({ selection }: { selection: HomeSelection })
         })}
       </ul>
     </section>
+
+    {selection.coats.length > 0 && <section id="kabanlar" className="scroll-mt-20 py-[clamp(3.5rem,10vh,7rem)]">
+      <div className="mb-7 flex flex-wrap items-baseline justify-between gap-3 px-4 md:px-8">
+        <h2 className={sectionTitle}>{copy('Yeni kış kabanları', 'New winter coats', 'معاطف الشتاء الجديدة')}</h2>
+        <Link href={href('/category/dis-giyim')} className={textLink}>{copy('Dış giyimi gör', 'See outerwear', 'شاهدي الملابس الخارجية')}</Link>
+      </div>
+      <div className="nrs-grid border-t border-nrs-ink/10">
+        {selection.coats.map(product => <ProductCard key={product.id} product={product} />)}
+      </div>
+    </section>}
 
     <section className="px-4 py-[clamp(4rem,12vh,9rem)] text-center">
       <p className="mx-auto max-w-4xl font-serif text-[1.65rem] leading-[1.3] md:text-[2.6rem]">

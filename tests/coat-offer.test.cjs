@@ -29,3 +29,11 @@ test('the homepage announces a price without claiming a discount', () => {
   assert.match(home, /coatFrom/);
   assert.doesNotMatch(home, /indirim|line-through|% ?20|20 ?%|discount/i);
 });
+
+test('white text on the clear navigation bar stays out of the light menu panels', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../src/app/globals.css'), 'utf8');
+  const nav = fs.readFileSync(path.join(__dirname, '../src/components/Navigation.tsx'), 'utf8');
+  assert.doesNotMatch(css, /\.nrs-nav-clear (button|a)\b/);
+  assert.match(css, /\.nrs-nav-clear :is\(button, a\):not\(\.nrs-nav-panel \*\)/);
+  assert.equal(nav.match(/nrs-nav-panel/g).length, 2);
+});

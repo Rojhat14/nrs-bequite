@@ -395,7 +395,7 @@ export default function Navigation({ onNavigate, introFinished, initialMode = 'a
               animate={{ x: 0 }}
               exit={{ x: reduceMotion ? 0 : locale === 'ar' ? '100%' : '-100%' }}
               transition={{ duration: reduceMotion ? 0.1 : 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className={`fixed inset-y-0 z-[121] flex h-[100dvh] w-[92vw] max-w-[480px] flex-col bg-nrs-canvas text-nrs-ink shadow-[16px_0_50px_rgba(20,18,15,0.12)] ${locale === 'ar' ? 'right-0 border-l border-nrs-ink/10' : 'left-0 border-r border-nrs-ink/10'}`}
+              className={`nrs-nav-panel fixed inset-y-0 z-[121] flex h-[100dvh] w-[92vw] max-w-[480px] flex-col bg-nrs-canvas text-nrs-ink shadow-[16px_0_50px_rgba(20,18,15,0.12)] ${locale === 'ar' ? 'right-0 border-l border-nrs-ink/10' : 'left-0 border-r border-nrs-ink/10'}`}
             >
               <div className="flex items-start justify-between border-b border-nrs-ink/10 px-7 pb-5 pt-6 sm:px-9">
                 <div>
@@ -568,7 +568,7 @@ function AccountControl({ user, profile, isAdmin, textClass, translate: t, compa
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: reduceMotion ? 0 : 4, scale: 1 }}
         transition={{ duration: reduceMotion ? 0.1 : 0.18, ease: 'easeOut' }}
-        className="absolute end-0 top-full z-[120] mt-3 w-[min(20rem,calc(100vw-2rem))] overflow-hidden border border-nrs-ink/20 bg-nrs-canvas text-start text-nrs-ink shadow-[0_12px_36px_rgba(25,22,18,0.12)]"
+        className="nrs-nav-panel absolute end-0 top-full z-[120] mt-3 w-[min(20rem,calc(100vw-2rem))] overflow-hidden border border-nrs-ink/20 bg-nrs-canvas text-start text-nrs-ink shadow-[0_12px_36px_rgba(25,22,18,0.12)]"
       >
         <div className="border-b border-nrs-ink/10 px-5 py-5">
           <p className="mb-2 text-[9px] uppercase tracking-[0.24em] text-nrs-ink/60">{t('account')}</p>
