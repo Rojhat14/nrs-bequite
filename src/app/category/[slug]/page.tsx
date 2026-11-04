@@ -87,7 +87,7 @@ export default async function CategoryPage({ params: paramsPromise }: CategoryPa
 
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
-      <CategoryHero title={locale === 'tr' ? banner.title : category.name.toLocaleUpperCase(locale === 'ar' ? 'ar' : 'en-US')} description={isHomeCategory(category)
+      <CategoryHero title={category.name} description={isHomeCategory(category)
         ? locale === 'en' ? 'Personalised embroidered bedding with your name, initials or a design you imagine. Let us create it with you.'
           : locale === 'ar' ? 'مفروشات مطرزة حسب الطلب باسمك أو بأحرفك الأولى أو بنقش تختارينه. دعينا نصممها لك.'
             : 'İsminiz, baş harfleriniz veya hayalinizdeki desenle kişiye özel nakışlı nevresimler. Sizin için tasarlayalım.'
@@ -102,7 +102,7 @@ export default async function CategoryPage({ params: paramsPromise }: CategoryPa
       </CategoryHero>
       {isHomeCategory(category) && <HomeEmbroideryRequest />}
 
-      <section className="max-w-7xl mx-auto px-6 py-24">
+      <section className="pb-16">
         <ProductListing products={products} title={category.name} />
       </section>
     </div>

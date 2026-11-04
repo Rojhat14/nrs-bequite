@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --background: 247 243 238; /* #F7F3EE */
-  --foreground: 5 5 5;      /* #050505 */
-  --muted: 139 129 123;     /* #8B817B */
-  --accent: 184 137 112;    /* #B88970 */
-  --nrs-header-height: 100px;
+  --background: 255 255 255;
+  --foreground: 20 18 16;
+  --muted: 118 112 106;
+  --accent: 20 18 16;
+  --nrs-header-height: 88px;
 }
 
 body {
@@ -15,7 +15,6 @@ body {
   color: rgb(var(--foreground));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.01em;
 }
 
 /* Native form controls follow the storefront's light surfaces. */
@@ -31,11 +30,11 @@ body {
 }
 
 .layout-content {
-  padding-top: var(--nrs-header-height);
+  padding-top: calc(var(--nrs-header-height) + 3rem);
 }
 
 @media (min-width: 768px) {
-  :root { --nrs-header-height: 135px; }
+  :root { --nrs-header-height: 100px; }
 }
 
 html { scroll-padding-top: calc(var(--nrs-header-height) + 1rem); }
@@ -49,22 +48,16 @@ html { scroll-padding-top: calc(var(--nrs-header-height) + 1rem); }
   input, select, textarea, input[class], select[class], textarea[class] { font-size: 16px; }
 }
 
-/* Side thumbnails let the main image use the remaining viewport height. */
-/* Desktop gallery fills the viewport beside the details; phones stack a
-   full-width 2:3 image instead (see ProductDetail). */
-@media (min-width: 1024px) {
-  .product-gallery {
-    height: calc(100svh - max(8rem, var(--nrs-header-height) + 1rem) - 1.5rem);
-  }
-}
 
 h1, h2, h3, h4, .font-serif {
-  font-family: var(--font-serif), 'Playfair Display', serif;
-  letter-spacing: 0.02em;
+  font-family: var(--font-serif), 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: lining-nums;
 }
 
 .font-sans {
-  font-family: var(--font-sans), 'Inter', sans-serif;
+  font-family: var(--font-sans), 'Jost', 'Futura', system-ui, sans-serif;
 }
 
 .font-arabic {
@@ -75,22 +68,22 @@ html[dir='rtl'] { text-align: start; }
 html[dir='rtl'] body { direction: rtl; }
 bdi, [dir='ltr'] { unicode-bidi: isolate; }
 
-/* Luxury interactive transitions */
+/* Quiet, quick interactive transitions */
 a, button {
-  transition-property: all;
+  transition-property: color, background-color, border-color, opacity;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 500ms;
+  transition-duration: 250ms;
 }
 
-/* Custom scrollbar for premium feel */
+/* Slim neutral scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F7F3EE;
+  background: #FFFFFF;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D2B48C;
+  background: #D5CFC5;
 }
 
 /* Entrance motion that starts with the first paint instead of waiting for
@@ -108,3 +101,21 @@ a, button {
 @media (prefers-reduced-motion: reduce) {
   .nrs-fade-in, .nrs-fade-up, .nrs-fade-side, .nrs-settle, .nrs-marquee { animation: none; }
 }
+
+/* Hairline product grid: cells share one thin line, even on a partial last row. */
+.nrs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.nrs-grid > * { box-shadow: 0 0 0 0.5px rgba(20, 18, 16, 0.13); }
+@media (min-width: 768px) { .nrs-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .nrs-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Display type keeps its thin strokes readable at large sizes. */
+.nrs-display { font-variation-settings: "opsz" 24; }
+.nrs-wordmark-light { filter: brightness(0) invert(1); }
+
+/* Header laid over the home page photographs. */
+.nrs-nav-clear button, .nrs-nav-clear a { color: #fff; }
+.nrs-nav-clear [aria-current='true'] { background: #fff; color: #141210; }
+.nrs-nav-clear [aria-current='true']:hover { color: #141210; }

@@ -3,6 +3,7 @@ import HomeLanding, { type HomeSelection } from '@/components/HomeLanding'
 import type { Product } from '@/data/products'
 import { getStorefrontProducts, isJumpsuitProduct } from '@/lib/products'
 import { lookFamilyOf } from '@/lib/look-families'
+import { resolveCatwalkLooks } from '@/lib/catwalk-resolve'
 import { headers } from 'next/headers'
 import { isLocale } from '@/lib/i18n/messages'
 
@@ -42,7 +43,8 @@ const structuredData = {
 // Hand-picked from Meta ad and site data (2026-10-30): the pieces shoppers
 // clicked and added to bag most, led by colourful, complete looks. Slugs, so
 // opaque product IDs do not matter; missing products are skipped.
-const HERO = ['scarlet-drape-pleated-ceket-takim', 'aura-gold-detayli-asimetrik-beyaz-tulum', 'marquise-asimetrik-katli-bordo-bol-paca-pantolon-kopya']
+// Three looks shot in the same set, so the opening reads as one campaign.
+const HERO = ['burgundy-embroidered-kalem-elbise', 'nocturne-kare-yaka-saten-lacivert-tulum', 'sky-asimetrik-dantel-detayli-ikili-takim']
 const FAVOURITES = ['aura-gold-detayli-asimetrik-beyaz-tulum', 'scarlet-drape-pleated-ceket-takim', 'marquise-asimetrik-katli-bordo-bol-paca-pantolon-kopya', 'midnight-isilti-islemeli-asimetrik-abiye-tulum',
   'burgundy-embroidered-kalem-elbise', 'olive-peplum-saten-ikili-takim', 'nocturne-kare-yaka-saten-lacivert-tulum', 'elysian-ekose-tuvit-blazer-takim']
 const CATEGORY_TILES = [
@@ -52,6 +54,8 @@ const CATEGORY_TILES = [
   { key: 'jackets', href: '/category/ceketler-blazerlar', slug: 'monochrome-tweed-broche-ceket-takim' },
 ] as const
 const ATELIER = 'ivory-sculpted-asimetrik-yelek-takim'
+const TAILORING = 'noir-klapa-islemeli-ceket-takim'
+const COAT = 'rosa-ekose-kemerli-yun-kasmir-kaban'
 
 function homeSelection(products: Product[]): HomeSelection {
   const bySlug = new Map(products.map(product => [product.slug || product.id, product]))
@@ -68,6 +72,9 @@ function homeSelection(products: Product[]): HomeSelection {
     favourites,
     underBudget,
     atelier: bySlug.get(ATELIER) ?? null,
+    tailoring: bySlug.get(TAILORING) ?? null,
+    coat: bySlug.get(COAT) ?? null,
+    looks: resolveCatwalkLooks(products),
     lowestPrice: standalone.length ? Math.min(...standalone.map(product => product.priceAmount!)) : null,
   }
 }

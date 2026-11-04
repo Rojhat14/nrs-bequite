@@ -27,7 +27,7 @@ export default async function LegalDocumentPage({ slug, version = LEGAL_DOCUMENT
       : { document, complete: false, sourceVersion: version }
   const displayDocument = localized.document
   return <main className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content" lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-    <article className="mx-auto max-w-3xl px-6 pt-10 sm:pt-12 pb-24 space-y-10">
+    <article className="mx-auto max-w-3xl px-6 pb-24 space-y-10">
       <header className="space-y-5 text-center">
         <p className="text-xs uppercase tracking-[0.2em] text-nrs-ink/60">NRS · {labelsForLocale.legal}</p>
         <h1 className="font-serif text-3xl sm:text-5xl leading-tight">{displayDocument.title}</h1>

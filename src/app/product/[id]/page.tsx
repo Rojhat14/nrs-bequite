@@ -40,8 +40,14 @@ export default async function ProductPage({ params: paramsPromise }: ProductPage
     const match = products.find(item => item.id === member.id)
     return match ? [{ id: match.id, slug: match.slug || match.id, name: match.name, kind: member.kind, price: match.price, priceAmount: match.priceAmount ?? null }] : []
   })) : []
+  // Same category first; separate pieces reuse a set's photo, so skip them.
+  const familyIds = new Set(family?.members.map(member => member.id) ?? [])
+  const related = (await getStorefrontProducts())
+    .filter(item => item.id !== product.id && !familyIds.has(item.id) && item.category === product.category && item.inStock && item.image
+      && (lookFamilyOf(item.id)?.kind ?? 'set') === 'set')
+    .slice(0, 4)
   return <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />
-    <ProductDetail product={product} look={look.length > 1 ? look : undefined} />
+    <ProductDetail product={product} look={look.length > 1 ? look : undefined} related={related} />
   </div>
 }

@@ -1,26 +1,14 @@
 import type { Metadata } from 'next'
-import Catwalk, { type CatwalkLook } from '@/components/catwalk/Catwalk'
-import { CATWALK_LOOKS } from '@/lib/catwalk-looks'
+import Catwalk from '@/components/catwalk/Catwalk'
+import { resolveCatwalkLooks } from '@/lib/catwalk-resolve'
 import { getStorefrontProducts } from '@/lib/products'
 
-// Test page: reachable by direct link only. Not in the menu or the sitemap.
 export const metadata: Metadata = {
-  title: 'Podyum | NRS',
-  robots: { index: false, follow: false },
+  title: 'NRS | Podyum',
+  description: 'NRS görünümleri podyumda: her parçayı görün, bedeninizi seçin, görünümün tamamını sepete ekleyin.',
+  alternates: { canonical: '/podyum' },
 }
 
 export default async function PodyumPage() {
-  const products = await getStorefrontProducts()
-  // Some older products have an ID that differs from their slug, so match both.
-  const byId = new Map(products.flatMap(product => [[product.id, product], ...(product.slug ? [[product.slug, product] as const] : [])] as const))
-  // A piece that is removed or sold out drops out of its look, and a look with
-  // no pieces left drops off the runway, so nobody meets a dead end.
-  const looks: CatwalkLook[] = CATWALK_LOOKS.flatMap(look => {
-    const pieces = look.pieces.flatMap(piece => {
-      const product = byId.get(piece.id)
-      return product?.inStock ? [{ product, x: piece.x, y: piece.y }] : []
-    })
-    return pieces.length ? [{ ...look, pieces }] : []
-  })
-  return <Catwalk looks={looks} />
+  return <main><Catwalk looks={resolveCatwalkLooks(await getStorefrontProducts())} /></main>
 }

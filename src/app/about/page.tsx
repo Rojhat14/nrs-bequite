@@ -15,7 +15,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-nrs-canvas text-nrs-ink layout-content">
 
-      <main className="max-w-7xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32">
+      <main className="max-w-7xl mx-auto px-6 pb-24 md:pb-32">
         {/* SECTION 1: NRS HAKKINDA */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center mb-32">
           <motion.div

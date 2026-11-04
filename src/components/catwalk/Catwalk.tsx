@@ -49,7 +49,7 @@ function sizeOptions(product: Product) {
   return sortActualVariantOptions(isNumericDressProduct(product) ? numericDressVariantOptions(actual) ?? actual : actual)
 }
 
-export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
+export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLook[]; embedded?: boolean }) {
   const { locale, priceTag } = useLocale()
   const copy = (tr: string, en: string, ar: string) => locale === 'ar' ? ar : locale === 'en' ? en : tr
   const prefix = localePrefix(locale)
@@ -108,10 +108,12 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
     const gap = height - (element.offsetTop + modelHeight)
     if (isMobile()) {
       const sheet = panel.offsetHeight
-      return { x: 0.5, y: -(sheet + 12 - gap), s: Math.min((height - sheet - 24) / modelHeight, 1), b: 0, o: 1, z: 30 }
+      const top = embedded ? document.querySelector('header')?.offsetHeight ?? 0 : 0
+      return { x: 0.5, y: -(sheet + 12 - gap), s: Math.min((height - top - sheet - 24) / modelHeight, 1), b: 0, o: 1, z: 30 }
     }
     const width = stage.clientWidth
-    return { x: (width - panel.offsetWidth) / 2 / width, y: gap - 44, s: Math.min((height - 72) / modelHeight, 1.2), b: 0, o: 1, z: 30 }
+    const headerSpace = embedded ? document.querySelector('header')?.offsetHeight ?? 0 : 0
+    return { x: (width - panel.offsetWidth) / 2 / width, y: gap - 44, s: Math.min((height - headerSpace - 72) / modelHeight, 1.2), b: 0, o: 1, z: 30 }
   }
 
   const layout = useCallback(() => {
@@ -181,7 +183,9 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
   function openShop(pieceId?: string) {
     if (!look) return
     lastFocus.current = document.activeElement as HTMLElement | null
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Bring the whole stage on screen; the page's own header stays above it.
+    const stageTop = (rootRef.current?.getBoundingClientRect().top ?? 0) + window.scrollY
+    window.scrollTo({ top: embedded ? stageTop : 0, behavior: 'smooth' })
     shopRef.current = true
     setMessage('')
     setOpenPiece(pieceId ?? look.pieces[0].product.id)
@@ -289,22 +293,22 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
   }
 
   if (!look) {
-    return <main className={styles.empty}>
+    return <section className={styles.empty}>
       <p>{copy('Podyum şu anda hazırlanıyor.', 'The runway is being prepared.', 'يجري إعداد العرض.')}</p>
       <Link href={`${prefix}/collections/yeni-gelenler`} className="underline underline-offset-4">{copy('Yeni gelenleri görün', 'See new arrivals', 'شاهدي الجديد')}</Link>
-    </main>
+    </section>
   }
 
   const priceOf = (product: Product) => product.priceAmount == null ? product.price : priceTag(product.priceAmount)
   const lookTotal = look.pieces.every(piece => piece.product.priceAmount != null)
     ? look.pieces.reduce((sum, piece) => sum + (piece.product.priceAmount ?? 0), 0)
     : null
-  const rootClass = [styles.runway, shop ? styles.isShop : '', !playing || shop || !visible ? styles.isPaused : '', walking ? styles.isWalking : ''].join(' ')
+  const rootClass = [styles.runway, embedded ? styles.embedded : '', shop ? styles.isShop : '', !playing || shop || !visible ? styles.isPaused : '', walking ? styles.isWalking : ''].join(' ')
 
-  return <main ref={rootRef} className={rootClass} aria-label={copy('Podyum', 'Runway', 'عرض الأزياء')}>
+  return <section ref={rootRef} className={rootClass} aria-label={copy('Podyum', 'Runway', 'عرض الأزياء')}>
     <div className={styles.copy}>
       <p className={styles.eyebrow}>{copy('Podyum', 'Runway', 'عرض الأزياء')} · {pad(active + 1)} / {pad(count)}</p>
-      <h1 className={styles.title}>{look.name}</h1>
+      {embedded ? <h2 className={styles.title}>{look.name}</h2> : <h1 className={styles.title}>{look.name}</h1>}
       <p className={styles.sub}>{copy('Görünümler tek tek yürür. Öndeki modele dokunun, her parçayı görün.', 'Looks walk out one at a time. Tap the model in front to see every piece.', 'تظهر الإطلالات واحدة تلو الأخرى. اضغطي على العارضة في الأمام لرؤية كل قطعة.')}</p>
     </div>
 
@@ -344,7 +348,7 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
               else goTo(index)
             }}
           >
-            <Image src={item.image} alt="" width={item.width} height={item.height} sizes="(max-width: 820px) 60vw, 34vw" priority={index === 0} draggable={false} />
+            <Image src={item.image} alt="" width={item.width} height={item.height} sizes="(max-width: 820px) 60vw, 34vw" priority={!embedded && index === 0} draggable={false} />
           </button>
           <span className={styles.shadow} aria-hidden="true" />
           {isFront && item.pieces.map((piece, pieceIndex) => <button
@@ -366,7 +370,7 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
     <p className={styles.hint}>{copy('Parçayı görmek için bir noktaya dokunun', 'Tap a dot to see the piece', 'اضغطي على نقطة لرؤية القطعة')}</p>
 
     <div className={styles.timeline}>
-      <button type="button" className={styles.round} onClick={() => go(-1)} aria-label={copy('Önceki görünüm', 'Previous look', 'الإطلالة السابقة')}><ArrowLeft size={16} strokeWidth={1.4} /></button>
+      <button type="button" className={styles.round} onClick={() => go(-1)} aria-label={copy('Önceki görünüm', 'Previous look', 'الإطلالة السابقة')}><ArrowLeft size={16} strokeWidth={1.4} className="rtl:rotate-180" /></button>
       <div className={styles.segments}>
         {looks.map((item, index) => <button
           key={item.id}
@@ -387,7 +391,7 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
           <span className={styles.segLabel}>{pad(index + 1)}{index === active && <b> {item.name}</b>}</span>
         </button>)}
       </div>
-      <button type="button" className={styles.round} onClick={() => go(1)} aria-label={copy('Sonraki görünüm', 'Next look', 'الإطلالة التالية')}><ArrowRight size={16} strokeWidth={1.4} /></button>
+      <button type="button" className={styles.round} onClick={() => go(1)} aria-label={copy('Sonraki görünüm', 'Next look', 'الإطلالة التالية')}><ArrowRight size={16} strokeWidth={1.4} className="rtl:rotate-180" /></button>
       <button type="button" className={`${styles.round} ${styles.play}`} onClick={() => setPlaying(value => !value)} aria-label={playing ? copy('Duraklat', 'Pause', 'إيقاف') : copy('Oynat', 'Play', 'تشغيل')}>
         {playing ? <Pause size={14} strokeWidth={1.4} /> : <Play size={14} strokeWidth={1.4} />}
       </button>
@@ -477,5 +481,5 @@ export default function Catwalk({ looks }: { looks: CatwalkLook[] }) {
         setGuideFor(null)
       }}
     />}
-  </main>
+  </section>
 }

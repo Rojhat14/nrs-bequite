@@ -35,13 +35,13 @@ export default async function CollectionDetailPage({ params: paramsPromise }: Co
   if (!collection) notFound()
   const presentation = getCollectionPresentation(collection)
   return <div className="min-h-screen bg-nrs-canvas text-nrs-ink">
-    <section className="mx-auto max-w-7xl px-6 pb-24 pt-[calc(var(--nrs-header-height)+2rem)]">
-      <div className="mb-16 text-center">
+    <section className="pb-16 pt-[calc(var(--nrs-header-height)+2.75rem)] md:pt-[calc(var(--nrs-header-height)+4rem)]">
+      <div className="mb-10 px-4 text-center">
         <p className="mb-4 text-[10px] uppercase tracking-[0.28em] text-nrs-ink/60">{t('collectionDetailHeading')}</p>
-        <h1 className="font-serif text-4xl tracking-tight md:text-6xl">{presentation.name}</h1>
+        <h1 className="nrs-display font-serif text-[2.6rem] leading-[1.05] md:text-7xl">{presentation.name}</h1>
         {presentation.description && <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-nrs-ink/55">{presentation.description}</p>}
       </div>
-      {products.length > 0 ? <div className="grid grid-cols-2 gap-x-3 sm:gap-x-8 gap-y-16 md:grid-cols-3 lg:grid-cols-4">
+      {products.length > 0 ? <div className="nrs-grid border-t border-nrs-ink/10">
         {products.map((product) => <ProductCard key={product.id} product={product} />)}
       </div> : <div className="py-24 text-center"><p className="font-serif text-xl italic text-nrs-ink/60">{t('collectionDetailEmpty')}</p></div>}
     </section>

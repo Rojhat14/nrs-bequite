@@ -46,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getRows('products'), getRows('categories'), getRows('collections'),
   ])
   const staticPaths = [
-    '/', '/collections', '/curated', '/about', '/contact',
+    '/', '/podyum', '/collections', '/curated', '/about', '/contact',
     '/size-guide', '/care-guide', '/faq', ...LEGAL_ROUTES,
   ]
   const entries: MetadataRoute.Sitemap = staticPaths.flatMap(path => LOCALES.map(locale => ({
