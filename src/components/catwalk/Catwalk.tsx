@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Pause, Play, Plus, Ruler, X } from 'lucide-react'
+import FitFinder from '@/components/FitFinder'
 import SizeGuideDialog from '@/components/SizeGuideDialog'
 import { useLocale } from '@/context/LocaleContext'
 import type { Product } from '@/data/products'
@@ -63,6 +64,7 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [bodies, setBodies] = useState<Record<string, BodyMeasurements | null>>({})
   const [guideFor, setGuideFor] = useState<Product | null>(null)
+  const [fitFor, setFitFor] = useState<Product | null>(null)
   const [message, setMessage] = useState('')
   const [playing, setPlaying] = useState(true)
   const [visible, setVisible] = useState(false)
@@ -229,7 +231,7 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (guideFor || useCart.getState().isDrawerOpen) return
+      if (guideFor || fitFor || useCart.getState().isDrawerOpen) return
       if (event.key === 'Escape' && shopRef.current) { closeShop(); return }
       if (shopRef.current || !visible) return
       const target = event.target as HTMLElement | null
@@ -437,7 +439,7 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
                 : <>
                   <div className={styles.sizeHead}>
                     <span>{copy('Beden', 'Size', 'المقاس')}</span>
-                    {hasChart && <button type="button" onClick={() => setGuideFor(product)}><Ruler size={13} strokeWidth={1.5} aria-hidden="true" />{copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك')}</button>}
+                    {hasChart && <button type="button" onClick={() => setFitFor(product)}><Ruler size={13} strokeWidth={1.5} aria-hidden="true" />{copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك')}</button>}
                   </div>
                   <div className={styles.sizes} role="group" aria-label={copy('Beden seçin', 'Select a size', 'اختاري المقاس')}>
                     {options.map(option => <button
@@ -468,6 +470,29 @@ export default function Catwalk({ looks, embedded = false }: { looks: CatwalkLoo
       </footer>
     </aside>
 
+    {fitFor && <FitFinder
+      open
+      onClose={() => setFitFor(null)}
+      productName={fitFor.name}
+      productKey={fitFor.slug || fitFor.id}
+      productImage={fitFor.image}
+      priceLabel={priceOf(fitFor)}
+      availableSizes={sizeOptions(fitFor).filter(option => option.size).map(option => option.label)}
+      onExactMeasurements={() => { setGuideFor(fitFor); setFitFor(null) }}
+      onSelect={size => {
+        const option = sizeOptions(fitFor).find(item => item.label === size)
+        if (option) setSelected(current => ({ ...current, [fitFor.id]: option.id }))
+        setFitFor(null)
+      }}
+      onAddToBag={size => {
+        const option = sizeOptions(fitFor).find(item => item.label === size)
+        setFitFor(null)
+        if (!option) return
+        setSelected(current => ({ ...current, [fitFor.id]: option.id }))
+        if (canAdd(fitFor, option.id)) { addPiece(fitFor, option.id); openDrawer() }
+        else setMessage(copy('Bu beden için yeterli stok yok.', 'There is not enough stock in this size.', 'لا يتوفر مخزون كافٍ لهذا المقاس.'))
+      }}
+    />}
     {guideFor && <SizeGuideDialog
       open
       onClose={() => setGuideFor(null)}

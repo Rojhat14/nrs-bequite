@@ -22,6 +22,8 @@ import { isNumericDressProduct, numericDressVariantOptions, sortActualVariantOpt
 import { normalizeSizeLabel, sizeButtonLabel, sizeChartRow, type BodyMeasurements } from '@/lib/size-chart'
 import { LOOK_PART_LABELS, type LookPartKind } from '@/lib/look-families'
 import SizeGuideDialog from '@/components/SizeGuideDialog'
+import FitFinder, { readFitAnswers } from '@/components/FitFinder'
+import { recommendFit } from '@/lib/fit-estimate'
 import { ProductCard } from '@/components/ProductCard'
 
 export type LookItem = { id: string; slug: string; name: string; kind: LookPartKind; price: string; priceAmount: number | null }
@@ -52,10 +54,20 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
   });
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [fitOpen, setFitOpen] = useState(false);
+  const [fitHint, setFitHint] = useState<string | null>(null);
   const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurements | null>(null);
   const closeSizeGuide = useCallback(() => setSizeGuideOpen(false), []);
   const touchStartX = useRef<number | null>(null);
   useEffect(() => { setSelectedVariantId(null); setOrderError(''); setQuantity(1); setBodyMeasurements(null) }, [product.id])
+  // Once the shopper has answered, later product pages can suggest a size. Only
+  // for sizes this product sells; the answers stay in this browser.
+  useEffect(() => {
+    if (fitOpen) return
+    const saved = readFitAnswers()
+    const labels = sortActualVariantOptions((product.variants ?? []).filter(variant => variant.size).map(variant => ({ id: variant.id, label: normalizeSizeLabel(variant.size!), size: variant.size!, stock: variant.stock_quantity }))).map(variant => variant.label)
+    setFitHint(saved.done ? recommendFit(saved, labels, product.slug || product.id)?.size ?? null : null)
+  }, [fitOpen, product.id, product.slug, product.variants])
   // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product page
   useEffect(() => trackViewContent(product), [product.id])
   useEffect(() => {
@@ -114,7 +126,8 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
   const numericDress = isNumericDressProduct(product)
   const madeToOrder = product.fulfillmentMode === 'made_to_order'
   const variants = sortActualVariantOptions(numericDress ? numericDressVariantOptions(actualVariants) ?? actualVariants : actualVariants)
-  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)
+  const currentVariant = variants.find((variant) => variant.id === selectedVariantId)
+  const selectedVariant = currentVariant
   const hasRealVariantInventory = actualVariants.length > 0
   const sizeLabels = variants.filter((variant) => variant.size).map((variant) => variant.label)
   const hasSizeChart = sizeLabels.some((label) => sizeChartRow(label))
@@ -127,7 +140,8 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
   const partLabel = (kind: LookPartKind) => copy(LOOK_PART_LABELS[kind].tr, LOOK_PART_LABELS[kind].en, LOOK_PART_LABELS[kind].ar)
   const measurementSummary = bodyMeasurements ? ([['chest', copy('Göğüs', 'Bust', 'الصدر')], ['waist', copy('Bel', 'Waist', 'الخصر')], ['hips', copy('Basen', 'Hips', 'الورك')]] as const)
     .filter(([field]) => bodyMeasurements[field]).map(([field, label]) => `${label} ${bodyMeasurements[field]}`).join(' · ') : ''
-  function addSelection(checkout = false) {
+  function addSelection(checkout = false, sizeOverride?: typeof currentVariant) {
+    const selectedVariant = sizeOverride ?? currentVariant;
     if (!product.inStock) return;
     if (variants.length > 0 && !selectedVariant) {
       setOrderError(copy('Lütfen bir beden seçin.', 'Please select a size.', 'يُرجى اختيار المقاس.')); return;
@@ -343,10 +357,14 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <p className="text-[13px] text-nrs-ink/70 font-sans">{copy('Beden seçin', 'Select a size', 'اختاري المقاس')}</p>
                     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      {hasSizeChart && <button type="button" onClick={() => setSizeGuideOpen(true)}
+                      {hasSizeChart && <button type="button" onClick={() => setFitOpen(true)}
                         className="inline-flex min-h-9 items-center gap-1.5 font-medium text-nrs-ink underline underline-offset-4">
                         <Ruler size={14} strokeWidth={1.5} aria-hidden="true" />
-                        {copy('Beden tablosu · Bedenimi bul', 'Size chart · Find my size', 'جدول المقاسات · اعرفي مقاسك')}
+                        {copy('Bedenimi bul', 'Find my size', 'اعرفي مقاسك')}
+                      </button>}
+                      {hasSizeChart && <button type="button" onClick={() => setSizeGuideOpen(true)}
+                        className="inline-flex min-h-9 items-center text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
+                        {copy('Beden tablosu', 'Size chart', 'جدول المقاسات')}
                       </button>}
                       {!hasSizeChart && whatsappNumber && <a href={whatsappUrl(copy(`Merhaba, ${product.name} için beden danışmak istiyorum.`, `Hello, I would like size advice for ${product.name}.`, `مرحبًا، أود استشارة بخصوص مقاس ${product.name}.`)) ?? undefined}
                         target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 text-nrs-ink/70 underline underline-offset-4 hover:text-nrs-ink">
@@ -373,6 +391,8 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
                       </button>
                     ))}
                   </div>
+                  {fitHint && !selectedVariant && <button type="button" onClick={() => { const variant = variants.find(item => item.label === fitHint); if (variant?.id) { setSelectedVariantId(variant.id); setOrderError('') } }}
+                    className="block text-start text-[13px] text-nrs-ink/70 hover:text-nrs-ink">{copy('Yanıtlarınıza göre önerimiz:', 'Suggested from your answers:', 'اقتراحنا بحسب إجاباتك:')} <span className="underline underline-offset-4">{sizeButtonLabel(fitHint)}</span></button>}
                   {selectedRow && <p className="text-xs leading-5 text-nrs-ink/65">{copy(
                     `${selectedRow.letter} · ${selectedRow.numeric} beden, vücut ölçüsü göğüs ${selectedRow.chest.join('–')}, bel ${selectedRow.waist.join('–')}, basen ${selectedRow.hips.join('–')} cm olanlara göre dikilir.`,
                     `Size ${selectedRow.letter} · ${selectedRow.numeric} is cut for a ${selectedRow.chest.join('–')} cm bust, ${selectedRow.waist.join('–')} cm waist and ${selectedRow.hips.join('–')} cm hips.`,
@@ -485,6 +505,21 @@ export default function ProductDetail({ product, look, related = [] }: ProductDe
         <button type="button" tabIndex={showBuyBar ? 0 : -1} disabled={!product.inStock || !hasRealVariantInventory} onClick={() => { if (variants.length > 0 && !selectedVariant) addButtonRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); addSelection() }}
           className="min-h-12 flex-1 border border-nrs-ink bg-nrs-ink text-[12px] uppercase tracking-[0.14em] text-nrs-ivory disabled:opacity-40">{t('addToBag')}</button>
       </div>
+      <FitFinder open={fitOpen} onClose={() => setFitOpen(false)} productName={product.name} productKey={product.slug || product.id}
+        productImage={product.image} priceLabel={product.priceAmount == null ? product.price : priceTag(product.priceAmount)} availableSizes={sizeLabels}
+        onExactMeasurements={() => { setFitOpen(false); setSizeGuideOpen(true) }}
+        onSelect={(size) => {
+          const variant = variants.find((item) => item.label === size)
+          if (variant?.id) { setSelectedVariantId(variant.id); setOrderError('') }
+          setFitOpen(false)
+        }}
+        onAddToBag={(size) => {
+          const variant = variants.find((item) => item.label === size)
+          if (!variant?.id) return
+          setSelectedVariantId(variant.id)
+          setFitOpen(false)
+          addSelection(false, variant)
+        }} />
       <SizeGuideDialog open={sizeGuideOpen} onClose={closeSizeGuide} productName={product.name} availableSizes={sizeLabels}
         initialMeasurements={bodyMeasurements ?? undefined}
         onApply={(size, measurements) => {
