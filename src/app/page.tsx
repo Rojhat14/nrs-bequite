@@ -4,6 +4,7 @@ import type { Product } from '@/data/products'
 import { getStorefrontProducts, isJumpsuitProduct } from '@/lib/products'
 import { lookFamilyOf } from '@/lib/look-families'
 import { resolveCatwalkLooks } from '@/lib/catwalk-resolve'
+import { coatStartingPrice } from '@/lib/coat-offer'
 import { headers } from 'next/headers'
 import { isLocale } from '@/lib/i18n/messages'
 
@@ -74,6 +75,7 @@ function homeSelection(products: Product[]): HomeSelection {
     atelier: bySlug.get(ATELIER) ?? null,
     tailoring: bySlug.get(TAILORING) ?? null,
     coat: bySlug.get(COAT) ?? null,
+    coatFrom: coatStartingPrice(products),
     looks: resolveCatwalkLooks(products),
     lowestPrice: standalone.length ? Math.min(...standalone.map(product => product.priceAmount!)) : null,
   }

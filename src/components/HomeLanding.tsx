@@ -20,6 +20,7 @@ export type HomeSelection = {
   atelier: Product | null
   tailoring: Product | null
   coat: Product | null
+  coatFrom: number | null
   lowestPrice: number | null
   looks: CatwalkLook[]
 }
@@ -69,6 +70,11 @@ export default function HomeLanding({ selection }: { selection: HomeSelection })
         {selection.lowestPrice != null && <p className="mt-3 text-[13px] text-white/75">{copy(`${priceTag(selection.lowestPrice)}’den başlayan fiyatlar · Türkiye geneli ücretsiz kargo`, `From ${priceTag(selection.lowestPrice)} · Free shipping within Türkiye`, `أسعار تبدأ من ${priceTag(selection.lowestPrice)} · شحن مجاني داخل تركيا`)}</p>}
       </div>
     </section>
+
+    {selection.coatFrom != null && <Link href={href('/category/dis-giyim')} className="flex min-h-12 flex-wrap items-center justify-center gap-x-3 bg-nrs-ink px-4 py-3 text-center text-[13px] tracking-[0.04em] text-nrs-ivory hover:text-nrs-ivory/70">
+      <span>{copy('Kış kabanları', 'Winter coats', 'معاطف الشتاء')}</span>
+      <span className="tabular-nums">{copy(`Başlangıç fiyatı ${priceTag(selection.coatFrom)}`, `From ${priceTag(selection.coatFrom)}`, `تبدأ من ${priceTag(selection.coatFrom)}`)}</span>
+    </Link>}
 
     <section aria-label={copy('Alışveriş ayrıcalıkları', 'Shopping benefits', 'مزايا التسوق')} className="border-b border-nrs-ink/10">
       <ul className="grid grid-cols-2 lg:grid-cols-4">
@@ -135,6 +141,7 @@ export default function HomeLanding({ selection }: { selection: HomeSelection })
         <p className={eyebrow}>{copy('Dış giyim', 'Outerwear', 'ملابس خارجية')}</p>
         <h2 className={sectionTitle}>{copy('Kışın en yüksek sesi.', 'The loudest voice of winter.', 'أعلى صوت في الشتاء.')}</h2>
         <p className="max-w-md text-[15px] leading-7 text-nrs-ivory/70">{copy('Siyahlar arasında tek bir renk. Ekose kabanlarımız uzun, kemerli ve çekingen değil.', 'A single colour among the blacks. Our check coats are long, belted and far from shy.', 'لون واحد بين الأسود. معاطفنا المربعة طويلة ومزودة بحزام وبعيدة عن الخجل.')}</p>
+        {selection.coatFrom != null && <p className="text-[15px] tabular-nums">{copy(`Başlangıç fiyatı ${priceTag(selection.coatFrom)}`, `From ${priceTag(selection.coatFrom)}`, `تبدأ من ${priceTag(selection.coatFrom)}`)}</p>}
         <Link href={href('/category/dis-giyim')} className={textLink}>{copy('Dış giyimi gör', 'See outerwear', 'شاهدي الملابس الخارجية')}</Link>
       </div>
       <div className="relative aspect-[4/5] overflow-hidden md:order-2 md:aspect-auto">
